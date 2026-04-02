@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elite Snipers - Web Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            overflow: hidden;
+            color: #fff;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        #usernameModal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            border: 3px solid #00ff00;
+            padding: 30px;
+            text-align: center;
+            pointer-events: all;
+            z-index: 1000;
+        }
+
+        #usernameModal h1 {
+            color: #00ff00;
+            margin-bottom: 10px;
+            font-size: 32px;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        #usernameModal p {
+            color: #aaa;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        #usernameInput {
+            background: #111;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px 20px;
+            font-size: 18px;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 20px;
+            width: 250px;
+        }
+
+        #teamSelect {
+            margin-bottom: 20px;
+        }
+
+        .teamBtn {
+            background: #111;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px 30px;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: all 0.2s;
+        }
+
+        .teamBtn:hover {
+            background: #00ff00;
+            color: #000;
+        }
+
+        .teamBtn.red {
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+
+        .teamBtn.red:hover {
+            background: #ff0000;
+            color: #fff;
+        }
+
+        .teamBtn.blue {
+            border-color: #0088ff;
+            color: #0088ff;
+        }
+
+        .teamBtn.blue:hover {
+            background: #0088ff;
+            color: #fff;
+        }
+
+        #startBtn {
+            background: #111;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 12px 40px;
+            font-size: 18px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #startBtn:hover {
+            background: #00ff00;
+            color: #000;
+        }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+        }
+
+        .stat {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            padding: 8px 15px;
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #00ff00;
+        }
+
+        #scoreboard {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            padding: 15px;
+            min-width: 200px;
+        }
+
+        .score-team {
+            margin-bottom: 15px;
+        }
+
+        .score-team h3 {
+            margin-bottom: 5px;
+            font-size: 18px;
+        }
+
+        .score-team.red h3 {
+            color: #ff0000;
+        }
+
+        .score-team.blue h3 {
+            color: #0088ff;
+        }
+
+        .player-score {
+            font-size: 14px;
+            color: #aaa;
+            margin-left: 10px;
+        }
+
+        #abilities {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+        }
+
+        .ability {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            padding: 15px;
+            width: 80px;
+            text-align: center;
+            pointer-events: all;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ability:hover {
+            background: rgba(0, 255, 0, 0.2);
+            transform: scale(1.05);
+        }
+
+        .ability.cooldown {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .ability-key {
+            color: #00ff00;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .ability-name {
+            color: #aaa;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .ability-cd {
+            color: #ff0000;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            padding: 15px;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        #controls h4 {
+            color: #00ff00;
+            margin-bottom: 8px;
+        }
+
+        #controls div {
+            margin-bottom: 3px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #killFeed {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+        }
+
+        .kill-message {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            padding: 8px 15px;
+            margin-bottom: 5px;
+            text-align: center;
+            animation: fadeIn 0.3s, fadeOut 0.5s 2.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        .minimap {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 150px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui">
+        <div id="usernameModal">
+            <h1>ELITE SNIPERS</h1>
+            <p>A tribute to the legendary Warcraft III custom game</p>
+            <input type="text" id="usernameInput" placeholder="Enter your name..." maxlength="12">
+            <div id="teamSelect">
+                <button class="teamBtn red" data-team="red">RED TEAM</button>
+                <button class="teamBtn blue" data-team="blue">BLUE TEAM</button>
+            </div>
+            <button id="startBtn">START GAME</button>
+        </div>
+
+        <div id="hud" class="hidden">
+            <div class="stat" id="playerName">Player</div>
+            <div class="stat" id="killCount">Kills: 0</div>
+            <div class="stat" id="deathCount">Deaths: 0</div>
+            <div class="stat" id="healthStat">HP: 100</div>
+        </div>
+
+        <div id="scoreboard" class="hidden">
+            <div class="score-team red">
+                <h3>RED TEAM</h3>
+                <div id="redScores"></div>
+            </div>
+            <div class="score-team blue">
+                <h3>BLUE TEAM</h3>
+                <div id="blueScores"></div>
+            </div>
+        </div>
+
+        <div id="abilities" class="hidden">
+            <div class="ability" data-ability="windwalk">
+                <div class="ability-key">Q</div>
+                <div class="ability-name">Windwalk</div>
+                <div class="ability-cd"></div>
+            </div>
+            <div class="ability" data-ability="farsight">
+                <div class="ability-key">E</div>
+                <div class="ability-name">Far Sight</div>
+                <div class="ability-cd"></div>
+            </div>
+        </div>
+
+        <div id="controls" class="hidden">
+            <h4>CONTROLS</h4>
+            <div>Left Click - Move/Attack</div>
+            <div>Right Click - Drag Camera</div>
+            <div>WASD/Edge - Scroll Map</div>
+            <div>Space - Center Camera</div>
+            <div>Q - Windwalk</div>
+            <div>E - Far Sight</div>
+        </div>
+
+        <div id="killFeed"></div>
+
+        <canvas class="minimap hidden" id="minimap"></canvas>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+        }
+    }
+    </script>
+    <script type="module" src="game.js"></script>
+</body>
+</html>
