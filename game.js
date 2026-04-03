@@ -34,7 +34,7 @@ const gameState = {
     gold: 0,
     // Debug
     debug: {
-        godMode: false,
+        godMode: true,
         showFPS: true,
     }
 };
