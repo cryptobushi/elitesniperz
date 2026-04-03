@@ -223,17 +223,24 @@ const createMap = () => {
     scene.add(blueSpawn);
 };
 
-// Fog of War — subtle darkening outside vision, enemies hidden outside radius
+// Fog of War System
 class FogOfWar {
     constructor() {
-        this.visionRadius = 25;
-        this.farsightRadius = 45;
-        this.visionSources = [];
-
+        this.fogTexture = null;
+        this.fogMesh = null;
         this.canvas = document.createElement('canvas');
         this.canvas.width = 256;
         this.canvas.height = 256;
         this.ctx = this.canvas.getContext('2d');
+        this.visibilityMap = new Array(256 * 256).fill(0);
+
+        // Explored areas (partially revealed, darker fog)
+        this.exploredCanvas = document.createElement('canvas');
+        this.exploredCanvas.width = 256;
+        this.exploredCanvas.height = 256;
+        this.exploredCtx = this.exploredCanvas.getContext('2d');
+        this.exploredCtx.fillStyle = 'rgba(0, 0, 0, 1)';
+        this.exploredCtx.fillRect(0, 0, 256, 256);
 
         this.init();
     }
@@ -246,69 +253,133 @@ class FogOfWar {
         const fogMaterial = new THREE.MeshBasicMaterial({
             map: this.fogTexture,
             transparent: true,
-            opacity: 0.45,
+            opacity: 0.95,
             color: 0x000000,
             depthWrite: false,
-            depthTest: false,
+            depthTest: false, // Don't test depth so it renders on top
             blending: THREE.NormalBlending
         });
 
         const fogGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE);
         this.fogMesh = new THREE.Mesh(fogGeometry, fogMaterial);
         this.fogMesh.rotation.x = -Math.PI / 2;
-        this.fogMesh.position.y = 10;
-        this.fogMesh.renderOrder = 10000;
+        this.fogMesh.position.y = 10; // Raised high above terrain to cover everything
+        this.fogMesh.renderOrder = 10000; // Render last
         scene.add(this.fogMesh);
     }
 
     update(player, allUnits, farsightPositions = []) {
-        this.visionSources = [];
+        const revealRadius = 25; // Much larger vision radius (in world units)
+        const farsightRadius = 45; // Far sight radius
 
-        // Collect vision sources
+        // Mark explored areas (areas you've been to before)
         if (player && player.health > 0) {
-            this.visionSources.push({ x: player.position.x, z: player.position.z, r: this.visionRadius });
+            this.markExplored(player.position.x, player.position.z, revealRadius);
         }
         allUnits.forEach(unit => {
             if (unit.team === gameState.team && unit.health > 0 && unit !== player) {
-                this.visionSources.push({ x: unit.position.x, z: unit.position.z, r: this.visionRadius });
+                this.markExplored(unit.position.x, unit.position.z, revealRadius);
             }
         });
-        farsightPositions.forEach(pos => {
-            this.visionSources.push({ x: pos.x, z: pos.z, r: this.farsightRadius });
+
+        // Start with explored fog (dark gray, not pure black)
+        this.ctx.drawImage(this.exploredCanvas, 0, 0);
+
+        // Clear fog around player (current vision)
+        if (player && player.health > 0) {
+            this.revealArea(player.position.x, player.position.z, revealRadius);
+        }
+
+        // Clear fog around ALL teammates (including bots)
+        allUnits.forEach(unit => {
+            if (unit.team === gameState.team && unit.health > 0 && unit !== player) {
+                this.revealArea(unit.position.x, unit.position.z, revealRadius);
+            }
         });
 
-        // Draw fog: fill dark, then punch transparent holes for vision
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 1)';
-        this.ctx.fillRect(0, 0, 256, 256);
-
-        this.ctx.globalCompositeOperation = 'destination-out';
-        for (const src of this.visionSources) {
-            const x = ((src.x + MAP_SIZE / 2) / MAP_SIZE) * 256;
-            const y = ((src.z + MAP_SIZE / 2) / MAP_SIZE) * 256;
-            const rPx = (src.r / MAP_SIZE) * 256;
-
-            const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, rPx);
-            gradient.addColorStop(0, 'rgba(255,255,255,1)');
-            gradient.addColorStop(0.75, 'rgba(255,255,255,0.8)');
-            gradient.addColorStop(1, 'rgba(255,255,255,0)');
-
-            this.ctx.fillStyle = gradient;
-            this.ctx.beginPath();
-            this.ctx.arc(x, y, rPx, 0, Math.PI * 2);
-            this.ctx.fill();
-        }
-        this.ctx.globalCompositeOperation = 'source-over';
+        // Clear fog around farsight areas
+        farsightPositions.forEach(pos => {
+            this.revealArea(pos.x, pos.z, farsightRadius);
+        });
 
         this.fogTexture.needsUpdate = true;
     }
 
-    isVisible(worldX, worldZ) {
-        for (const src of this.visionSources) {
-            const dx = worldX - src.x;
-            const dz = worldZ - src.z;
-            if (dx * dx + dz * dz <= src.r * src.r) return true;
+    markExplored(worldX, worldZ, radius) {
+        // Mark this area as explored (permanently partially revealed)
+        const x = ((worldX + MAP_SIZE / 2) / MAP_SIZE) * 256;
+        const y = ((worldZ + MAP_SIZE / 2) / MAP_SIZE) * 256;
+        const radiusPixels = (radius / MAP_SIZE) * 256;
+
+        this.exploredCtx.globalCompositeOperation = 'destination-out';
+
+        // Create semi-transparent explored area
+        const gradient = this.exploredCtx.createRadialGradient(x, y, 0, x, y, radiusPixels);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.5)'); // 50% revealed
+        gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.4)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+        this.exploredCtx.fillStyle = gradient;
+        this.exploredCtx.beginPath();
+        this.exploredCtx.arc(x, y, radiusPixels, 0, Math.PI * 2);
+        this.exploredCtx.fill();
+
+        this.exploredCtx.globalCompositeOperation = 'source-over';
+    }
+
+    revealArea(worldX, worldZ, radius) {
+        // Convert world coordinates to texture coordinates
+        const x = ((worldX + MAP_SIZE / 2) / MAP_SIZE) * 256;
+        const y = ((worldZ + MAP_SIZE / 2) / MAP_SIZE) * 256;
+        const radiusPixels = (radius / MAP_SIZE) * 256;
+
+        // Create irregular vision area (not a perfect circle)
+        this.ctx.globalCompositeOperation = 'destination-out';
+
+        // Draw multiple overlapping circles with slight offsets to create irregular shape
+        const numCircles = 8;
+        for (let i = 0; i < numCircles; i++) {
+            const angle = (i / numCircles) * Math.PI * 2;
+            const offset = radiusPixels * 0.15; // 15% variation
+            const offsetX = Math.cos(angle) * offset * (Math.random() * 0.5 + 0.5);
+            const offsetY = Math.sin(angle) * offset * (Math.random() * 0.5 + 0.5);
+
+            const gradient = this.ctx.createRadialGradient(
+                x + offsetX, y + offsetY, 0,
+                x + offsetX, y + offsetY, radiusPixels * 0.9
+            );
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+            gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.25)');
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+            this.ctx.fillStyle = gradient;
+            this.ctx.beginPath();
+            this.ctx.arc(x + offsetX, y + offsetY, radiusPixels * 0.9, 0, Math.PI * 2);
+            this.ctx.fill();
         }
-        return false;
+
+        // Main central clear area
+        const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, radiusPixels);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.9)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+        this.ctx.fillStyle = gradient;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, radiusPixels, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.globalCompositeOperation = 'source-over';
+    }
+
+    isVisible(worldX, worldZ) {
+        const x = Math.floor(((worldX + MAP_SIZE / 2) / MAP_SIZE) * 256);
+        const y = Math.floor(((worldZ + MAP_SIZE / 2) / MAP_SIZE) * 256);
+
+        if (x < 0 || x >= 256 || y < 0 || y >= 256) return false;
+
+        const imageData = this.ctx.getImageData(x, y, 1, 1);
+        return imageData.data[3] < 200; // Check alpha channel
     }
 }
 
