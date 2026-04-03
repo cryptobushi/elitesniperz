@@ -2226,13 +2226,16 @@ function checkShopProximity() {
     }
 }
 
-// Candle builder — green for kills/streaks, red for death
+// Candle builder — INSANE green candles for dopamine
 function makeCandle(bodyH, color, glowColor, wickH = 0) {
-    const topWick = wickH || Math.round(bodyH * 0.4);
+    const topWick = wickH || Math.round(bodyH * 0.5);
+    const bodyW = Math.min(12 + bodyH / 2, 50);
+    const glowSize = Math.min(bodyH, 80);
+    const megaGlow = Math.min(bodyH * 2, 150);
     return `
-        <div style="width:4px;height:${topWick}px;background:linear-gradient(to top,${color},${glowColor});box-shadow:0 0 8px ${glowColor};margin-bottom:2px;animation:candleGrow 0.2s ease-out forwards;transform-origin:bottom;"></div>
-        <div style="width:${Math.min(8 + bodyH/3, 28)}px;height:${bodyH}px;background:linear-gradient(to top,${color},${glowColor});box-shadow:0 0 ${Math.min(bodyH/2,20)}px ${glowColor},0 0 ${Math.min(bodyH,40)}px ${color}66;border-radius:2px;animation:candleGrow 0.15s ease-out forwards;transform-origin:bottom;"></div>
-        <div style="width:4px;height:${Math.round(topWick*0.4)}px;background:${color};margin-top:2px;"></div>
+        <div style="width:6px;height:${topWick}px;background:linear-gradient(to top,${color},${glowColor});box-shadow:0 0 12px ${glowColor},0 0 24px ${glowColor}88;margin-bottom:2px;animation:candleGrow 0.15s cubic-bezier(0,0.8,0.2,1.2) forwards;transform-origin:bottom;"></div>
+        <div style="width:${bodyW}px;height:${bodyH}px;background:linear-gradient(to top,${color},${glowColor});box-shadow:0 0 ${glowSize}px ${glowColor},0 0 ${megaGlow}px ${color}88,inset 0 0 ${bodyH/3}px ${glowColor}44;border-radius:3px;animation:candleGrow 0.12s cubic-bezier(0,0.8,0.2,1.3) forwards;transform-origin:bottom;position:relative;"></div>
+        <div style="width:6px;height:${Math.round(topWick*0.3)}px;background:${color};box-shadow:0 0 6px ${color};margin-top:2px;"></div>
     `;
 }
 
@@ -2240,41 +2243,62 @@ function makeCandle(bodyH, color, glowColor, wickH = 0) {
 function showStreakPopup(text, color) {
     const popup = document.getElementById('streakPopup');
 
-    // Map streak text to candle size
     const candleSizes = {
-        'FIRST BLOOD': 30,
-        'KILLING SPREE': 40,
-        'RAMPAGE': 55,
-        'DOMINATING': 70,
-        'UNSTOPPABLE': 90,
-        'GODLIKE': 120,
-        'DOUBLE KILL': 35,
-        'MULTI KILL': 45,
-        'MEGA KILL': 60,
-        'ULTRA KILL': 80,
-        'MONSTER KILL': 100,
-        'LUDICROUS KILL': 130,
-        'SHIELD BLOCKED!': 25,
+        'FIRST BLOOD': 50,
+        'KILLING SPREE': 70,
+        'RAMPAGE': 100,
+        'DOMINATING': 140,
+        'UNSTOPPABLE': 180,
+        'GODLIKE': 240,
+        'DOUBLE KILL': 60,
+        'MULTI KILL': 80,
+        'MEGA KILL': 110,
+        'ULTRA KILL': 150,
+        'MONSTER KILL': 200,
+        'LUDICROUS KILL': 260,
+        'SHIELD BLOCKED!': 30,
     };
-    const bodyH = candleSizes[text] || 30;
+    const bodyH = candleSizes[text] || 50;
+    const intensity = Math.min(bodyH / 260, 1);
+
+    // Screen flash
+    const flash = document.createElement('div');
+    flash.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:${color};opacity:${0.15 + intensity * 0.2};pointer-events:none;z-index:9998;animation:screenFlash 0.4s ease-out forwards;`;
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 500);
+
+    // Sparkle particles around the candle
+    let particles = '';
+    const numParticles = Math.floor(5 + intensity * 15);
+    for (let i = 0; i < numParticles; i++) {
+        const angle = (i / numParticles) * 360;
+        const dist = 20 + Math.random() * 60;
+        const size = 2 + Math.random() * 4;
+        const delay = Math.random() * 0.3;
+        particles += `<div style="position:absolute;width:${size}px;height:${size}px;background:#00ff44;border-radius:50%;box-shadow:0 0 ${size*3}px #00ff44;opacity:0;animation:sparkle 0.8s ${delay}s ease-out forwards;left:50%;top:50%;transform:translate(-50%,-50%) rotate(${angle}deg) translateY(-${dist}px);"></div>`;
+    }
 
     const el = document.createElement('div');
-    el.style.cssText = `display:flex;flex-direction:column;align-items:center;pointer-events:none;animation:goldFloat 2s ease-out forwards;`;
+    el.style.cssText = `display:flex;flex-direction:column;align-items:center;pointer-events:none;animation:goldFloat 2.5s ease-out forwards;position:relative;`;
     el.innerHTML = `
-        ${makeCandle(bodyH, '#00aa00', '#00ff44')}
+        <div style="position:relative;">
+            ${particles}
+            ${makeCandle(bodyH, '#00aa00', '#00ff44')}
+        </div>
         <div style="
             color:${color};
-            font-size:clamp(1.2rem, 5vw, 2.5rem);
+            font-size:clamp(1.5rem, 7vw, 3.5rem);
             font-weight:900;
-            text-shadow:0 0 20px ${color}, 0 0 40px ${color}88;
-            letter-spacing:0.1em;
-            margin-top:6px;
-            animation:streakIn 0.15s ease-out forwards;
+            text-shadow:0 0 30px ${color}, 0 0 60px ${color}aa, 0 0 100px ${color}44;
+            letter-spacing:0.15em;
+            margin-top:8px;
+            animation:streakIn 0.12s cubic-bezier(0,0.8,0.2,1.3) forwards;
         ">${text}</div>
+        <div style="color:#00ff4488;font-size:${1 + intensity}rem;margin-top:2px;">📈${'🟢'.repeat(Math.ceil(intensity * 5))}</div>
     `;
     popup.innerHTML = '';
     popup.appendChild(el);
-    setTimeout(() => el.remove(), 2500);
+    setTimeout(() => el.remove(), 3000);
 }
 
 function addKillFeed(killer, victim) {
