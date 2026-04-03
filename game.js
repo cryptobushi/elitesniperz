@@ -2752,9 +2752,10 @@ function updateMinimap() {
         const x = (p.position.x + MAP_SIZE / 2) * scale;
         const y = (p.position.z + MAP_SIZE / 2) * scale;
 
-        minimapCtx.fillStyle = p.team === 'red' ? '#ff0000' : '#0088ff';
+        const isMe = p === gameState.player;
+        minimapCtx.fillStyle = isMe ? '#ffd700' : (p.team === 'red' ? '#ff0000' : '#0088ff');
         minimapCtx.beginPath();
-        minimapCtx.arc(x, y, 3, 0, Math.PI * 2);
+        minimapCtx.arc(x, y, isMe ? 4 : 3, 0, Math.PI * 2);
         minimapCtx.fill();
     });
 }
