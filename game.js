@@ -2458,32 +2458,64 @@ document.addEventListener('wheel', (e) => {
     gameState.cameraOffset.z = newZoom;
 }, { passive: false });
 
-// Create visual move marker
+// WC3-style move marker — three spinning arrows converging on point
 function createMoveMarker(position) {
-    const markerGeometry = new THREE.RingGeometry(0.3, 0.5, 16);
-    const markerMaterial = new THREE.MeshBasicMaterial({
-        color: 0x00ff00,
-        transparent: true,
-        opacity: 0.8
-    });
-    const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-    marker.rotation.x = -Math.PI / 2;
-    marker.position.copy(position);
-    marker.position.y = 0.1;
-    scene.add(marker);
+    const markerGroup = new THREE.Group();
+    const terrainY = Math.sin(position.x * 0.1) * Math.cos(position.z * 0.1) * 2 + 0.6;
 
-    // Animate and remove
-    let opacity = 0.8;
-    const fadeInterval = setInterval(() => {
-        opacity -= 0.05;
-        markerMaterial.opacity = opacity;
+    // Three arrow shapes, 120 degrees apart
+    for (let i = 0; i < 3; i++) {
+        const arrow = new THREE.Group();
+
+        // Arrow body — thin triangle pointing inward
+        const shape = new THREE.Shape();
+        shape.moveTo(0, 0);
+        shape.lineTo(-0.12, 0.5);
+        shape.lineTo(0.12, 0.5);
+        shape.closePath();
+        const geo = new THREE.ShapeGeometry(shape);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0x00ff00,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        arrow.add(mesh);
+
+        // Position arrow pointing inward from outside
+        const angle = (i / 3) * Math.PI * 2;
+        arrow.position.set(Math.cos(angle) * 0.8, 0, Math.sin(angle) * 0.8);
+        arrow.rotation.x = -Math.PI / 2;
+        arrow.rotation.z = -angle + Math.PI;
+
+        markerGroup.add(arrow);
+    }
+
+    markerGroup.position.set(position.x, terrainY, position.z);
+    scene.add(markerGroup);
+
+    // Animate: spin + shrink + fade
+    let time = 0;
+    let opacity = 0.9;
+    const animInterval = setInterval(() => {
+        time += 0.05;
+        markerGroup.rotation.y += 0.15;
+        const scale = Math.max(0.3, 1 - time * 0.5);
+        markerGroup.scale.set(scale, scale, scale);
+        opacity -= 0.03;
+        markerGroup.children.forEach(arrow => {
+            arrow.children[0].material.opacity = opacity;
+        });
         if (opacity <= 0) {
-            clearInterval(fadeInterval);
-            scene.remove(marker);
-            markerGeometry.dispose();
-            markerMaterial.dispose();
+            clearInterval(animInterval);
+            scene.remove(markerGroup);
+            markerGroup.children.forEach(arrow => {
+                arrow.children[0].geometry.dispose();
+                arrow.children[0].material.dispose();
+            });
         }
-    }, 30);
+    }, 25);
 }
 
 // Game Setup
@@ -2740,6 +2772,8 @@ function animate() {
     // Spacebar to center on player
     if (gameState.keys[' '] && gameState.player) {
         gameState.cameraTarget.copy(gameState.player.position);
+        smoothCamX = gameState.player.position.x;
+        smoothCamZ = gameState.player.position.z;
     }
 
     // Clamp camera to map bounds
@@ -2984,13 +3018,8 @@ function smoothCameraUpdate() {
 }
 smoothCameraUpdate();
 
-// Keep smoothCam in sync when game moves camera (space to center, etc)
+// Desktop — smoothCam follows cameraTarget directly (no lerp layer needed)
 if (!isMobile) {
-    // On desktop, smoothCam just follows cameraTarget directly
-    setInterval(() => {
-        smoothCamX = gameState.cameraTarget.x;
-        smoothCamZ = gameState.cameraTarget.z;
-    }, 100);
 
     // Ability buttons work via tap on the HTML elements (pointer-events: all)
     document.querySelectorAll('.ability').forEach(btn => {
