@@ -1626,8 +1626,8 @@ class Player {
                     hasSpecial = true;
                 }
 
-                // Only play headshot if no special announcement
-                if (!hasSpecial) audioManager.play('headshot');
+                // Play headshot on every kill — it's short and punchy
+                audioManager.play('headshot');
 
             } else {
                 // Bot got a kill — play special sounds globally (no popup text)
