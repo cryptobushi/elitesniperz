@@ -2002,7 +2002,7 @@ class Player {
         this.targetPosition = null;
         this.attackWalkTarget = null;
 
-        // Respawn after 5 seconds (matches death screen duration)
+        // Auto-respawn after 5 seconds
         setTimeout(() => this.respawn(), 5000);
     }
 
@@ -2117,13 +2117,26 @@ function updateGoldUI() {
     if (el) el.textContent = `Gold: ${gameState.gold}`;
 }
 
+let _goldPopupEl = null;
 function showGoldPopup(text) {
+    // Remove previous gold popup
+    if (_goldPopupEl) _goldPopupEl.remove();
+
     const popup = document.getElementById('streakPopup');
     const el = document.createElement('div');
-    el.style.cssText = 'color:#ffd700;font-size:1.2rem;font-weight:bold;text-shadow:0 0 10px #ffd70066;animation:streakIn 0.1s ease-out,streakOut 0.3s 0.8s forwards;opacity:0;';
+    el.style.cssText = `
+        color: #ffd700;
+        font-size: clamp(1.5rem, 5vw, 2.5rem);
+        font-weight: 900;
+        text-shadow: 0 0 20px #ffd700, 0 0 40px #ff880088, 0 2px 4px rgba(0,0,0,0.8);
+        letter-spacing: 0.05em;
+        animation: goldSlam 0.15s ease-out forwards, goldFloat 1.2s 0.15s ease-out forwards;
+        pointer-events: none;
+    `;
     el.textContent = text;
     popup.appendChild(el);
-    setTimeout(() => el.remove(), 1200);
+    _goldPopupEl = el;
+    setTimeout(() => { if (_goldPopupEl === el) { el.remove(); _goldPopupEl = null; } }, 1500);
 }
 
 function updateShopUI() {
@@ -2933,11 +2946,10 @@ preGameRender();
 // Respawn button — immediate respawn
 document.getElementById('respawnBtn')?.addEventListener('click', () => {
     document.getElementById('deathPopup').classList.add('hidden');
-    if (gameState.player && gameState.player.health <= 0) {
-        gameState.player.respawn();
+    // Just snap camera to spawn — auto-respawn handles the actual respawn
+    if (gameState.player) {
         const spawnX = gameState.player.team === 'red' ? -70 : 70;
         const spawnZ = gameState.player.team === 'red' ? -70 : 70;
-        // Respawn camera handled by cameraTarget
         gameState.cameraTarget.x = spawnX;
         gameState.cameraTarget.z = spawnZ;
     }
