@@ -2455,6 +2455,12 @@ document.addEventListener('mousedown', (e) => {
         const intersectPoint = new THREE.Vector3();
         raycaster.ray.intersectPlane(plane, intersectPoint);
 
+        // Sanity check — ignore clicks that resolve too far from player (bad raycast)
+        if (gameState.player) {
+            const dist = intersectPoint.distanceTo(gameState.player.position);
+            if (dist > 80) return; // Ignore wild raycasts
+        }
+
         // Set move target
         gameState.moveTarget = intersectPoint.clone();
         gameState.targetLock = null; // Clear attack target
