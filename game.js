@@ -2945,9 +2945,11 @@ if (isMobile) {
     // Camera velocity for flick momentum
     let camVelX = 0, camVelZ = 0;
 
+    const _shopOpen = () => !document.getElementById('shopPanel').classList.contains('hidden');
+
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        // Kill any existing momentum on new touch
+        if (_shopOpen()) return;
         camVelX = 0;
         camVelZ = 0;
 
@@ -2968,6 +2970,7 @@ if (isMobile) {
 
     canvas.addEventListener('touchmove', (e) => {
         e.preventDefault();
+        if (_shopOpen()) return;
 
         if (e.touches.length >= 1) {
             const t = e.touches[0];
@@ -3012,6 +3015,7 @@ if (isMobile) {
 
     canvas.addEventListener('touchend', (e) => {
         e.preventDefault();
+        if (_shopOpen()) { touches.clear(); return; }
 
         for (const t of e.changedTouches) {
             const data = touches.get(t.identifier);
