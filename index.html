@@ -253,6 +253,64 @@
         @keyframes streakPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
         @keyframes streakOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-20px); } }
 
+        /* === DARK SOULS DEATH SCREEN === */
+        #deathPopup {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 900;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #deathOverlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #000;
+            opacity: 0;
+            animation: deathFadeIn 1.5s ease-in forwards;
+        }
+        @keyframes deathFadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 0.7; }
+        }
+        #deathText {
+            position: relative;
+            z-index: 1;
+            font-family: 'Times New Roman', 'Georgia', serif;
+            font-size: clamp(2.5rem, 10vw, 5rem);
+            font-weight: 400;
+            letter-spacing: 0.3em;
+            color: #8b0000;
+            text-shadow: 0 0 40px rgba(139,0,0,0.5), 0 0 80px rgba(139,0,0,0.2);
+            opacity: 0;
+            animation: deathTextIn 2.5s ease-in-out 0.8s forwards;
+        }
+        @keyframes deathTextIn {
+            0% { opacity: 0; letter-spacing: 0.6em; }
+            40% { opacity: 1; letter-spacing: 0.3em; }
+            80% { opacity: 1; }
+            100% { opacity: 0.9; }
+        }
+        #deathKiller {
+            position: relative;
+            z-index: 1;
+            font-family: 'Times New Roman', 'Georgia', serif;
+            font-size: clamp(0.8rem, 3vw, 1.2rem);
+            color: #666;
+            letter-spacing: 0.15em;
+            opacity: 0;
+            animation: deathSubIn 1s ease-in 2.5s forwards;
+            margin-top: 1rem;
+        }
+        @keyframes deathSubIn {
+            0% { opacity: 0; }
+            100% { opacity: 0.7; }
+        }
+
         .hidden { display: none !important; }
 
         /* === KILL FEED — above minimap, bottom left === */
@@ -394,24 +452,10 @@
             ">Clear Kill Feed</button>
         </div>
 
-        <div id="deathPopup" class="hidden" style="
-            position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-            background:rgba(0,0,0,0.9); border:2px solid #ff0000; border-radius:10px;
-            padding:1.5rem 2rem; text-align:center; pointer-events:all; z-index:900;
-            min-width:200px;
-        ">
-            <div id="deathPopupClose" style="
-                position:absolute; top:8px; right:12px; color:#666; font-size:1.2rem;
-                cursor:pointer; -webkit-tap-highlight-color:transparent;
-            ">✕</div>
-            <div style="color:#ff0000; font-size:1.5rem; font-weight:bold; text-shadow:0 0 10px #ff000066;">YOU DIED</div>
-            <div id="deathKiller" style="color:#888; font-size:0.8rem; margin:0.5rem 0;"></div>
-            <button id="respawnBtn" style="
-                background:#ff0000; border:none; color:#fff; padding:0.6rem 1.5rem;
-                font-size:0.9rem; font-family:'Courier New',monospace; font-weight:bold;
-                border-radius:5px; cursor:pointer; margin-top:0.5rem;
-                -webkit-tap-highlight-color:transparent;
-            ">RETURN TO SPAWN</button>
+        <div id="deathPopup" class="hidden">
+            <div id="deathOverlay"></div>
+            <div id="deathText">YOU DIED</div>
+            <div id="deathKiller"></div>
         </div>
         <canvas class="minimap hidden" id="minimap"></canvas>
     </div>

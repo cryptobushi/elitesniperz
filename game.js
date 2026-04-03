@@ -1634,11 +1634,17 @@ class Player {
             gameState.moveTarget = null;
             gameState.targetLock = null;
 
-            // Show death popup
+            // Dark Souls death screen
             const popup = document.getElementById('deathPopup');
-            const killerName = killer ? killer.username : 'Unknown';
-            document.getElementById('deathKiller').textContent = `Killed by ${killerName}`;
+            const killerName = killer ? killer.username : 'the darkness';
+            document.getElementById('deathKiller').textContent = `Felled by ${killerName}`;
+            // Reset animations by removing and re-adding
+            popup.classList.add('hidden');
+            void popup.offsetHeight; // Force reflow
             popup.classList.remove('hidden');
+
+            // Auto-dismiss after animation
+            setTimeout(() => popup.classList.add('hidden'), 5000);
         }
 
         // Hide during death
@@ -1648,8 +1654,8 @@ class Player {
         this.targetPosition = null;
         this.attackWalkTarget = null;
 
-        // Respawn after 3 seconds
-        setTimeout(() => this.respawn(), 3000);
+        // Respawn after 5 seconds (matches death screen duration)
+        setTimeout(() => this.respawn(), 5000);
     }
 
     respawn() {
@@ -2326,22 +2332,7 @@ function preGameRender() {
 // Start pre-game rendering immediately
 preGameRender();
 
-// Death popup handlers
-document.getElementById('respawnBtn')?.addEventListener('click', () => {
-    document.getElementById('deathPopup').classList.add('hidden');
-    // Teleport camera to spawn point
-    if (gameState.player) {
-        const spawnX = gameState.player.team === 'red' ? -70 : 70;
-        const spawnZ = gameState.player.team === 'red' ? -70 : 70;
-        smoothCamX = spawnX;
-        smoothCamZ = spawnZ;
-        gameState.cameraTarget.x = spawnX;
-        gameState.cameraTarget.z = spawnZ;
-    }
-});
-document.getElementById('deathPopupClose')?.addEventListener('click', () => {
-    document.getElementById('deathPopup').classList.add('hidden');
-});
+// Death screen auto-centers camera on respawn
 
 // Also hide popup on respawn
 const _origRespawn = Player.prototype.respawn;
