@@ -632,7 +632,7 @@ class FogOfWar {
     }
 
     update(player, allUnits, farsightPositions = []) {
-        const revealRadius = 25;
+        const revealRadius = 25; // Much larger vision radius (in world units)
         const farsightRadius = 45; // Far sight radius
 
         // Mark explored areas (areas you've been to before)
@@ -756,7 +756,7 @@ class Player {
         this.speed = 8;
         this.normalSpeed = 8;
         this.windwalkSpeed = 14;
-        this.shootRange = 25;
+        this.shootRange = 50;
         this.damage = 25;
         this.isWindwalking = false;
         this.farsightActive = false;
@@ -773,7 +773,7 @@ class Player {
         this.hasShield = false;
         this.goldMultiplier = 1.0;
         this.baseSpeed = 8;
-        this.baseRange = 25;
+        this.baseRange = 50;
         this.baseCooldown = 1.0;
 
         this.createMesh(team);
@@ -1042,7 +1042,7 @@ class Player {
             });
             const halo = new THREE.Mesh(haloGeometry, haloMaterial);
             halo.rotation.x = -Math.PI / 2;
-            halo.position.y = -0.3;
+            halo.position.y = -0.55;
             halo.raycast = () => {};
             group.add(halo);
         }
@@ -1113,12 +1113,6 @@ class Player {
             this.shootCooldown -= deltaTime;
         }
 
-        // Reveal timer (shooting reveals you)
-        if (this._revealTimer > 0) {
-            this._revealTimer -= deltaTime;
-            if (this._revealTimer <= 0) this._revealed = false;
-        }
-
         // Auto-shoot at enemies in FOV
         if (this.health > 0 && this.shootCooldown <= 0) {
             this.autoShootAtEnemies();
@@ -1131,47 +1125,68 @@ class Player {
     }
 
     autoShootAtEnemies() {
+        // Get all potential enemies
         const allEnemies = [...gameState.bots];
         if (gameState.player && gameState.player.team !== this.team) {
             allEnemies.push(gameState.player);
         }
 
-        // Find closest enemy in range
-        let closest = null;
-        let closestDist = Infinity;
+        const visibleEnemies = allEnemies.filter(enemy =>
+            enemy &&
+            enemy !== this &&
+            enemy.team !== this.team &&
+            enemy.health > 0 &&
+            enemy.mesh.visible // This checks fog of war visibility
+        );
 
-        for (const enemy of allEnemies) {
-            if (!enemy || enemy === this || enemy.team === this.team) continue;
-            if (enemy.health <= 0 || !enemy.mesh.visible) continue;
+        if (visibleEnemies.length === 0) return;
 
-            const dist = this.position.distanceTo(enemy.position);
-            if (dist < closestDist && dist <= this.shootRange) {
-                closest = enemy;
-                closestDist = dist;
+        // Get weapon direction (where the rifle is pointing)
+        const weaponDirection = new THREE.Vector3(0, 0, 1);
+        if (this.weapon) {
+            weaponDirection.applyQuaternion(this.weapon.getWorldQuaternion(new THREE.Quaternion()));
+        }
+
+        const fovAngle = 30; // 30 degree FOV cone
+        const fovRadians = (fovAngle * Math.PI) / 180;
+
+        // Check each enemy
+        for (let enemy of visibleEnemies) {
+            const toEnemy = new THREE.Vector3().subVectors(enemy.position, this.position).normalize();
+            const angle = weaponDirection.angleTo(toEnemy);
+
+            // If enemy is within FOV cone and in range
+            if (angle < fovRadians) {
+                const distance = this.position.distanceTo(enemy.position);
+                if (distance <= this.shootRange) {
+                    // Double-check fog of war visibility
+                    const enemyVisible = fogOfWar.isVisible(enemy.position.x, enemy.position.z);
+                    if (!enemyVisible) {
+                        continue; // Skip this enemy, can't see them in fog
+                    }
+
+                    // Check line of sight (walls blocking)
+                    const raycaster = new THREE.Raycaster();
+                    raycaster.set(this.position, toEnemy);
+                    const intersects = raycaster.intersectObjects(gameState._wallObjects || [], false);
+
+                    let blocked = false;
+                    for (let intersect of intersects) {
+                        if (intersect.distance < distance) {
+                            blocked = true;
+                            break;
+                        }
+                    }
+
+                    if (!blocked) {
+                        // SHOOT!
+                        this.shoot(enemy);
+                        this.shootCooldown = this.shootCooldownTime;
+                        return; // Only shoot one target per check
+                    }
+                }
             }
         }
-
-        if (!closest) return;
-
-        // FOV cone check — must be facing the enemy
-        const forward = new THREE.Vector3(0, 0, 1);
-        if (this.mesh) forward.applyQuaternion(this.mesh.quaternion);
-        const toEnemy = new THREE.Vector3().subVectors(closest.position, this.position).normalize();
-        const angle = forward.angleTo(toEnemy);
-        if (angle > Math.PI / 4) return; // 45 degree FOV half-angle (90 degree cone)
-
-        // Wall LOS check
-        const dir = toEnemy;
-        const ray = new THREE.Raycaster();
-        ray.set(this.position, dir);
-        const hits = ray.intersectObjects(gameState._wallObjects || [], false);
-        for (const hit of hits) {
-            if (hit.distance < closestDist) return; // Blocked by wall
-        }
-
-        // Face and shoot
-        this.shoot(closest);
-        this.shootCooldown = this.shootCooldownTime;
     }
 
     botAI(deltaTime) {
@@ -1457,12 +1472,11 @@ class Player {
             return true;
         }
 
-        // Check walls — raycast only against wall objects
+        // Check walls — raycast only against wall objects (not sprites)
         const dir = new THREE.Vector3().subVectors(newPos, this.position);
         if (dir.length() < 0.001) return false;
         dir.normalize();
 
-        // Collect wall objects (cached per frame for performance)
         if (!gameState._wallObjects || gameState._wallCacheFrame !== gameState._frame) {
             gameState._wallObjects = [];
             scene.traverse(child => {
@@ -1518,11 +1532,6 @@ class Player {
 
         // HUGE CANNON-LIKE SHOOTING ANIMATION
         this.createShootingEffect(target.position);
-
-        // Reveal shooter to the target (and their team) for 2 seconds
-        if (!this._revealTimer) this._revealTimer = 0;
-        this._revealed = true;
-        this._revealTimer = 2.0;
 
         // Instant kill (classic snipers!) — goes through takeDamage for shield check
         target.takeDamage(999, this);
@@ -1956,7 +1965,6 @@ class Player {
         // Reset kill streak when dying
         if (this.isPlayer) {
             gameState.killStreak = 0;
-            resetStreakChart();
             gameState.gold = this.gold;
             updateGoldUI();
         }
@@ -2117,75 +2125,26 @@ function updateGoldUI() {
     if (el) el.textContent = `Gold: ${gameState.gold}`;
 }
 
+let _goldPopupEl = null;
 function showGoldPopup(text) {
-    // Each kill = new candle. Open/close based on previous candle to create real chart movement
-    const prev = _chartCandles.length > 0 ? _chartCandles[_chartCandles.length - 1] : null;
-    const open = prev ? prev.close : 20;
-    const close = open + 5 + Math.random() * 15; // Always green — price goes up
-    const high = close + Math.random() * 10;
-    const low = open - Math.random() * 5;
-    _chartCandles.push({ open, close, high, low });
-    if (_chartCandles.length > 25) _chartCandles.shift();
+    // Remove previous gold popup
+    if (_goldPopupEl) _goldPopupEl.remove();
 
-    _renderChart(text);
-}
-
-function _renderChart(label, labelColor) {
     const popup = document.getElementById('streakPopup');
-    popup.innerHTML = '';
-    const clr = labelColor || '#00ff44';
-
-    const chart = document.createElement('div');
-    const chartW = Math.min(350, _chartCandles.length * 16);
-    chart.style.cssText = `display:flex;align-items:flex-end;pointer-events:none;height:200px;width:${chartW}px;`;
-
-    // Find min/max for scaling
-    let minVal = Infinity, maxVal = -Infinity;
-    _chartCandles.forEach(c => {
-        minVal = Math.min(minVal, c.low);
-        maxVal = Math.max(maxVal, c.high);
-    });
-    const range = maxVal - minVal || 1;
-    const scale = 180 / range;
-    const w = Math.max(4, Math.min(12, (chartW - _chartCandles.length * 2) / _chartCandles.length));
-
-    _chartCandles.forEach((c, i) => {
-        const isNew = i === _chartCandles.length - 1;
-        const isGreen = c.close >= c.open;
-        const bodyTop = Math.max(c.open, c.close);
-        const bodyBot = Math.min(c.open, c.close);
-        const bodyH = Math.max(2, (bodyTop - bodyBot) * scale);
-        const wickTopH = Math.max(0, (c.high - bodyTop) * scale);
-        const wickBotH = Math.max(0, (bodyBot - c.low) * scale);
-        const bottom = (c.low - minVal) * scale;
-        const totalH = wickBotH + bodyH + wickTopH;
-        const color = isGreen ? '#00cc44' : '#cc2222';
-        const glowColor = isGreen ? '#00ff44' : '#ff2222';
-        const glow = isNew ? `box-shadow:0 0 12px ${glowColor},0 0 24px ${glowColor}66;` : '';
-        const anim = isNew ? 'animation:candleGrow 0.12s cubic-bezier(0,0.8,0.2,1.3) forwards;transform-origin:bottom;' : '';
-
-        chart.innerHTML += `<div style="flex-shrink:0;width:${w + 2}px;display:flex;flex-direction:column;align-items:center;align-self:flex-end;margin-bottom:${bottom}px;">
-            <div style="width:2px;height:${wickTopH}px;background:${color};"></div>
-            <div style="width:${w}px;height:${bodyH}px;background:${color};border-radius:1px;${glow}${anim}"></div>
-            <div style="width:2px;height:${wickBotH}px;background:${color};"></div>
-        </div>`;
-    });
-
-    popup.appendChild(chart);
-
-    if (label) {
-        const el = document.createElement('div');
-        el.style.cssText = `color:${clr};font-size:clamp(0.9rem,3vw,1.4rem);font-weight:900;text-shadow:0 0 15px ${clr};pointer-events:none;margin-top:4px;font-family:monospace;`;
-        el.textContent = label;
-        popup.appendChild(el);
-    }
-
-    clearTimeout(popup._fadeTimer);
-    popup._fadeTimer = setTimeout(() => {
-        popup.style.transition = 'opacity 1s';
-        popup.style.opacity = '0';
-        setTimeout(() => { popup.style.transition = ''; popup.style.opacity = '1'; popup.innerHTML = ''; }, 1000);
-    }, 2500);
+    const el = document.createElement('div');
+    el.style.cssText = `
+        color: #ffd700;
+        font-size: clamp(1.5rem, 5vw, 2.5rem);
+        font-weight: 900;
+        text-shadow: 0 0 20px #ffd700, 0 0 40px #ff880088, 0 2px 4px rgba(0,0,0,0.8);
+        letter-spacing: 0.05em;
+        animation: goldSlam 0.15s ease-out forwards, goldFloat 1.2s 0.15s ease-out forwards;
+        pointer-events: none;
+    `;
+    el.textContent = text;
+    popup.appendChild(el);
+    _goldPopupEl = el;
+    setTimeout(() => { if (_goldPopupEl === el) { el.remove(); _goldPopupEl = null; } }, 1500);
 }
 
 function updateShopUI() {
@@ -2248,49 +2207,16 @@ function checkShopProximity() {
     }
 }
 
-// Candle builder — INSANE green candles for dopamine
-function makeCandle(bodyH, color, glowColor, wickH = 0) {
-    const topWick = wickH || Math.round(bodyH * 0.5);
-    const bodyW = Math.min(12 + bodyH / 2, 50);
-    const glowSize = Math.min(bodyH, 80);
-    const megaGlow = Math.min(bodyH * 2, 150);
-    return `
-        <div style="width:6px;height:${topWick}px;background:linear-gradient(to top,${color},${glowColor});box-shadow:0 0 12px ${glowColor},0 0 24px ${glowColor}88;margin-bottom:2px;animation:candleGrow 0.15s cubic-bezier(0,0.8,0.2,1.2) forwards;transform-origin:bottom;"></div>
-        <div style="width:${bodyW}px;height:${bodyH}px;background:linear-gradient(to top,${color},${glowColor});box-shadow:0 0 ${glowSize}px ${glowColor},0 0 ${megaGlow}px ${color}88,inset 0 0 ${bodyH/3}px ${glowColor}44;border-radius:3px;animation:candleGrow 0.12s cubic-bezier(0,0.8,0.2,1.3) forwards;transform-origin:bottom;position:relative;"></div>
-        <div style="width:6px;height:${Math.round(topWick*0.3)}px;background:${color};box-shadow:0 0 6px ${color};margin-top:2px;"></div>
-    `;
-}
-
 // UI Functions
-// Persistent chart that builds up with each kill
-let _chartCandles = [];
-let _chartContainer = null;
-
 function showStreakPopup(text, color) {
-    // Streaks add a BIG candle — massive pump
-    const prev = _chartCandles.length > 0 ? _chartCandles[_chartCandles.length - 1] : null;
-    const open = prev ? prev.close : 20;
-    const boost = { 'FIRST BLOOD':20, 'KILLING SPREE':30, 'RAMPAGE':45, 'DOMINATING':60, 'UNSTOPPABLE':80, 'GODLIKE':120,
-        'DOUBLE KILL':25, 'MULTI KILL':35, 'MEGA KILL':50, 'ULTRA KILL':70, 'MONSTER KILL':90, 'LUDICROUS KILL':130 };
-    const close = open + (boost[text] || 20) + Math.random() * 10;
-    const high = close + Math.random() * 15;
-    const low = open - Math.random() * 3;
-    _chartCandles.push({ open, close, high, low });
-    if (_chartCandles.length > 25) _chartCandles.shift();
-
-    // Screen flash
-    const flash = document.createElement('div');
-    flash.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:${color};opacity:0.2;pointer-events:none;z-index:9998;animation:screenFlash 0.3s ease-out forwards;`;
-    document.body.appendChild(flash);
-    setTimeout(() => flash.remove(), 400);
-
-    _renderChart(text, color);
-}
-
-function resetStreakChart() {
-    _chartCandles = [];
     const popup = document.getElementById('streakPopup');
-    if (popup) popup.innerHTML = '';
+    const el = document.createElement('div');
+    el.className = 'streak-text';
+    el.style.color = color;
+    el.textContent = text;
+    popup.innerHTML = '';
+    popup.appendChild(el);
+    setTimeout(() => el.remove(), 2200);
 }
 
 function addKillFeed(killer, victim) {
@@ -2934,6 +2860,8 @@ function animate() {
         raycaster.ray.intersectPlane(plane, intersectPoint);
 
         gameState.player.weapon.lookAt(intersectPoint);
+
+        // Gold display updated via earnGold()
     }
 
     // Update bots
@@ -2969,39 +2897,19 @@ function animate() {
 
     fogOfWar.update(gameState.player, allUnits, farsightPositions);
 
-    // Hide enemy units — brief linger after leaving vision, then gone
-    const VISION_LINGER = 1.0; // seconds to stay visible after leaving fog
+    // Hide enemy units — instant hide when leaving vision, no linger
     gameState.bots.forEach(bot => {
         if (bot.team !== gameState.team) {
-            const inFog = fogOfWar.isVisible(bot.position.x, bot.position.z);
-            const revealed = bot._revealed; // from shooting
-
-            if (inFog || revealed) {
-                bot._visTimer = VISION_LINGER;
-                // Instant appear — no fade in
-                if (!bot.mesh.visible || bot._fading) {
-                    bot._fading = false;
-                    bot.mesh.traverse(child => {
-                        if (child.material && !child.isSprite) {
-                            child.material.transparent = false;
-                            child.material.opacity = 1;
-                        }
-                    });
-                }
-                bot.mesh.visible = bot.health > 0;
-            } else if ((bot._visTimer || 0) > 0) {
-                bot._visTimer -= deltaTime;
-                bot._fading = true;
-                const fade = Math.max(0, bot._visTimer / VISION_LINGER);
-                bot.mesh.visible = fade > 0 && bot.health > 0;
+            const inVision = fogOfWar.isVisible(bot.position.x, bot.position.z);
+            bot.mesh.visible = inVision && bot.health > 0;
+            // Reset opacity when visible
+            if (bot.mesh.visible) {
                 bot.mesh.traverse(child => {
                     if (child.material && !child.isSprite) {
-                        child.material.transparent = true;
-                        child.material.opacity = fade;
+                        child.material.transparent = false;
+                        child.material.opacity = 1;
                     }
                 });
-            } else {
-                bot.mesh.visible = false;
             }
         } else {
             bot.mesh.visible = bot.health > 0;
