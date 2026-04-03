@@ -37,12 +37,11 @@ const gameState = {
     }
 };
 
-// Audio System — pre-loaded pool for instant overlapping playback
+// Audio System — single preloaded instances, simple and light
 class AudioManager {
     constructor() {
-        this.pools = {};
+        this.sounds = {};
         this.enabled = true;
-        this.POOL_SIZE = 4;
 
         const soundFiles = {
             firstBlood: 'sounds/first_blood.wav',
@@ -61,30 +60,23 @@ class AudioManager {
             sniperFire: 'sounds/sniper_fire_h3_1.wav'
         };
 
-        const volumes = { sniperFire: 0.5 };
-
         for (const [name, path] of Object.entries(soundFiles)) {
-            const vol = volumes[name] || 0.7;
-            const pool = [];
-            for (let i = 0; i < this.POOL_SIZE; i++) {
-                const a = new Audio(path);
-                a.preload = 'auto';
-                a.volume = vol;
-                pool.push(a);
-            }
-            this.pools[name] = { instances: pool, index: 0 };
+            const a = new Audio(path);
+            a.preload = 'auto';
+            a.volume = (name === 'sniperFire') ? 0.5 : 0.7;
+            this.sounds[name] = a;
         }
     }
 
     init() {}
 
     play(soundName) {
-        if (!this.enabled || !this.pools[soundName]) return;
-        const pool = this.pools[soundName];
-        const audio = pool.instances[pool.index];
-        pool.index = (pool.index + 1) % this.POOL_SIZE;
-        audio.currentTime = 0;
-        audio.play().catch(() => {});
+        if (!this.enabled || !this.sounds[soundName]) return;
+        const a = this.sounds[soundName];
+        // If still playing, let it finish — don't interrupt
+        if (!a.paused && a.currentTime > 0) return;
+        a.currentTime = 0;
+        a.play().catch(() => {});
     }
 }
 
