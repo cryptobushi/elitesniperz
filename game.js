@@ -497,202 +497,224 @@ class Player {
 
     createMesh(team) {
         const group = new THREE.Group();
+        const robeColor = team === 'red' ? 0x881111 : 0x112288;
+        const robeDark = team === 'red' ? 0x550a0a : 0x0a1155;
+        const robeLight = team === 'red' ? 0xaa3333 : 0x3344aa;
+        const cloth = new THREE.MeshStandardMaterial({ color: robeColor, roughness: 0.9 });
+        const clothDark = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.9 });
 
-        // Legs
-        const legGeometry = new THREE.CapsuleGeometry(0.15, 0.8, 6, 8);
-        const legMaterial = new THREE.MeshStandardMaterial({
-            color: 0x2a2a2a,
-            roughness: 0.8
-        });
-        const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-        leftLeg.position.set(-0.15, -0.2, 0);
-        leftLeg.castShadow = true;
+        // === LEGS — thin sticks under the robe ===
+        const legGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.7, 4);
+        const legMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+
+        const leftLeg = new THREE.Mesh(legGeo, legMat);
+        leftLeg.position.set(-0.12, -0.15, 0);
         group.add(leftLeg);
 
-        const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-        rightLeg.position.set(0.15, -0.2, 0);
-        rightLeg.castShadow = true;
+        const rightLeg = new THREE.Mesh(legGeo, legMat);
+        rightLeg.position.set(0.12, -0.15, 0);
         group.add(rightLeg);
 
         this.leftLeg = leftLeg;
         this.rightLeg = rightLeg;
 
-        // Torso
-        const torsoGeometry = new THREE.BoxGeometry(0.6, 0.8, 0.4);
-        const torsoMaterial = new THREE.MeshStandardMaterial({
-            color: team === 'red' ? 0xcc0000 : 0x0066cc,
-            roughness: 0.7,
-            metalness: 0.2
-        });
-        const torso = new THREE.Mesh(torsoGeometry, torsoMaterial);
-        torso.position.y = 0.4;
-        torso.castShadow = true;
-        torso.receiveShadow = true;
-        group.add(torso);
+        // === POINTY SHOES ===
+        const shoeGeo = new THREE.ConeGeometry(0.1, 0.35, 4);
+        const shoeMat = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.8 });
 
-        // Head
-        const headGeometry = new THREE.SphereGeometry(0.25, 12, 12);
-        const headMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffdbac,
-            roughness: 0.9
-        });
-        const head = new THREE.Mesh(headGeometry, headMaterial);
-        head.position.y = 1;
-        head.castShadow = true;
-        group.add(head);
+        const leftShoe = new THREE.Mesh(shoeGeo, shoeMat);
+        leftShoe.position.set(-0.12, -0.55, 0.08);
+        leftShoe.rotation.x = -Math.PI / 2;
+        group.add(leftShoe);
+        this.leftShoe = leftShoe;
 
-        // Helmet/Hat
-        const helmetGeometry = new THREE.CylinderGeometry(0.28, 0.28, 0.15, 12);
-        const helmetMaterial = new THREE.MeshStandardMaterial({
-            color: team === 'red' ? 0x880000 : 0x003388,
-            roughness: 0.6
-        });
-        const helmet = new THREE.Mesh(helmetGeometry, helmetMaterial);
-        helmet.position.y = 1.15;
-        helmet.castShadow = true;
-        group.add(helmet);
+        const rightShoe = new THREE.Mesh(shoeGeo, shoeMat);
+        rightShoe.position.set(0.12, -0.55, 0.08);
+        rightShoe.rotation.x = -Math.PI / 2;
+        group.add(rightShoe);
+        this.rightShoe = rightShoe;
 
-        // Arms
-        const armGeometry = new THREE.CapsuleGeometry(0.12, 0.6, 6, 8);
-        const armMaterial = new THREE.MeshStandardMaterial({
-            color: team === 'red' ? 0xaa0000 : 0x0055aa,
-            roughness: 0.7
+        // === ROBE BODY — tapered cylinder, wider at bottom ===
+        const robeGeo = new THREE.CylinderGeometry(0.2, 0.45, 1.1, 6);
+        const robe = new THREE.Mesh(robeGeo, cloth);
+        robe.position.y = 0.45;
+        robe.castShadow = true;
+        group.add(robe);
+
+        // Belt/sash
+        const beltGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.08, 6);
+        const beltMat = new THREE.MeshStandardMaterial({ color: 0x886622, roughness: 0.7, metalness: 0.3 });
+        const belt = new THREE.Mesh(beltGeo, beltMat);
+        belt.position.y = 0.2;
+        group.add(belt);
+
+        // === WIZARD HAT — the head IS the hat ===
+        const hatGroup = new THREE.Group();
+        hatGroup.position.y = 1.05;
+
+        // Hat brim — wide flat disc
+        const brimGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.06, 8);
+        const hatMat = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.8 });
+        const brim = new THREE.Mesh(brimGeo, hatMat);
+        brim.position.y = -0.05;
+        hatGroup.add(brim);
+
+        // Hat cone — tall and pointy, slightly bent
+        const coneGeo = new THREE.ConeGeometry(0.28, 0.9, 6);
+        const cone = new THREE.Mesh(coneGeo, hatMat);
+        cone.position.y = 0.4;
+        cone.rotation.z = 0.15; // Slight tilt
+        cone.castShadow = true;
+        hatGroup.add(cone);
+
+        // Hat tip — small sphere at the bent tip
+        const tipGeo = new THREE.SphereGeometry(0.06, 4, 4);
+        const tipMat = new THREE.MeshStandardMaterial({ color: robeLight, roughness: 0.7, emissive: robeLight, emissiveIntensity: 0.3 });
+        const tip = new THREE.Mesh(tipGeo, tipMat);
+        tip.position.set(0.12, 0.85, 0);
+        hatGroup.add(tip);
+
+        // Hat band — stripe of accent color
+        const bandGeo = new THREE.CylinderGeometry(0.29, 0.29, 0.06, 6);
+        const bandMat = new THREE.MeshStandardMaterial({ color: 0x886622, roughness: 0.6, metalness: 0.4 });
+        const band = new THREE.Mesh(bandGeo, bandMat);
+        band.position.y = 0.02;
+        hatGroup.add(band);
+
+        // Visor glow — two small glowing eyes under the brim
+        const eyeGeo = new THREE.SphereGeometry(0.04, 4, 4);
+        const eyeMat = new THREE.MeshBasicMaterial({
+            color: team === 'red' ? 0xff4444 : 0x4488ff,
         });
-        const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-        leftArm.position.set(-0.4, 0.3, 0);
-        leftArm.rotation.z = 0.3;
+        const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+        leftEye.position.set(-0.1, -0.12, 0.2);
+        hatGroup.add(leftEye);
+        const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+        rightEye.position.set(0.1, -0.12, 0.2);
+        hatGroup.add(rightEye);
+
+        group.add(hatGroup);
+
+        // === ARMS — thin sleeves ===
+        const armGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.6, 4);
+
+        const leftArm = new THREE.Mesh(armGeo, cloth);
+        leftArm.position.set(-0.32, 0.5, 0);
+        leftArm.rotation.z = 0.4;
         leftArm.castShadow = true;
         group.add(leftArm);
+        this.leftArm = leftArm;
 
-        const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-        rightArm.position.set(0.4, 0.3, 0);
-        rightArm.rotation.z = -0.3;
+        const rightArm = new THREE.Mesh(armGeo, cloth);
+        rightArm.position.set(0.32, 0.5, 0);
+        rightArm.rotation.z = -0.4;
         rightArm.castShadow = true;
         group.add(rightArm);
+        this.rightArm = rightArm;
 
-        // SNIPER RIFLE
+        // === OVERSIZED SNIPER RIFLE ===
         const rifleGroup = new THREE.Group();
+        const gunMetal = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3, metalness: 0.9 });
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2a10, roughness: 0.8, metalness: 0.1 });
 
-        // Main barrel (long and sleek)
-        const barrelGeometry = new THREE.CylinderGeometry(0.04, 0.04, 2.0, 12);
-        const barrelMaterial = new THREE.MeshStandardMaterial({
-            color: 0x1a1a1a,
-            roughness: 0.3,
-            metalness: 0.9
-        });
-        const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
+        // Barrel — extra long and thick
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.8, 6), gunMetal);
         barrel.rotation.x = Math.PI / 2;
-        barrel.position.z = 1.0;
+        barrel.position.z = 1.2;
         barrel.castShadow = true;
         rifleGroup.add(barrel);
 
-        // Muzzle brake (small tip)
-        const muzzleGeometry = new THREE.CylinderGeometry(0.06, 0.04, 0.15, 8);
-        const muzzle = new THREE.Mesh(muzzleGeometry, barrelMaterial);
+        // Muzzle brake
+        const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.06, 0.2, 6), gunMetal);
         muzzle.rotation.x = Math.PI / 2;
-        muzzle.position.z = 2.075;
-        muzzle.castShadow = true;
+        muzzle.position.z = 2.7;
         rifleGroup.add(muzzle);
 
-        // Scope
-        const scopeGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.6, 12);
-        const scopeMaterial = new THREE.MeshStandardMaterial({
-            color: 0x0a0a0a,
-            roughness: 0.3,
-            metalness: 0.9
-        });
-        const scope = new THREE.Mesh(scopeGeometry, scopeMaterial);
+        // Receiver body — chunky box
+        const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.8), gunMetal);
+        receiver.position.set(0, 0.02, 0.1);
+        receiver.castShadow = true;
+        rifleGroup.add(receiver);
+
+        // Scope — oversized
+        const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.8, 6), new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.3, metalness: 0.9 }));
         scope.rotation.x = Math.PI / 2;
-        scope.position.set(0, 0.15, 0.5);
+        scope.position.set(0, 0.2, 0.5);
         scope.castShadow = true;
         rifleGroup.add(scope);
 
         // Scope lens
-        const lensGeometry = new THREE.CircleGeometry(0.07, 16);
-        const lensMaterial = new THREE.MeshStandardMaterial({
-            color: 0x2244aa,
-            roughness: 0.1,
-            metalness: 1,
-            emissive: 0x0000aa,
-            emissiveIntensity: 0.3
-        });
-        const lens = new THREE.Mesh(lensGeometry, lensMaterial);
-        lens.position.set(0, 0.15, 0.81);
+        const lens = new THREE.Mesh(new THREE.CircleGeometry(0.09, 8), new THREE.MeshStandardMaterial({
+            color: 0x2244aa, roughness: 0.1, metalness: 1, emissive: 0x0000aa, emissiveIntensity: 0.3
+        }));
+        lens.position.set(0, 0.2, 0.91);
         rifleGroup.add(lens);
 
         // Scope mount rings
         for (let i = 0; i < 2; i++) {
-            const mountGeometry = new THREE.TorusGeometry(0.09, 0.015, 8, 12);
-            const mount = new THREE.Mesh(mountGeometry, barrelMaterial);
+            const mount = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.02, 6, 8), gunMetal);
             mount.rotation.y = Math.PI / 2;
-            mount.position.set(0, 0.15, 0.3 + (i * 0.4));
-            mount.castShadow = true;
+            mount.position.set(0, 0.2, 0.25 + i * 0.5);
             rifleGroup.add(mount);
         }
 
-        // Wooden stock
-        const stockGeometry = new THREE.BoxGeometry(0.15, 0.25, 0.6);
-        const stockMaterial = new THREE.MeshStandardMaterial({
-            color: 0x4a2a10,
-            roughness: 0.8,
-            metalness: 0.1
-        });
-        const stock = new THREE.Mesh(stockGeometry, stockMaterial);
-        stock.position.z = -0.3;
+        // Stock — big chunky wood
+        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 0.7), woodMat);
+        stock.position.set(0, 0, -0.4);
         stock.castShadow = true;
         rifleGroup.add(stock);
 
-        // Stock end
-        const stockEndGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-        const stockEnd = new THREE.Mesh(stockEndGeometry, stockMaterial);
-        stockEnd.position.z = -0.6;
-        stockEnd.scale.set(1.5, 1.8, 0.8);
-        stockEnd.castShadow = true;
+        // Stock butt
+        const stockEnd = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), woodMat);
+        stockEnd.position.z = -0.75;
+        stockEnd.scale.set(1.5, 2, 0.8);
         rifleGroup.add(stockEnd);
 
-        // Trigger/grip area
-        const gripGeometry = new THREE.BoxGeometry(0.12, 0.25, 0.2);
-        const grip = new THREE.Mesh(gripGeometry, stockMaterial);
-        grip.position.set(0, -0.15, 0.2);
-        grip.castShadow = true;
+        // Grip
+        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.2), woodMat);
+        grip.position.set(0, -0.18, 0.2);
         rifleGroup.add(grip);
 
-        // Trigger guard
-        const triggerGuardGeometry = new THREE.TorusGeometry(0.06, 0.01, 8, 12);
-        const triggerGuard = new THREE.Mesh(triggerGuardGeometry, barrelMaterial);
-        triggerGuard.rotation.x = Math.PI / 2;
-        triggerGuard.position.set(0, -0.12, 0.15);
-        triggerGuard.castShadow = true;
-        rifleGroup.add(triggerGuard);
+        // Magazine — oversized box mag
+        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.35, 0.14), gunMetal);
+        mag.position.set(0, -0.12, 0.05);
+        rifleGroup.add(mag);
 
-        // Magazine
-        const magGeometry = new THREE.BoxGeometry(0.08, 0.3, 0.12);
-        const magMaterial = new THREE.MeshStandardMaterial({
-            color: 0x1a1a1a,
-            roughness: 0.4,
-            metalness: 0.8
-        });
-        const magazine = new THREE.Mesh(magGeometry, magMaterial);
-        magazine.position.set(0, -0.08, 0.1);
-        magazine.castShadow = true;
-        rifleGroup.add(magazine);
-
-        // Bolt/action
-        const boltGeometry = new THREE.BoxGeometry(0.06, 0.06, 0.15);
-        const bolt = new THREE.Mesh(boltGeometry, barrelMaterial);
-        bolt.position.set(0.04, 0.03, 0);
-        bolt.castShadow = true;
+        // Bolt handle
+        const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.18), gunMetal);
+        bolt.position.set(0.06, 0.05, 0);
         rifleGroup.add(bolt);
 
-        // Position rifle in character's hands
         rifleGroup.position.set(0.3, 0.5, 0.3);
         rifleGroup.rotation.y = 0.1;
         group.add(rifleGroup);
 
         this.rifleGroup = rifleGroup;
-        this.weapon = rifleGroup; // Keep for backward compatibility
+        this.weapon = rifleGroup;
 
-        // Nameplate
+        // === CAPE — long flowing cape on all characters ===
+        const capeShape = new THREE.Shape();
+        capeShape.moveTo(-0.3, 0);
+        capeShape.lineTo(0.3, 0);
+        capeShape.lineTo(0.35, -1.4);
+        capeShape.lineTo(0.1, -1.6);
+        capeShape.lineTo(-0.1, -1.6);
+        capeShape.lineTo(-0.35, -1.4);
+        capeShape.closePath();
+        const capeGeo = new THREE.ShapeGeometry(capeShape);
+        const capeMat = new THREE.MeshStandardMaterial({
+            color: robeDark,
+            side: THREE.DoubleSide,
+            roughness: 0.9,
+        });
+        const cape = new THREE.Mesh(capeGeo, capeMat);
+        cape.position.set(0, 0.95, -0.22);
+        cape.rotation.x = 0.1;
+        cape.castShadow = true;
+        group.add(cape);
+        this.cape = cape;
+
+        // === NAMEPLATE ===
         const canvas = document.createElement('canvas');
         canvas.width = 256;
         canvas.height = 64;
@@ -706,50 +728,29 @@ class Player {
         const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
         const sprite = new THREE.Sprite(spriteMaterial);
         sprite.scale.set(2, 0.5, 1);
-        sprite.position.y = 1.5;
-        sprite.raycast = () => {}; // Disable raycasting for sprites
+        sprite.position.y = 2.1;
+        sprite.raycast = () => {};
         group.add(sprite);
 
-        // Health bar
+        // === HEALTH BAR ===
         const healthBarGeometry = new THREE.PlaneGeometry(1, 0.1);
         const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
         const healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
-        healthBar.position.y = 1.2;
+        healthBar.position.y = 1.8;
         group.add(healthBar);
         this.healthBar = healthBar;
 
-        // Player-only features: ground halo + cape
+        // === PLAYER GROUND HALO ===
         if (this.isPlayer) {
-            // White ground halo ring
-            const haloGeometry = new THREE.RingGeometry(0.6, 0.8, 32);
+            const haloGeometry = new THREE.RingGeometry(0.6, 0.8, 16);
             const haloMaterial = new THREE.MeshBasicMaterial({
                 color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.5,
             });
             const halo = new THREE.Mesh(haloGeometry, haloMaterial);
             halo.rotation.x = -Math.PI / 2;
-            halo.position.y = -0.45;
+            halo.position.y = -0.55;
             halo.raycast = () => {};
             group.add(halo);
-
-            // Cape — cloth hanging from shoulders
-            const capeShape = new THREE.Shape();
-            capeShape.moveTo(-0.25, 0);
-            capeShape.lineTo(0.25, 0);
-            capeShape.lineTo(0.2, -1.2);
-            capeShape.lineTo(-0.2, -1.2);
-            capeShape.closePath();
-            const capeGeometry = new THREE.ShapeGeometry(capeShape);
-            const capeMaterial = new THREE.MeshStandardMaterial({
-                color: team === 'red' ? 0x660000 : 0x002266,
-                side: THREE.DoubleSide,
-                roughness: 0.9,
-            });
-            const cape = new THREE.Mesh(capeGeometry, capeMaterial);
-            cape.position.set(0, 0.8, -0.22);
-            cape.rotation.x = 0.15; // Slight backward tilt
-            cape.castShadow = true;
-            group.add(cape);
-            this.cape = cape;
         }
 
         group.position.y = 0.5;
@@ -778,22 +779,46 @@ class Player {
             this.speed = this.normalSpeed;
         }
 
-        // Running animation
+        // Animation
         const isMoving = this.velocity.length() > 0.01;
+        const time = Date.now() * 0.001;
+
         if (isMoving && this.leftLeg && this.rightLeg) {
-            const runSpeed = 10; // Animation speed
-            const time = Date.now() * 0.001 * runSpeed;
+            const runTime = time * 10;
 
-            // Leg swing animation
-            this.leftLeg.rotation.x = Math.sin(time) * 0.5;
-            this.rightLeg.rotation.x = Math.sin(time + Math.PI) * 0.5;
+            // Leg swing
+            this.leftLeg.rotation.x = Math.sin(runTime) * 0.6;
+            this.rightLeg.rotation.x = Math.sin(runTime + Math.PI) * 0.6;
 
-            // Slight body bob
-            this.mesh.position.y += Math.sin(time * 2) * 0.02;
+            // Shoe follows leg
+            if (this.leftShoe) this.leftShoe.rotation.x = -Math.PI / 2 + Math.sin(runTime) * 0.3;
+            if (this.rightShoe) this.rightShoe.rotation.x = -Math.PI / 2 + Math.sin(runTime + Math.PI) * 0.3;
+
+            // Arm swing (opposite to legs)
+            if (this.leftArm) this.leftArm.rotation.x = Math.sin(runTime + Math.PI) * 0.4;
+            if (this.rightArm) this.rightArm.rotation.x = Math.sin(runTime) * 0.4;
+
+            // Body bob
+            this.mesh.position.y += Math.sin(runTime * 2) * 0.025;
+
+            // Cape billows back when running
+            if (this.cape) this.cape.rotation.x = 0.3 + Math.sin(runTime * 1.5) * 0.15;
         } else if (this.leftLeg && this.rightLeg) {
-            // Reset to standing position
+            // Idle pose — gentle sway
             this.leftLeg.rotation.x = 0;
             this.rightLeg.rotation.x = 0;
+            if (this.leftShoe) this.leftShoe.rotation.x = -Math.PI / 2;
+            if (this.rightShoe) this.rightShoe.rotation.x = -Math.PI / 2;
+
+            // Gentle breathing sway
+            if (this.leftArm) this.leftArm.rotation.x = Math.sin(time * 2) * 0.05;
+            if (this.rightArm) this.rightArm.rotation.x = Math.sin(time * 2 + 0.5) * 0.05;
+
+            // Cape gentle sway
+            if (this.cape) this.cape.rotation.x = 0.1 + Math.sin(time * 1.5) * 0.05;
+
+            // Idle bob
+            this.mesh.position.y += Math.sin(time * 2) * 0.008;
         }
 
         // Update shoot cooldown
@@ -1558,6 +1583,7 @@ class Player {
                 if (!gameState.firstBlood) {
                     gameState.firstBlood = true;
                     audioManager.play('firstBlood');
+                    showStreakPopup('FIRST BLOOD', '#ff4444');
                 }
 
                 // Always play headshot for kills (it's a sniper game!)
@@ -1565,7 +1591,13 @@ class Player {
 
                 // Kill streak tracking
                 gameState.killStreak++;
-                audioManager.playKillStreak(gameState.killStreak);
+                const streak = gameState.killStreak;
+                audioManager.playKillStreak(streak);
+                if (streak === 5) showStreakPopup('KILLING SPREE', '#ff8800');
+                else if (streak === 10) showStreakPopup('RAMPAGE', '#ff4400');
+                else if (streak === 15) showStreakPopup('DOMINATING', '#ff0044');
+                else if (streak === 20) showStreakPopup('UNSTOPPABLE', '#cc00ff');
+                else if (streak === 25) showStreakPopup('GODLIKE', '#ffdd00');
 
                 // Multi-kill tracking (kills within 4 seconds)
                 if (gameState.multiKillTimer > 0) {
@@ -1575,9 +1607,13 @@ class Player {
                 }
                 gameState.multiKillTimer = 4.0; // 4 second window
 
-                if (gameState.multiKillCount >= 2) {
-                    audioManager.playMultiKill(gameState.multiKillCount);
-                }
+                const mk = gameState.multiKillCount;
+                if (mk === 2) { audioManager.playMultiKill(mk); showStreakPopup('DOUBLE KILL', '#44ffaa'); }
+                else if (mk === 3) { audioManager.playMultiKill(mk); showStreakPopup('MULTI KILL', '#44ddff'); }
+                else if (mk === 4) { audioManager.playMultiKill(mk); showStreakPopup('MEGA KILL', '#4488ff'); }
+                else if (mk === 5) { audioManager.playMultiKill(mk); showStreakPopup('ULTRA KILL', '#aa44ff'); }
+                else if (mk === 6) { audioManager.playMultiKill(mk); showStreakPopup('MONSTER KILL', '#ff44aa'); }
+                else if (mk >= 7) { audioManager.playMultiKill(mk); showStreakPopup('LUDICROUS KILL', '#ff0000'); }
             }
 
             // Show kill feed
@@ -1639,6 +1675,17 @@ class Player {
 }
 
 // UI Functions
+function showStreakPopup(text, color) {
+    const popup = document.getElementById('streakPopup');
+    const el = document.createElement('div');
+    el.className = 'streak-text';
+    el.style.color = color;
+    el.textContent = text;
+    popup.innerHTML = '';
+    popup.appendChild(el);
+    setTimeout(() => el.remove(), 2200);
+}
+
 function addKillFeed(killer, victim) {
     const killFeed = document.getElementById('killFeed');
     const message = document.createElement('div');

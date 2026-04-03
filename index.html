@@ -230,25 +230,50 @@
         #controls h4 { color: #00ff0088; margin-bottom: 4px; font-size: 0.65rem; }
         #controls div { margin-bottom: 1px; }
 
+        /* === STREAK POPUP === */
+        #streakPopup {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 500;
+            text-align: center;
+        }
+        .streak-text {
+            font-size: clamp(1.5rem, 6vw, 3rem);
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            text-shadow: 0 0 20px currentColor, 0 0 40px currentColor, 0 2px 4px rgba(0,0,0,0.8);
+            animation: streakIn 0.15s ease-out, streakPulse 0.3s 0.15s ease-in-out 2, streakOut 0.5s 1.5s forwards;
+            opacity: 0;
+            animation-fill-mode: forwards;
+        }
+        @keyframes streakIn { from { opacity: 0; transform: scale(2.5); } to { opacity: 1; transform: scale(1); } }
+        @keyframes streakPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        @keyframes streakOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-20px); } }
+
         .hidden { display: none !important; }
 
-        /* === KILL FEED === */
+        /* === KILL FEED — bottom left, compact === */
         #killFeed {
             position: absolute;
-            top: env(safe-area-inset-top, 8px);
-            left: 50%;
-            transform: translateX(-50%);
-            width: min(300px, 60vw);
-            padding-top: 8px;
+            bottom: env(safe-area-inset-bottom, 80px);
+            left: env(safe-area-inset-left, 8px);
+            width: min(220px, 45vw);
+            padding-bottom: 8px;
+            padding-left: 8px;
+            pointer-events: none;
         }
 
         .kill-message {
-            background: rgba(0, 0, 0, 0.7);
-            border: 1px solid #00ff0066;
-            padding: 4px 10px;
-            margin-bottom: 3px;
-            text-align: center;
-            font-size: 0.7rem;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #00ff0044;
+            padding: 2px 8px;
+            margin-bottom: 2px;
+            text-align: left;
+            font-size: 0.55rem;
             border-radius: 3px;
             animation: fadeIn 0.3s, fadeOut 0.5s 2.5s;
         }
@@ -352,6 +377,7 @@
         </div>
 
         <div id="killFeed"></div>
+        <div id="streakPopup"></div>
 
         <div id="deathPopup" class="hidden" style="
             position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
