@@ -2800,17 +2800,16 @@ function animate() {
         // space-to-center handled by cameraTarget.copy above
     }
 
-    // On mobile, camera gently follows player when not dragging
+    // On mobile, only pull camera back if player is very far off screen
     if (isMobile && gameState.player && gameState.player.health > 0) {
         const px = gameState.player.position.x;
         const pz = gameState.player.position.z;
         const dx = px - gameState.cameraTarget.x;
         const dz = pz - gameState.cameraTarget.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
-        // Pull camera toward player if they're getting far from center of screen
-        if (dist > 5) {
-            gameState.cameraTarget.x += dx * 0.03;
-            gameState.cameraTarget.z += dz * 0.03;
+        if (dist > 25) {
+            gameState.cameraTarget.x += dx * 0.01;
+            gameState.cameraTarget.z += dz * 0.01;
         }
     }
 
