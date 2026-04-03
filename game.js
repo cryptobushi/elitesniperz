@@ -252,17 +252,19 @@ class MedievalSoundtrack {
             for (const [noteName, beats] of phrase) {
                 const freq = this.notes[noteName];
                 const dur = beats * this.beat;
-                // Square wave + triangle = brassy MIDI trumpet
-                this._voice('square', freq, t, dur * 0.9, 0.1, 0.02, 0.05);
-                this._voice('triangle', freq, t, dur * 0.9, 0.08, 0.02, 0.05);
+                // Loud brass lead — square + triangle + octave shimmer
+                this._voice('square', freq, t, dur * 0.9, 0.22, 0.015, 0.05);
+                this._voice('triangle', freq, t, dur * 0.9, 0.18, 0.015, 0.05);
+                this._voice('sine', freq * 2, t, dur * 0.9, 0.06, 0.02, 0.08); // Octave above for brightness
                 t += dur;
             }
 
-            // Rest 2 bars then next phrase
-            const rest = this.beat * 8;
+            // Short rest (1 bar) then next phrase — keeps it continuous
+            const rest = this.beat * 4;
             this.timers.push(setTimeout(playPhrase, (t + rest) * 1000));
         };
-        this.timers.push(setTimeout(() => playPhrase(), 2000));
+        // Start immediately
+        playPhrase();
     }
 
     // Harpsichord arpeggios — classic RS accompaniment
@@ -278,7 +280,7 @@ class MedievalSoundtrack {
             const pattern = [...chord, ...chord.slice().reverse()];
             for (const noteName of pattern) {
                 const freq = this.notes[noteName] * 2; // Up an octave
-                this._pluck(freq, t, this.beat * 0.4, 0.1);
+                this._pluck(freq, t, this.beat * 0.4, 0.16);
                 t += this.beat / 4;
             }
 
