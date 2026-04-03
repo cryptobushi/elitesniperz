@@ -2938,11 +2938,26 @@ function animate() {
             }
         }
 
+        // Hover detection — show crosshair on enemy under cursor
+        const hoverRay = new THREE.Raycaster();
+        hoverRay.setFromCamera(gameState.mousePos, camera);
+        const enemyBodies = gameState.bots
+            .filter(b => b.team !== gameState.team && b.health > 0 && b.mesh.visible)
+            .map(b => ({ bot: b, mesh: b.mesh.children[0] }));
+        const hoverHits = hoverRay.intersectObjects(enemyBodies.map(e => e.mesh), false);
+        let hoverTarget = null;
+        if (hoverHits.length > 0) {
+            const hit = enemyBodies.find(e => e.mesh === hoverHits[0].object);
+            if (hit) hoverTarget = hit.bot;
+        }
+
+        // Use hover target or click-locked target
+        const activeTarget = gameState.targetLock || hoverTarget;
+
         // Target lock crosshair + range boost
-        if (gameState.targetLock) {
-            const tgt = gameState.targetLock;
+        if (activeTarget) {
+            const tgt = activeTarget;
             if (tgt.health <= 0 || !tgt.mesh.visible) {
-                // Target dead or hidden — clear lock
                 gameState.targetLock = null;
                 if (gameState._crosshair) { scene.remove(gameState._crosshair); gameState._crosshair = null; }
             } else {
@@ -2970,9 +2985,8 @@ function animate() {
                 gameState._crosshair.position.set(tgt.position.x, tgt.position.y + 2.2, tgt.position.z);
                 gameState._crosshair.rotation.z += deltaTime * 2; // Slow spin
             }
-        } else if (gameState._crosshair) {
-            scene.remove(gameState._crosshair);
-            gameState._crosshair = null;
+        } else {
+            if (gameState._crosshair) { scene.remove(gameState._crosshair); gameState._crosshair = null; }
         }
 
         // Aim weapon at mouse
