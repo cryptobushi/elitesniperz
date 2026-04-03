@@ -335,6 +335,65 @@
             text-shadow: 0 0 20px rgba(255,0,0,0.4);
         }
 
+        /* === SHOP PANEL === */
+        #shopPanel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.92);
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 1rem;
+            pointer-events: all;
+            z-index: 600;
+            width: min(95%, 500px);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        #shopPanel h2 {
+            color: #ffd700;
+            font-size: 1rem;
+            text-align: center;
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.1em;
+        }
+        #shopPanel .shop-gold {
+            text-align: center;
+            color: #ffd700;
+            font-size: 0.85rem;
+            margin-bottom: 0.75rem;
+        }
+        .shop-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            margin-bottom: 0.3rem;
+            background: rgba(255,215,0,0.05);
+            border: 1px solid #ffd70033;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .shop-item:hover:not(.disabled) {
+            background: rgba(255,215,0,0.15);
+            border-color: #ffd700;
+        }
+        .shop-item:active:not(.disabled) {
+            background: rgba(255,215,0,0.25);
+        }
+        .shop-item.disabled {
+            opacity: 0.35;
+            cursor: default;
+        }
+        .shop-icon { font-size: 1.3rem; width: 2rem; text-align: center; }
+        .shop-name { color: #fff; font-size: 0.8rem; font-weight: bold; flex: 1; }
+        .shop-cost { color: #ffd700; font-size: 0.75rem; font-weight: bold; }
+        .shop-desc { color: #888; font-size: 0.6rem; width: 100%; margin-top: 0.1rem; }
+        .shop-item { flex-wrap: wrap; }
+
         .hidden { display: none !important; }
 
         /* === KILL FEED — above minimap, bottom left === */
@@ -412,7 +471,7 @@
             <div class="stat" id="playerName">Player</div>
             <div class="stat" id="killCount">Kills: 0</div>
             <div class="stat" id="deathCount">Deaths: 0</div>
-            <div class="stat" id="healthStat">HP: 100</div>
+            <div class="stat" id="goldCount" style="color:#ffd700;border-color:#ffd70066;">Gold: 0</div>
         </div>
 
         <div id="scoreboard" class="hidden">
@@ -437,6 +496,11 @@
                 <div class="ability-name">Sight</div>
                 <div class="ability-cd"></div>
             </div>
+            <div class="ability" id="shopBtn">
+                <div class="ability-key">B</div>
+                <div class="ability-name">Shop</div>
+                <div class="ability-cd"></div>
+            </div>
             <div class="ability" id="scoreBtn">
                 <div class="ability-key">TAB</div>
                 <div class="ability-name">Score</div>
@@ -451,6 +515,12 @@
             <div>WASD - Scroll</div>
             <div>Space - Center</div>
             <div>Q - Windwalk | E - Far Sight</div>
+        </div>
+
+        <div id="shopPanel" class="hidden">
+            <h2>⚔ ARMORY ⚔</h2>
+            <div class="shop-gold" id="shopGold">Gold: 0</div>
+            <div id="shopItems"></div>
         </div>
 
         <div id="killFeed"></div>

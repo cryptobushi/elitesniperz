@@ -30,11 +30,27 @@ const gameState = {
     multiKillTimer: 0,
     multiKillCount: 0,
     firstBlood: false,
+    // Gold + Shop
+    gold: 0,
     // Debug
     debug: {
         godMode: true,
         showFPS: true,
     }
+};
+
+// === SHOP ITEM DEFINITIONS ===
+const SHOP_ITEMS = {
+    boots1:    { name: 'Swift Boots',      cost: 100, icon: '🥾', desc: '+20% speed',        stat: 'speed',     mult: 1.2, tier: 1, group: 'boots' },
+    boots2:    { name: 'Windrider Boots',  cost: 300, icon: '💨', desc: '+50% speed',        stat: 'speed',     mult: 1.5, tier: 2, group: 'boots', requires: 'boots1' },
+    cloak1:    { name: 'Shadow Cloak',     cost: 150, icon: '🌑', desc: '+3s windwalk',      stat: 'wwDur',     val: 3,    tier: 1, group: 'cloak' },
+    cloak2:    { name: 'Phantom Shroud',   cost: 400, icon: '👻', desc: '+6s windwalk',      stat: 'wwDur',     val: 6,    tier: 2, group: 'cloak', requires: 'cloak1' },
+    scope1:    { name: 'Scout Scope',      cost: 150, icon: '🔭', desc: '+25% range',        stat: 'range',     mult: 1.25, tier: 1, group: 'scope' },
+    scope2:    { name: 'Eagle Eye',        cost: 400, icon: '🦅', desc: '+50% range',        stat: 'range',     mult: 1.5, tier: 2, group: 'scope', requires: 'scope1' },
+    ward:      { name: 'Vision Ward',      cost: 75,  icon: '👁', desc: 'Place a ward',      stat: 'ward',      val: 1,    tier: 1, group: 'ward', stackable: true },
+    shield:    { name: 'Iron Buckler',     cost: 200, icon: '🛡', desc: 'Survive 1 shot',    stat: 'shield',    val: 1,    tier: 1, group: 'shield' },
+    rapidfire: { name: 'Hair Trigger',     cost: 250, icon: '⚡', desc: '-30% shot cooldown', stat: 'firerate',  mult: 0.7, tier: 1, group: 'firerate' },
+    bounty:    { name: 'Bounty Hunter',    cost: 200, icon: '💰', desc: '+50% gold per kill', stat: 'goldMult',  mult: 1.5, tier: 1, group: 'bounty' },
 };
 
 // === AUDIO SYSTEM — Web Audio API for zero-skip playback ===
@@ -749,6 +765,16 @@ class Player {
         // Auto-shoot cooldown
         this.shootCooldown = 0;
         this.shootCooldownTime = 1.0; // 1 second between shots
+
+        // Gold + Inventory
+        this.gold = 0;
+        this.inventory = {}; // { itemId: true }
+        this.wardCharges = 0;
+        this.hasShield = false;
+        this.goldMultiplier = 1.0;
+        this.baseSpeed = 8;
+        this.baseRange = 50;
+        this.baseCooldown = 1.0;
 
         this.createMesh(team);
         this.position = this.mesh.position;
@@ -1823,6 +1849,13 @@ class Player {
     takeDamage(damage, attacker) {
         // God mode — player can't die
         if (this.isPlayer && gameState.debug.godMode) return;
+        // Shield blocks one shot
+        if (this.hasShield) {
+            this.hasShield = false;
+            delete this.inventory['shield'];
+            if (this.isPlayer) showStreakPopup('SHIELD BLOCKED!', '#44aaff');
+            return;
+        }
         // Instant kill - no health system
         this.die(attacker);
     }
@@ -1847,6 +1880,11 @@ class Player {
                 if (killer.isPlayer) showStreakPopup('FIRST BLOOD', '#ff4444');
                 hasSpecial = true;
             }
+
+            // Gold reward
+            const baseGold = 50;
+            const streakBonus = (killer._streak || 0) * 10;
+            killer.earnGold(baseGold + streakBonus);
 
             // Player-specific streak/multi-kill tracking
             if (killer.isPlayer) {
@@ -1922,7 +1960,7 @@ class Player {
         if (this.isPlayer) {
             gameState.deaths++;
             document.getElementById('deathCount').textContent = `Deaths: ${gameState.deaths}`;
-            document.getElementById('healthStat').textContent = `Status: DEAD`;
+            // Player died
 
             // Clear ALL move targets and commands
             gameState.moveTarget = null;
@@ -1968,7 +2006,165 @@ class Player {
         this.mesh.visible = true;
 
         if (this.isPlayer) {
-            document.getElementById('healthStat').textContent = `Status: ALIVE`;
+            // Player alive
+            updateShopUI();
+        } else {
+            // Bot auto-buy: prioritize items they don't have
+            this._botShop();
+        }
+    }
+
+    _botShop() {
+        const priorities = ['boots1', 'scope1', 'shield', 'rapidfire', 'boots2', 'scope2', 'bounty', 'cloak1'];
+        for (const id of priorities) {
+            const item = SHOP_ITEMS[id];
+            if (!item) continue;
+            if (this.inventory[id] && !item.stackable) continue;
+            if (item.requires && !this.inventory[item.requires]) continue;
+            if (this.gold >= item.cost) {
+                this.gold -= item.cost;
+                this.inventory[id] = true;
+                this._applyItems();
+            }
+        }
+    }
+
+    earnGold(amount) {
+        const earned = Math.round(amount * this.goldMultiplier);
+        this.gold += earned;
+        if (this.isPlayer) {
+            gameState.gold = this.gold;
+            updateGoldUI();
+            // Float gold text
+            showGoldPopup(`+${earned}g`);
+        }
+    }
+
+    buyItem(itemId) {
+        const item = SHOP_ITEMS[itemId];
+        if (!item) return false;
+        if (this.gold < item.cost) return false;
+        if (this.inventory[itemId] && !item.stackable) return false;
+        if (item.requires && !this.inventory[item.requires]) return false;
+
+        this.gold -= item.cost;
+        this.inventory[itemId] = true;
+        if (this.isPlayer) gameState.gold = this.gold;
+
+        this._applyItems();
+        updateGoldUI();
+        updateShopUI();
+        return true;
+    }
+
+    _applyItems() {
+        // Reset to base stats
+        this.normalSpeed = this.baseSpeed;
+        this.shootRange = this.baseRange;
+        this.shootCooldownTime = this.baseCooldown;
+        this.goldMultiplier = 1.0;
+        this.hasShield = false;
+
+        // Apply all owned items
+        for (const id of Object.keys(this.inventory)) {
+            const item = SHOP_ITEMS[id];
+            if (!item) continue;
+
+            if (item.stat === 'speed') this.normalSpeed = this.baseSpeed * item.mult;
+            if (item.stat === 'range') this.shootRange = this.baseRange * item.mult;
+            if (item.stat === 'firerate') this.shootCooldownTime = this.baseCooldown * item.mult;
+            if (item.stat === 'goldMult') this.goldMultiplier *= item.mult;
+            if (item.stat === 'shield') this.hasShield = true;
+            if (item.stat === 'ward') this.wardCharges = (this.wardCharges || 0) + item.val;
+        }
+
+        // Update derived speed
+        this.speed = this.normalSpeed;
+        this.windwalkSpeed = this.normalSpeed * 1.75;
+    }
+
+    isNearSpawn() {
+        const spawnX = this.team === 'red' ? -70 : 70;
+        const spawnZ = this.team === 'red' ? -70 : 70;
+        const dx = this.position.x - spawnX;
+        const dz = this.position.z - spawnZ;
+        return Math.sqrt(dx*dx + dz*dz) < 15;
+    }
+}
+
+// Gold + Shop UI
+function updateGoldUI() {
+    const el = document.getElementById('goldCount');
+    if (el) el.textContent = `Gold: ${gameState.gold}`;
+}
+
+function showGoldPopup(text) {
+    const popup = document.getElementById('streakPopup');
+    const el = document.createElement('div');
+    el.style.cssText = 'color:#ffd700;font-size:1.2rem;font-weight:bold;text-shadow:0 0 10px #ffd70066;animation:streakIn 0.1s ease-out,streakOut 0.3s 0.8s forwards;opacity:0;';
+    el.textContent = text;
+    popup.appendChild(el);
+    setTimeout(() => el.remove(), 1200);
+}
+
+function updateShopUI() {
+    const panel = document.getElementById('shopPanel');
+    if (!panel || !gameState.player) return;
+
+    const nearSpawn = gameState.player.isNearSpawn();
+    if (!nearSpawn) {
+        panel.classList.add('hidden');
+        return;
+    }
+    panel.classList.remove('hidden');
+
+    const inv = gameState.player.inventory;
+    const gold = gameState.player.gold;
+    const shopGold = document.getElementById('shopGold');
+    if (shopGold) shopGold.textContent = `Gold: ${gold}`;
+
+    let html = '';
+    for (const [id, item] of Object.entries(SHOP_ITEMS)) {
+        const owned = inv[id] && !item.stackable;
+        const canAfford = gold >= item.cost;
+        const needsReq = item.requires && !inv[item.requires];
+        const disabled = owned || !canAfford || needsReq;
+
+        let status = '';
+        if (owned) status = ' owned';
+        else if (needsReq) status = ` (need ${SHOP_ITEMS[item.requires].name})`;
+        else if (!canAfford) status = ' (need gold)';
+
+        html += `<div class="shop-item${disabled ? ' disabled' : ''}" data-item="${id}">
+            <span class="shop-icon">${item.icon}</span>
+            <span class="shop-name">${item.name}</span>
+            <span class="shop-cost">${item.cost}g</span>
+            <span class="shop-desc">${item.desc}${status}</span>
+        </div>`;
+    }
+    document.getElementById('shopItems').innerHTML = html;
+
+    // Bind click handlers
+    panel.querySelectorAll('.shop-item:not(.disabled)').forEach(el => {
+        el.onclick = () => {
+            const itemId = el.dataset.item;
+            if (gameState.player.buyItem(itemId)) {
+                audioManager.play('headshot'); // Reuse as buy sound
+                showGoldPopup(`Bought ${SHOP_ITEMS[itemId].name}!`);
+            }
+        };
+    });
+}
+
+// Check shop proximity every frame
+function checkShopProximity() {
+    if (gameState.player && gameState.player.health > 0) {
+        const nearSpawn = gameState.player.isNearSpawn();
+        const panel = document.getElementById('shopPanel');
+        if (panel) {
+            if (nearSpawn && !panel.classList.contains('hidden')) return; // already showing
+            if (nearSpawn) updateShopUI();
+            else panel.classList.add('hidden');
         }
     }
 }
@@ -2129,6 +2325,14 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         document.getElementById('scoreboard').classList.remove('hidden');
         updateScoreboard();
+    }
+    if (e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        if (gameState.player && gameState.player.isNearSpawn()) {
+            const panel = document.getElementById('shopPanel');
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) updateShopUI();
+        }
     }
     if (e.key === '`') {
         const panel = document.getElementById('debugPanel');
@@ -2338,6 +2542,13 @@ document.querySelectorAll('.ability').forEach(el => {
         const ability = el.dataset.ability;
         if (ability === 'windwalk') useWindwalk();
         if (ability === 'farsight') useFarsight();
+        if (el.id === 'shopBtn') {
+            if (gameState.player && gameState.player.isNearSpawn()) {
+                const panel = document.getElementById('shopPanel');
+                panel.classList.toggle('hidden');
+                if (!panel.classList.contains('hidden')) updateShopUI();
+            }
+        }
         if (el.id === 'scoreBtn') {
             const sb = document.getElementById('scoreboard');
             sb.classList.toggle('hidden');
@@ -2484,6 +2695,9 @@ function animate() {
     lastTime = currentTime;
 
     if (!gameState.gameStarted) return;
+
+    // Shop proximity check
+    checkShopProximity();
 
     // Multi-kill timer countdown
     if (gameState.multiKillTimer > 0) {
