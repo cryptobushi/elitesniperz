@@ -2888,33 +2888,17 @@ function animate() {
 
     fogOfWar.update(gameState.player, allUnits, farsightPositions);
 
-    // Hide enemy units with fade-out when leaving vision
-    const FOG_LINGER = 2.5; // seconds to fade after leaving vision
+    // Hide enemy units — instant hide when leaving vision, no linger
     gameState.bots.forEach(bot => {
         if (bot.team !== gameState.team) {
             const inVision = fogOfWar.isVisible(bot.position.x, bot.position.z);
-
-            if (inVision) {
-                bot._fogTimer = FOG_LINGER;
-                bot.mesh.visible = bot.health > 0;
-                bot._fogFade = 1;
-            } else if ((bot._fogTimer || 0) > 0) {
-                bot._fogTimer -= deltaTime;
-                bot._fogFade = Math.max(0, bot._fogTimer / FOG_LINGER);
-                bot.mesh.visible = bot._fogFade > 0 && bot.health > 0;
-            } else {
-                bot.mesh.visible = false;
-                bot._fogFade = 0;
-            }
-
-            // Apply fade to all materials
+            bot.mesh.visible = inVision && bot.health > 0;
+            // Reset opacity when visible
             if (bot.mesh.visible) {
-                const opacity = bot._fogFade || 1;
-                const needsTransparent = opacity < 1;
                 bot.mesh.traverse(child => {
                     if (child.material && !child.isSprite) {
-                        child.material.transparent = needsTransparent;
-                        child.material.opacity = opacity;
+                        child.material.transparent = false;
+                        child.material.opacity = 1;
                     }
                 });
             }
