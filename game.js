@@ -105,7 +105,7 @@ class MedievalSoundtrack {
         this.ctx = null;
         this.masterGain = null;
         this.playing = false;
-        this.volume = 0.15;
+        this.volume = 0.5;
         this.timers = [];
     }
 
@@ -150,8 +150,8 @@ class MedievalSoundtrack {
             osc1.frequency.value = 146.83; // D3
             const g1 = this.ctx.createGain();
             g1.gain.setValueAtTime(0, now);
-            g1.gain.linearRampToValueAtTime(0.06, now + 2);
-            g1.gain.linearRampToValueAtTime(0.06, now + 10);
+            g1.gain.linearRampToValueAtTime(0.12, now + 2);
+            g1.gain.linearRampToValueAtTime(0.12, now + 10);
             g1.gain.linearRampToValueAtTime(0, now + 12);
             osc1.connect(g1).connect(this.masterGain);
             osc1.start(now);
@@ -163,8 +163,8 @@ class MedievalSoundtrack {
             osc2.frequency.value = 220.00; // A3
             const g2 = this.ctx.createGain();
             g2.gain.setValueAtTime(0, now);
-            g2.gain.linearRampToValueAtTime(0.04, now + 2);
-            g2.gain.linearRampToValueAtTime(0.04, now + 10);
+            g2.gain.linearRampToValueAtTime(0.08, now + 2);
+            g2.gain.linearRampToValueAtTime(0.08, now + 10);
             g2.gain.linearRampToValueAtTime(0, now + 12);
             osc2.connect(g2).connect(this.masterGain);
             osc2.start(now);
@@ -176,7 +176,7 @@ class MedievalSoundtrack {
     }
 
     // Plucked lute-like melody
-    _pluck(freq, time, duration = 0.8, vol = 0.12) {
+    _pluck(freq, time, duration = 0.8, vol = 0.25) {
         const now = this.ctx.currentTime + time;
         const osc = this.ctx.createOscillator();
         osc.type = 'triangle';
@@ -234,7 +234,7 @@ class MedievalSoundtrack {
         const playBass = () => {
             if (!this.playing) return;
             const idx = [0, 3, 4, 0, 3, 7][Math.floor(Math.random() * 6)];
-            this._pluck(this.bassScale[idx], 0, 1.5, 0.08);
+            this._pluck(this.bassScale[idx], 0, 1.5, 0.18);
             const wait = [1500, 2000, 2500, 3000][Math.floor(Math.random() * 4)];
             this.timers.push(setTimeout(playBass, wait));
         };
@@ -258,7 +258,7 @@ class MedievalSoundtrack {
             filter.frequency.value = 200;
 
             const env = this.ctx.createGain();
-            env.gain.setValueAtTime(0.08, now);
+            env.gain.setValueAtTime(0.15, now);
             env.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
 
             noise.connect(filter).connect(env).connect(this.masterGain);
