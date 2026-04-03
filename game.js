@@ -1164,7 +1164,8 @@ class Player {
             // If enemy is within FOV cone and in range
             if (angle < fovRadians) {
                 const distance = this.position.distanceTo(enemy.position);
-                const range = this.shootRange + (this.isPlayer && gameState.targetLock === enemy ? 10 : 0);
+                const hasTarget = this.isPlayer && (gameState.targetLock === enemy || gameState._hoverTarget === enemy);
+                const range = this.shootRange + (hasTarget ? 10 : 0);
                 if (distance <= range) {
                     // Double-check fog of war visibility
                     const enemyVisible = fogOfWar.isVisible(enemy.position.x, enemy.position.z);
@@ -2956,13 +2957,15 @@ function animate() {
         hoverRay.ray.intersectPlane(hoverPlane, hoverPoint);
 
         let hoverTarget = null;
-        let closestDist = 3; // Must be within 3 units of cursor
+        gameState._hoverTarget = null;
+        let closestDist = 3;
         gameState.bots.forEach(bot => {
             if (bot.team !== gameState.team && bot.health > 0 && bot.mesh.visible) {
                 const d = hoverPoint.distanceTo(bot.position);
                 if (d < closestDist) {
                     closestDist = d;
                     hoverTarget = bot;
+                    gameState._hoverTarget = bot;
                 }
             }
         });
