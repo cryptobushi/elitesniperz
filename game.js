@@ -118,13 +118,16 @@ class MedievalSoundtrack {
         this.masterGain.gain.value = this.volume;
         this.masterGain.connect(this.ctx.destination);
 
-        // Dorian mode frequencies (medieval sounding)
-        // D4, E4, F4, G4, A4, Bb4, C5, D5
-        this.scale = [293.66, 329.63, 349.23, 392.00, 440.00, 466.16, 523.25, 587.33];
-        this.bassScale = [146.83, 164.81, 174.61, 196.00, 220.00, 233.08, 261.63, 293.66];
+        // Mixolydian mode — bright and energetic medieval
+        // D4, E4, F#4, G4, A4, B4, C5, D5, E5, F#5
+        this.scale = [293.66, 329.63, 369.99, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 739.99];
+        this.bassScale = [146.83, 164.81, 185.00, 196.00, 220.00, 246.94, 261.63, 293.66];
+        this.bpm = 160;
+        this.beat = 60000 / this.bpm; // ms per beat
 
         this._startDrone();
         this._startMelody();
+        this._startCounterMelody();
         this._startBass();
         this._startPercussion();
     }
@@ -138,41 +141,36 @@ class MedievalSoundtrack {
         }
     }
 
-    // Persistent droning fifth — like a hurdy-gurdy
+    // Pulsing hurdy-gurdy drone — rhythmic energy
     _startDrone() {
-        const drone = () => {
+        const pulse = () => {
             if (!this.playing) return;
             const now = this.ctx.currentTime;
+            const dur = this.beat / 1000 * 2; // 2-beat pulse
 
-            // Root drone
             const osc1 = this.ctx.createOscillator();
             osc1.type = 'sawtooth';
             osc1.frequency.value = 146.83; // D3
             const g1 = this.ctx.createGain();
-            g1.gain.setValueAtTime(0, now);
-            g1.gain.linearRampToValueAtTime(0.12, now + 2);
-            g1.gain.linearRampToValueAtTime(0.12, now + 10);
-            g1.gain.linearRampToValueAtTime(0, now + 12);
+            g1.gain.setValueAtTime(0.1, now);
+            g1.gain.linearRampToValueAtTime(0.06, now + dur);
             osc1.connect(g1).connect(this.masterGain);
             osc1.start(now);
-            osc1.stop(now + 12);
+            osc1.stop(now + dur);
 
-            // Fifth drone
             const osc2 = this.ctx.createOscillator();
             osc2.type = 'sawtooth';
             osc2.frequency.value = 220.00; // A3
             const g2 = this.ctx.createGain();
-            g2.gain.setValueAtTime(0, now);
-            g2.gain.linearRampToValueAtTime(0.08, now + 2);
-            g2.gain.linearRampToValueAtTime(0.08, now + 10);
-            g2.gain.linearRampToValueAtTime(0, now + 12);
+            g2.gain.setValueAtTime(0.07, now);
+            g2.gain.linearRampToValueAtTime(0.03, now + dur);
             osc2.connect(g2).connect(this.masterGain);
             osc2.start(now);
-            osc2.stop(now + 12);
+            osc2.stop(now + dur);
 
-            this.timers.push(setTimeout(drone, 11000));
+            this.timers.push(setTimeout(pulse, this.beat * 2));
         };
-        drone();
+        pulse();
     }
 
     // Plucked lute-like melody
@@ -203,74 +201,121 @@ class MedievalSoundtrack {
     }
 
     _startMelody() {
+        const b = this.beat / 1000; // beat in seconds
         const playPhrase = () => {
             if (!this.playing) return;
 
-            // Generate a random medieval phrase (4-8 notes)
-            const len = 4 + Math.floor(Math.random() * 5);
-            let noteIdx = Math.floor(Math.random() * this.scale.length);
+            // Fast jig-like phrase (8-16 notes)
+            const len = 8 + Math.floor(Math.random() * 9);
+            let noteIdx = Math.floor(Math.random() * 6) + 2; // Start mid-range
             let t = 0;
 
             for (let i = 0; i < len; i++) {
                 const freq = this.scale[noteIdx];
-                const dur = [0.3, 0.5, 0.7, 1.0][Math.floor(Math.random() * 4)];
-                this._pluck(freq, t, dur + 0.3);
-                t += dur;
+                // Mix of eighth and sixteenth notes for energy
+                const rhythm = [b/2, b/2, b/4, b/2, b/4, b/4, b, b/2][Math.floor(Math.random() * 8)];
+                this._pluck(freq, t, rhythm + 0.15, 0.22);
+                t += rhythm;
 
-                // Move by step or small leap (sounds medieval)
-                const jump = [-2, -1, -1, 0, 1, 1, 2][Math.floor(Math.random() * 7)];
+                // Stepwise with occasional leaps — jig feel
+                const jump = [-3, -2, -1, -1, 1, 1, 2, 3][Math.floor(Math.random() * 8)];
                 noteIdx = Math.max(0, Math.min(this.scale.length - 1, noteIdx + jump));
             }
 
-            // Pause between phrases
-            const pause = 2000 + Math.random() * 4000;
+            // Short pause then next phrase
+            const pause = this.beat * (1 + Math.random() * 2);
             this.timers.push(setTimeout(playPhrase, (t * 1000) + pause));
         };
-        this.timers.push(setTimeout(playPhrase, 2000));
+        this.timers.push(setTimeout(playPhrase, 500));
     }
 
-    // Low plucked bass notes
+    // Counter-melody — higher octave arpeggios
+    _startCounterMelody() {
+        const b = this.beat / 1000;
+        const highScale = this.scale.map(f => f * 2); // One octave up
+        const playArp = () => {
+            if (!this.playing) return;
+
+            // Quick 3-5 note arpeggios
+            const len = 3 + Math.floor(Math.random() * 3);
+            const root = Math.floor(Math.random() * 5);
+            let t = 0;
+
+            for (let i = 0; i < len; i++) {
+                const idx = Math.min(root + i * 2, highScale.length - 1);
+                this._pluck(highScale[idx], t, b/2 + 0.1, 0.12);
+                t += b / 3;
+            }
+
+            const wait = this.beat * (3 + Math.random() * 5);
+            this.timers.push(setTimeout(playArp, (t * 1000) + wait));
+        };
+        this.timers.push(setTimeout(playArp, 3000));
+    }
+
+    // Pumping bass — on the beat
     _startBass() {
+        const pattern = [0, 0, 3, 4, 0, 0, 4, 3]; // Root-heavy with 4th and 5th
+        let step = 0;
         const playBass = () => {
             if (!this.playing) return;
-            const idx = [0, 3, 4, 0, 3, 7][Math.floor(Math.random() * 6)];
-            this._pluck(this.bassScale[idx], 0, 1.5, 0.18);
-            const wait = [1500, 2000, 2500, 3000][Math.floor(Math.random() * 4)];
-            this.timers.push(setTimeout(playBass, wait));
+            const idx = pattern[step % pattern.length];
+            this._pluck(this.bassScale[idx], 0, this.beat / 1000 + 0.1, 0.2);
+            step++;
+            this.timers.push(setTimeout(playBass, this.beat));
         };
-        this.timers.push(setTimeout(playBass, 4000));
+        this.timers.push(setTimeout(playBass, 200));
     }
 
-    // Subtle percussion — like a hand drum
+    // Driving percussion — tavern drum feel
+    _drum(freq, vol, decay) {
+        const now = this.ctx.currentTime;
+        const noise = this.ctx.createBufferSource();
+        const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.15, this.ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1);
+        noise.buffer = buf;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = freq;
+
+        const env = this.ctx.createGain();
+        env.gain.setValueAtTime(vol, now);
+        env.gain.exponentialRampToValueAtTime(0.001, now + decay);
+
+        noise.connect(filter).connect(env).connect(this.masterGain);
+        noise.start(now);
+        noise.stop(now + decay);
+    }
+
     _startPercussion() {
-        const hit = () => {
+        // Pattern: KICK . snare . KICK kick snare .  (in eighth notes)
+        const pattern = [
+            { type: 'kick' },
+            null,
+            { type: 'snare' },
+            null,
+            { type: 'kick' },
+            { type: 'kick', soft: true },
+            { type: 'snare' },
+            null,
+        ];
+        let step = 0;
+        const tick = () => {
             if (!this.playing) return;
-            const now = this.ctx.currentTime;
-
-            const noise = this.ctx.createBufferSource();
-            const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.1, this.ctx.sampleRate);
-            const data = buf.getChannelData(0);
-            for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1);
-            noise.buffer = buf;
-
-            const filter = this.ctx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.value = 200;
-
-            const env = this.ctx.createGain();
-            env.gain.setValueAtTime(0.15, now);
-            env.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-
-            noise.connect(filter).connect(env).connect(this.masterGain);
-            noise.start(now);
-            noise.stop(now + 0.15);
-
-            // Rhythmic pattern with variation
-            const beats = [500, 500, 750, 250, 500, 1000];
-            const wait = beats[Math.floor(Math.random() * beats.length)];
-            this.timers.push(setTimeout(hit, wait));
+            const p = pattern[step % pattern.length];
+            if (p) {
+                if (p.type === 'kick') {
+                    this._drum(150, p.soft ? 0.1 : 0.18, 0.12);
+                } else {
+                    this._drum(800, 0.12, 0.08);
+                }
+            }
+            step++;
+            this.timers.push(setTimeout(tick, this.beat / 2));
         };
-        this.timers.push(setTimeout(hit, 6000));
+        tick();
     }
 }
 
