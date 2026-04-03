@@ -969,21 +969,20 @@ class Player {
             }
         });
 
-        // If enemy found, aim at them while moving
+        // If enemy found, aim at them and chase
         if (closestEnemy) {
-            // Aim at enemy
             this.weapon.lookAt(closestEnemy.position);
 
-            // Change direction to move towards enemy
             const enemyDirection = new THREE.Vector3()
                 .subVectors(closestEnemy.position, this.position)
                 .normalize();
 
-            this.targetPosition.copy(this.position).add(enemyDirection.multiplyScalar(10));
-
-            // Auto-shoot will handle shooting when enemy is in FOV
-        } else {
-            // No enemy - aim in movement direction
+            // Switch to chase state and pursue enemy
+            this._botState = 'chase';
+            this._campTimer = 0;
+            this.targetPosition = this.position.clone().add(enemyDirection.multiplyScalar(10));
+        } else if (this.targetPosition) {
+            // No enemy — aim in movement direction
             this.weapon.lookAt(this.targetPosition);
         }
     }
