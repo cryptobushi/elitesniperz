@@ -73,15 +73,8 @@ class AudioManager {
     play(soundName) {
         if (!this.enabled || !this.sounds[soundName]) return;
         const a = this.sounds[soundName];
-        if (a.paused || a.ended) {
-            a.currentTime = 0;
-            a.play().catch(() => {});
-        } else {
-            // Already playing — clone for overlap (only happens on rapid fire)
-            const c = new Audio(a.src);
-            c.volume = a.volume;
-            c.play().catch(() => {});
-        }
+        a.currentTime = 0;
+        a.play().catch(() => {});
     }
 }
 
@@ -388,45 +381,40 @@ class FogOfWar {
     }
 
     revealArea(worldX, worldZ, radius) {
-        // Convert world coordinates to texture coordinates
         const x = ((worldX + MAP_SIZE / 2) / MAP_SIZE) * 256;
         const y = ((worldZ + MAP_SIZE / 2) / MAP_SIZE) * 256;
         const radiusPixels = (radius / MAP_SIZE) * 256;
 
-        // Create irregular vision area (not a perfect circle)
         this.ctx.globalCompositeOperation = 'destination-out';
 
-        // Draw multiple overlapping circles with slight offsets to create irregular shape
-        const numCircles = 8;
-        for (let i = 0; i < numCircles; i++) {
-            const angle = (i / numCircles) * Math.PI * 2;
-            const offset = radiusPixels * 0.15; // 15% variation
-            const offsetX = Math.cos(angle) * offset * (Math.random() * 0.5 + 0.5);
-            const offsetY = Math.sin(angle) * offset * (Math.random() * 0.5 + 0.5);
+        // Draw an irregular blob using a polygon with noisy radius
+        const segments = 24;
+        const time = Date.now() * 0.0003; // Slow drift for organic feel
 
-            const gradient = this.ctx.createRadialGradient(
-                x + offsetX, y + offsetY, 0,
-                x + offsetX, y + offsetY, radiusPixels * 0.9
-            );
-            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
-            gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.25)');
-            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-            this.ctx.fillStyle = gradient;
-            this.ctx.beginPath();
-            this.ctx.arc(x + offsetX, y + offsetY, radiusPixels * 0.9, 0, Math.PI * 2);
-            this.ctx.fill();
+        this.ctx.beginPath();
+        for (let i = 0; i <= segments; i++) {
+            const angle = (i / segments) * Math.PI * 2;
+            // Layered sine waves for organic edge — deterministic, no flicker
+            const noise = 1.0
+                + 0.12 * Math.sin(angle * 3 + worldX * 0.1 + time)
+                + 0.08 * Math.sin(angle * 5 - worldZ * 0.15 + time * 1.3)
+                + 0.05 * Math.sin(angle * 8 + time * 0.7);
+            const r = radiusPixels * noise;
+            const px = x + Math.cos(angle) * r;
+            const py = y + Math.sin(angle) * r;
+            if (i === 0) this.ctx.moveTo(px, py);
+            else this.ctx.lineTo(px, py);
         }
+        this.ctx.closePath();
 
-        // Main central clear area
-        const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, radiusPixels);
+        // Fill with radial gradient for soft edges
+        const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, radiusPixels * 1.15);
         gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.9)');
+        gradient.addColorStop(0.65, 'rgba(255, 255, 255, 0.95)');
+        gradient.addColorStop(0.85, 'rgba(255, 255, 255, 0.4)');
         gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
         this.ctx.fillStyle = gradient;
-        this.ctx.beginPath();
-        this.ctx.arc(x, y, radiusPixels, 0, Math.PI * 2);
         this.ctx.fill();
 
         this.ctx.globalCompositeOperation = 'source-over';
@@ -724,13 +712,7 @@ class Player {
         sprite.raycast = () => {};
         group.add(sprite);
 
-        // === HEALTH BAR ===
-        const healthBarGeometry = new THREE.PlaneGeometry(1, 0.1);
-        const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        const healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
-        healthBar.position.y = 1.8;
-        group.add(healthBar);
-        this.healthBar = healthBar;
+        this.healthBar = null;
 
         // === PLAYER GROUND HALO ===
         if (this.isPlayer) {
@@ -751,14 +733,7 @@ class Player {
     }
 
     update(deltaTime) {
-        // Update health bar
-        const healthPercent = this.health / this.maxHealth;
-        this.healthBar.scale.x = healthPercent;
-        this.healthBar.material.color.setHex(
-            healthPercent > 0.5 ? 0x00ff00 :
-            healthPercent > 0.25 ? 0xffff00 :
-            0xff0000
-        );
+        // Health (no bar — instant kill game)
 
         // Windwalk effect
         if (this.isWindwalking) {
@@ -2258,9 +2233,9 @@ function animate() {
     gameState.cameraTarget.z = THREE.MathUtils.clamp(gameState.cameraTarget.z, -mapBound, mapBound);
 
     // Smooth camera movement
-    camera.position.x = THREE.MathUtils.lerp(camera.position.x, gameState.cameraTarget.x + gameState.cameraOffset.x, 0.18);
+    camera.position.x = THREE.MathUtils.lerp(camera.position.x, gameState.cameraTarget.x + gameState.cameraOffset.x, 0.06);
     camera.position.y = gameState.cameraOffset.y;
-    camera.position.z = THREE.MathUtils.lerp(camera.position.z, gameState.cameraTarget.z + gameState.cameraOffset.z, 0.18);
+    camera.position.z = THREE.MathUtils.lerp(camera.position.z, gameState.cameraTarget.z + gameState.cameraOffset.z, 0.06);
     camera.lookAt(gameState.cameraTarget);
 
     // Update player movement (click to move)
@@ -2492,7 +2467,7 @@ if (isMobile) {
 // Smooth camera lerp — always runs (mobile + minimap clicks on desktop)
 function smoothCameraUpdate() {
     requestAnimationFrame(smoothCameraUpdate);
-    const lerp = 0.25;
+    const lerp = 0.08;
     gameState.cameraTarget.x += (smoothCamX - gameState.cameraTarget.x) * lerp;
     gameState.cameraTarget.z += (smoothCamZ - gameState.cameraTarget.z) * lerp;
 }
