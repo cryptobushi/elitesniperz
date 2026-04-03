@@ -1847,15 +1847,15 @@ class Player {
     }
 
     takeDamage(damage, attacker) {
-        // God mode — player can't die
-        if (this.isPlayer && gameState.debug.godMode) return;
-        // Shield blocks one shot
+        // Shield blocks one shot (check before god mode so it still consumes)
         if (this.hasShield) {
             this.hasShield = false;
             delete this.inventory['shield'];
             if (this.isPlayer) showStreakPopup('SHIELD BLOCKED!', '#44aaff');
             return;
         }
+        // God mode — player can't die
+        if (this.isPlayer && gameState.debug.godMode) return;
         // Instant kill - no health system
         this.die(attacker);
     }
