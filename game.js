@@ -2119,24 +2119,51 @@ function updateGoldUI() {
 
 let _goldPopupEl = null;
 function showGoldPopup(text) {
-    // Remove previous gold popup
     if (_goldPopupEl) _goldPopupEl.remove();
 
     const popup = document.getElementById('streakPopup');
     const el = document.createElement('div');
     el.style.cssText = `
-        color: #ffd700;
-        font-size: clamp(1.5rem, 5vw, 2.5rem);
-        font-weight: 900;
-        text-shadow: 0 0 20px #ffd700, 0 0 40px #ff880088, 0 2px 4px rgba(0,0,0,0.8);
-        letter-spacing: 0.05em;
-        animation: goldSlam 0.15s ease-out forwards, goldFloat 1.2s 0.15s ease-out forwards;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
         pointer-events: none;
+        animation: goldFloat 1.5s ease-out forwards;
     `;
-    el.textContent = text;
+    el.innerHTML = `
+        <div style="
+            width: 4px; height: 30px;
+            background: linear-gradient(to top, #00aa00, #00ff44);
+            box-shadow: 0 0 8px #00ff44, 0 0 16px #00aa0066;
+            margin-bottom: 2px;
+            animation: candleGrow 0.2s ease-out forwards;
+            transform-origin: bottom;
+        "></div>
+        <div style="
+            width: 16px; height: 24px;
+            background: linear-gradient(to top, #00cc00, #00ff44);
+            box-shadow: 0 0 12px #00ff44, 0 0 24px #00aa0066;
+            border-radius: 1px;
+            animation: candleGrow 0.15s ease-out forwards;
+            transform-origin: bottom;
+        "></div>
+        <div style="
+            width: 4px; height: 8px;
+            background: linear-gradient(to top, #00aa00, #009900);
+            margin-top: 2px;
+        "></div>
+        <div style="
+            color: #00ff44;
+            font-size: clamp(1.2rem, 4vw, 2rem);
+            font-weight: 900;
+            text-shadow: 0 0 15px #00ff44, 0 0 30px #00aa0066;
+            margin-top: 4px;
+            font-family: 'Courier New', monospace;
+        ">${text} 📈</div>
+    `;
     popup.appendChild(el);
     _goldPopupEl = el;
-    setTimeout(() => { if (_goldPopupEl === el) { el.remove(); _goldPopupEl = null; } }, 1500);
+    setTimeout(() => { if (_goldPopupEl === el) { el.remove(); _goldPopupEl = null; } }, 1800);
 }
 
 function updateShopUI() {

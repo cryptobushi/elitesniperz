@@ -252,8 +252,8 @@
         @keyframes streakIn { from { opacity: 0; transform: scale(2.5); } to { opacity: 1; transform: scale(1); } }
         @keyframes streakPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
         @keyframes streakOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-20px); } }
-        @keyframes goldSlam { 0% { opacity: 0; transform: scale(2); } 100% { opacity: 1; transform: scale(1); } }
-        @keyframes goldFloat { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-40px); } }
+        @keyframes candleGrow { 0% { transform: scaleY(0); } 100% { transform: scaleY(1); } }
+        @keyframes goldFloat { 0% { opacity: 1; transform: translateY(0); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-60px); } }
 
         /* === DARK SOULS DEATH SCREEN === */
         #deathPopup {
