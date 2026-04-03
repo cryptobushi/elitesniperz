@@ -632,7 +632,7 @@ class FogOfWar {
     }
 
     update(player, allUnits, farsightPositions = []) {
-        const revealRadius = 25; // Much larger vision radius (in world units)
+        const revealRadius = 55; // Must be >= shoot range so you see enemies before they shoot
         const farsightRadius = 45; // Far sight radius
 
         // Mark explored areas (areas you've been to before)
