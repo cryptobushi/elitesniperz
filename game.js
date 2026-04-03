@@ -66,7 +66,7 @@ scene.add(hemiLight);
 // Add initial preview scene
 const previewGeometry = new THREE.PlaneGeometry(80, 80);
 const previewMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2a3a2a,
+    color: 0x2a2a2a,
     roughness: 0.8
 });
 const previewGround = new THREE.Mesh(previewGeometry, previewMaterial);
@@ -91,7 +91,7 @@ const createMap = () => {
     groundGeometry.computeVertexNormals();
 
     const groundMaterial = new THREE.MeshStandardMaterial({
-        color: 0x3a4a2a,
+        color: 0x353535,
         roughness: 0.9,
         metalness: 0.1
     });
@@ -106,7 +106,7 @@ const createMap = () => {
 
         // Trunk
         const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 3, 8);
-        const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x4a3520 });
+        const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x3a3a3a });
         const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
         trunk.position.y = 1.5;
         trunk.castShadow = true;
@@ -114,7 +114,7 @@ const createMap = () => {
 
         // Foliage
         const foliageGeometry = new THREE.ConeGeometry(1.5, 3, 8);
-        const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x2d5016 });
+        const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x444444 });
         const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
         foliage.position.y = 4;
         foliage.castShadow = true;
@@ -209,14 +209,14 @@ const createMap = () => {
 
     // Team spawn markers
     const redSpawnGeometry = new THREE.CircleGeometry(5, 32);
-    const redSpawnMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.3 });
+    const redSpawnMaterial = new THREE.MeshBasicMaterial({ color: 0xaa4444, transparent: true, opacity: 0.3 });
     const redSpawn = new THREE.Mesh(redSpawnGeometry, redSpawnMaterial);
     redSpawn.rotation.x = -Math.PI / 2;
     redSpawn.position.set(-70, 0.1, -70);
     scene.add(redSpawn);
 
     const blueSpawnGeometry = new THREE.CircleGeometry(5, 32);
-    const blueSpawnMaterial = new THREE.MeshBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0.3 });
+    const blueSpawnMaterial = new THREE.MeshBasicMaterial({ color: 0x4444aa, transparent: true, opacity: 0.3 });
     const blueSpawn = new THREE.Mesh(blueSpawnGeometry, blueSpawnMaterial);
     blueSpawn.rotation.x = -Math.PI / 2;
     blueSpawn.position.set(70, 0.1, 70);
@@ -452,7 +452,7 @@ class Player {
         // Torso
         const torsoGeometry = new THREE.BoxGeometry(0.6, 0.8, 0.4);
         const torsoMaterial = new THREE.MeshStandardMaterial({
-            color: team === 'red' ? 0xcc0000 : 0x0066cc,
+            color: team === 'red' ? 0x884444 : 0x445588,
             roughness: 0.7,
             metalness: 0.2
         });
@@ -465,7 +465,7 @@ class Player {
         // Head
         const headGeometry = new THREE.SphereGeometry(0.25, 12, 12);
         const headMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffdbac,
+            color: 0xb0b0b0,
             roughness: 0.9
         });
         const head = new THREE.Mesh(headGeometry, headMaterial);
@@ -476,7 +476,7 @@ class Player {
         // Helmet/Hat
         const helmetGeometry = new THREE.CylinderGeometry(0.28, 0.28, 0.15, 12);
         const helmetMaterial = new THREE.MeshStandardMaterial({
-            color: team === 'red' ? 0x880000 : 0x003388,
+            color: team === 'red' ? 0x665050 : 0x505066,
             roughness: 0.6
         });
         const helmet = new THREE.Mesh(helmetGeometry, helmetMaterial);
@@ -487,7 +487,7 @@ class Player {
         // Arms
         const armGeometry = new THREE.CapsuleGeometry(0.12, 0.6, 6, 8);
         const armMaterial = new THREE.MeshStandardMaterial({
-            color: team === 'red' ? 0xaa0000 : 0x0055aa,
+            color: team === 'red' ? 0x775555 : 0x555577,
             roughness: 0.7
         });
         const leftArm = new THREE.Mesh(armGeometry, armMaterial);
@@ -542,7 +542,7 @@ class Player {
         // Scope lens
         const lensGeometry = new THREE.CircleGeometry(0.07, 16);
         const lensMaterial = new THREE.MeshStandardMaterial({
-            color: 0x2244aa,
+            color: 0x555555,
             roughness: 0.1,
             metalness: 1,
             emissive: 0x0000aa,
@@ -565,7 +565,7 @@ class Player {
         // Wooden stock
         const stockGeometry = new THREE.BoxGeometry(0.15, 0.25, 0.6);
         const stockMaterial = new THREE.MeshStandardMaterial({
-            color: 0x4a2a10,
+            color: 0x3a3a3a,
             roughness: 0.8,
             metalness: 0.1
         });
@@ -672,7 +672,7 @@ class Player {
             capeShape.closePath();
             const capeGeometry = new THREE.ShapeGeometry(capeShape);
             const capeMaterial = new THREE.MeshStandardMaterial({
-                color: team === 'red' ? 0x660000 : 0x002266,
+                color: team === 'red' ? 0x554444 : 0x444455,
                 side: THREE.DoubleSide,
                 roughness: 0.9,
             });
@@ -1181,7 +1181,7 @@ class Player {
         // MASSIVE MUZZLE FLASH
         const flashGeometry = new THREE.SphereGeometry(2, 12, 12);
         const flashMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffdd00,
+            color: 0xcccccc,
             transparent: true,
             opacity: 1
         });
@@ -1192,7 +1192,7 @@ class Player {
         // Secondary flash (outer)
         const flash2Geometry = new THREE.SphereGeometry(3, 12, 12);
         const flash2Material = new THREE.MeshBasicMaterial({
-            color: 0xff6600,
+            color: 0x999999,
             transparent: true,
             opacity: 0.6
         });
@@ -1283,7 +1283,7 @@ class Player {
             targetPos.clone()
         ]);
         const bulletMaterial = new THREE.LineBasicMaterial({
-            color: this.team === 'red' ? 0xff0000 : 0x0088ff,
+            color: this.team === 'red' ? 0xaa7777 : 0x7777aa,
             linewidth: 5
         });
         const bullet = new THREE.Line(bulletGeometry, bulletMaterial);
@@ -1296,7 +1296,7 @@ class Player {
                 targetPos.clone()
             ]);
             const tracerMaterial = new THREE.LineBasicMaterial({
-                color: this.team === 'red' ? 0xffaaaa : 0xaaccff,
+                color: this.team === 'red' ? 0x998888 : 0x889099,
                 transparent: true,
                 opacity: 0.8 - (i * 0.2),
                 linewidth: 8 - (i * 2)
@@ -1341,7 +1341,7 @@ class Player {
         // Secondary impact flash
         const impact2Geometry = new THREE.SphereGeometry(4, 12, 12);
         const impact2Material = new THREE.MeshBasicMaterial({
-            color: 0xff6600,
+            color: 0x999999,
             transparent: true,
             opacity: 0.7
         });
