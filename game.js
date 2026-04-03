@@ -37,12 +37,17 @@ const gameState = {
     }
 };
 
-// Audio System — single preloaded instances, simple and light
+// === AUDIO SYSTEM — Web Audio API for zero-skip playback ===
 class AudioManager {
     constructor() {
-        this.sounds = {};
+        this.ctx = null;
+        this.buffers = {};
         this.enabled = true;
+        this.ready = false;
+        this.pendingFetches = {};
+        this.volumes = { sniperFire: 0.4 };
 
+        // Start fetching immediately
         const soundFiles = {
             firstBlood: 'sounds/first_blood.wav',
             doubleKill: 'sounds/Double_Kill.wav',
@@ -61,24 +66,215 @@ class AudioManager {
         };
 
         for (const [name, path] of Object.entries(soundFiles)) {
-            const a = new Audio(path);
-            a.preload = 'auto';
-            a.volume = (name === 'sniperFire') ? 0.5 : 0.7;
-            this.sounds[name] = a;
+            this.pendingFetches[name] = fetch(path).then(r => r.arrayBuffer()).catch(() => null);
         }
     }
 
-    init() {}
+    async init() {
+        if (this.ready) return;
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.ready = true;
+
+        // Decode all fetched audio
+        for (const [name, promise] of Object.entries(this.pendingFetches)) {
+            try {
+                const buf = await promise;
+                if (buf) this.buffers[name] = await this.ctx.decodeAudioData(buf);
+            } catch {}
+        }
+        this.pendingFetches = {};
+    }
 
     play(soundName) {
-        if (!this.enabled || !this.sounds[soundName]) return;
-        const a = this.sounds[soundName];
-        a.currentTime = 0;
-        a.play().catch(() => {});
+        if (!this.enabled || !this.ctx || !this.buffers[soundName]) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const source = this.ctx.createBufferSource();
+        source.buffer = this.buffers[soundName];
+        const gain = this.ctx.createGain();
+        gain.gain.value = this.volumes[soundName] || 0.7;
+        source.connect(gain).connect(this.ctx.destination);
+        source.start(0);
     }
 }
 
 const audioManager = new AudioManager();
+
+// === PROCEDURAL MEDIEVAL SOUNDTRACK ===
+class MedievalSoundtrack {
+    constructor() {
+        this.ctx = null;
+        this.masterGain = null;
+        this.playing = false;
+        this.volume = 0.15;
+        this.timers = [];
+    }
+
+    start(audioCtx) {
+        if (this.playing) return;
+        this.ctx = audioCtx;
+        this.playing = true;
+
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = this.volume;
+        this.masterGain.connect(this.ctx.destination);
+
+        // Dorian mode frequencies (medieval sounding)
+        // D4, E4, F4, G4, A4, Bb4, C5, D5
+        this.scale = [293.66, 329.63, 349.23, 392.00, 440.00, 466.16, 523.25, 587.33];
+        this.bassScale = [146.83, 164.81, 174.61, 196.00, 220.00, 233.08, 261.63, 293.66];
+
+        this._startDrone();
+        this._startMelody();
+        this._startBass();
+        this._startPercussion();
+    }
+
+    stop() {
+        this.playing = false;
+        this.timers.forEach(t => clearTimeout(t));
+        this.timers = [];
+        if (this.masterGain) {
+            this.masterGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 1);
+        }
+    }
+
+    // Persistent droning fifth — like a hurdy-gurdy
+    _startDrone() {
+        const drone = () => {
+            if (!this.playing) return;
+            const now = this.ctx.currentTime;
+
+            // Root drone
+            const osc1 = this.ctx.createOscillator();
+            osc1.type = 'sawtooth';
+            osc1.frequency.value = 146.83; // D3
+            const g1 = this.ctx.createGain();
+            g1.gain.setValueAtTime(0, now);
+            g1.gain.linearRampToValueAtTime(0.06, now + 2);
+            g1.gain.linearRampToValueAtTime(0.06, now + 10);
+            g1.gain.linearRampToValueAtTime(0, now + 12);
+            osc1.connect(g1).connect(this.masterGain);
+            osc1.start(now);
+            osc1.stop(now + 12);
+
+            // Fifth drone
+            const osc2 = this.ctx.createOscillator();
+            osc2.type = 'sawtooth';
+            osc2.frequency.value = 220.00; // A3
+            const g2 = this.ctx.createGain();
+            g2.gain.setValueAtTime(0, now);
+            g2.gain.linearRampToValueAtTime(0.04, now + 2);
+            g2.gain.linearRampToValueAtTime(0.04, now + 10);
+            g2.gain.linearRampToValueAtTime(0, now + 12);
+            osc2.connect(g2).connect(this.masterGain);
+            osc2.start(now);
+            osc2.stop(now + 12);
+
+            this.timers.push(setTimeout(drone, 11000));
+        };
+        drone();
+    }
+
+    // Plucked lute-like melody
+    _pluck(freq, time, duration = 0.8, vol = 0.12) {
+        const now = this.ctx.currentTime + time;
+        const osc = this.ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+
+        // Slight vibrato for medieval feel
+        const vibrato = this.ctx.createOscillator();
+        vibrato.frequency.value = 5;
+        const vibGain = this.ctx.createGain();
+        vibGain.gain.value = 2;
+        vibrato.connect(vibGain).connect(osc.frequency);
+        vibrato.start(now);
+        vibrato.stop(now + duration);
+
+        // Pluck envelope — sharp attack, quick decay
+        const env = this.ctx.createGain();
+        env.gain.setValueAtTime(0, now);
+        env.gain.linearRampToValueAtTime(vol, now + 0.01);
+        env.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        osc.connect(env).connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + duration);
+    }
+
+    _startMelody() {
+        const playPhrase = () => {
+            if (!this.playing) return;
+
+            // Generate a random medieval phrase (4-8 notes)
+            const len = 4 + Math.floor(Math.random() * 5);
+            let noteIdx = Math.floor(Math.random() * this.scale.length);
+            let t = 0;
+
+            for (let i = 0; i < len; i++) {
+                const freq = this.scale[noteIdx];
+                const dur = [0.3, 0.5, 0.7, 1.0][Math.floor(Math.random() * 4)];
+                this._pluck(freq, t, dur + 0.3);
+                t += dur;
+
+                // Move by step or small leap (sounds medieval)
+                const jump = [-2, -1, -1, 0, 1, 1, 2][Math.floor(Math.random() * 7)];
+                noteIdx = Math.max(0, Math.min(this.scale.length - 1, noteIdx + jump));
+            }
+
+            // Pause between phrases
+            const pause = 2000 + Math.random() * 4000;
+            this.timers.push(setTimeout(playPhrase, (t * 1000) + pause));
+        };
+        this.timers.push(setTimeout(playPhrase, 2000));
+    }
+
+    // Low plucked bass notes
+    _startBass() {
+        const playBass = () => {
+            if (!this.playing) return;
+            const idx = [0, 3, 4, 0, 3, 7][Math.floor(Math.random() * 6)];
+            this._pluck(this.bassScale[idx], 0, 1.5, 0.08);
+            const wait = [1500, 2000, 2500, 3000][Math.floor(Math.random() * 4)];
+            this.timers.push(setTimeout(playBass, wait));
+        };
+        this.timers.push(setTimeout(playBass, 4000));
+    }
+
+    // Subtle percussion — like a hand drum
+    _startPercussion() {
+        const hit = () => {
+            if (!this.playing) return;
+            const now = this.ctx.currentTime;
+
+            const noise = this.ctx.createBufferSource();
+            const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.1, this.ctx.sampleRate);
+            const data = buf.getChannelData(0);
+            for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1);
+            noise.buffer = buf;
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 200;
+
+            const env = this.ctx.createGain();
+            env.gain.setValueAtTime(0.08, now);
+            env.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+            noise.connect(filter).connect(env).connect(this.masterGain);
+            noise.start(now);
+            noise.stop(now + 0.15);
+
+            // Rhythmic pattern with variation
+            const beats = [500, 500, 750, 250, 500, 1000];
+            const wait = beats[Math.floor(Math.random() * beats.length)];
+            this.timers.push(setTimeout(hit, wait));
+        };
+        this.timers.push(setTimeout(hit, 6000));
+    }
+}
+
+const soundtrack = new MedievalSoundtrack();
 
 // Three.js Setup
 const scene = new THREE.Scene();
@@ -2011,7 +2207,9 @@ document.querySelectorAll('.teamBtn').forEach(btn => {
 });
 
 document.getElementById('startBtn').addEventListener('click', () => {
-    audioManager.init(); // Unlock audio on first user interaction
+    audioManager.init().then(() => {
+        soundtrack.start(audioManager.ctx);
+    }); // Unlock audio + start music on first user interaction
     const username = document.getElementById('usernameInput').value.trim() || 'Sniper';
 
     if (!selectedTeamValue) {
