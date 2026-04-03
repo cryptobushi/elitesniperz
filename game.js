@@ -2559,13 +2559,13 @@ document.querySelectorAll('.ability').forEach(el => {
 
 function startGame() {
     console.log('startGame() called');
+    try {
 
-    // Remove preview ground
-    scene.children.forEach(child => {
-        if (child.geometry && child.geometry.type === 'PlaneGeometry') {
-            scene.remove(child);
-        }
-    });
+    // Remove preview ground (not fog mesh)
+    const toRemove = scene.children.filter(child =>
+        child.geometry && child.geometry.type === 'PlaneGeometry' && child !== fogOfWar.fogMesh
+    );
+    toRemove.forEach(child => scene.remove(child));
 
     createMap();
     console.log('Map created');
@@ -2594,6 +2594,7 @@ function startGame() {
     document.body.focus();
 
     animate();
+    } catch(e) { console.error('startGame error:', e); }
 }
 
 // Minimap
