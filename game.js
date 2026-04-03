@@ -2326,6 +2326,11 @@ document.addEventListener('keydown', (e) => {
         console.log('Key pressed:', e.key.toLowerCase());
     }
 
+    if (e.key === ' ' && gameState.player && gameState.player.health <= 0) {
+        e.preventDefault();
+        document.getElementById('respawnBtn')?.click();
+        return;
+    }
     if (e.key.toLowerCase() === 'q') {
         e.preventDefault();
         useWindwalk();
