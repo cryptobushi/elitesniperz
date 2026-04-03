@@ -2007,7 +2007,6 @@ class Player {
 
         if (this.isPlayer) {
             // Player alive
-            updateShopUI();
         } else {
             // Bot auto-buy: prioritize items they don't have
             this._botShop();
@@ -2156,15 +2155,13 @@ function updateShopUI() {
     });
 }
 
-// Check shop proximity every frame
+// Check shop proximity every frame — only auto-CLOSE when leaving spawn
 function checkShopProximity() {
     if (gameState.player && gameState.player.health > 0) {
         const nearSpawn = gameState.player.isNearSpawn();
         const panel = document.getElementById('shopPanel');
-        if (panel) {
-            if (nearSpawn && !panel.classList.contains('hidden')) return; // already showing
-            if (nearSpawn) updateShopUI();
-            else panel.classList.add('hidden');
+        if (panel && !nearSpawn) {
+            panel.classList.add('hidden');
         }
     }
 }
@@ -2567,12 +2564,14 @@ function startGame() {
     );
     toRemove.forEach(child => scene.remove(child));
 
+    console.log('About to createMap...');
     createMap();
     console.log('Map created');
 
     // Create player
+    console.log('About to create player...');
     gameState.player = new Player(gameState.username, gameState.team, true);
-    console.log('Player created:', gameState.player);
+    console.log('Player created at', gameState.player.position.x, gameState.player.position.z);
 
     // Initialize camera at player position
     gameState.cameraTarget.copy(gameState.player.position);
