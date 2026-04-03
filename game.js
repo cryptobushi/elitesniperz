@@ -73,10 +73,15 @@ class AudioManager {
     play(soundName) {
         if (!this.enabled || !this.sounds[soundName]) return;
         const a = this.sounds[soundName];
-        // If still playing, let it finish — don't interrupt
-        if (!a.paused && a.currentTime > 0) return;
-        a.currentTime = 0;
-        a.play().catch(() => {});
+        if (a.paused || a.ended) {
+            a.currentTime = 0;
+            a.play().catch(() => {});
+        } else {
+            // Already playing — clone for overlap (only happens on rapid fire)
+            const c = new Audio(a.src);
+            c.volume = a.volume;
+            c.play().catch(() => {});
+        }
     }
 }
 
