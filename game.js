@@ -29,18 +29,20 @@ const gameState = {
     killStreak: 0,
     multiKillTimer: 0,
     multiKillCount: 0,
-    firstBlood: false
+    firstBlood: false,
+    // Debug
+    debug: {
+        godMode: true,
+        showFPS: true,
+    }
 };
 
-// Audio System
+// Audio System — preloaded HTML Audio, cloneNode for overlap
 class AudioManager {
     constructor() {
         this.sounds = {};
         this.enabled = true;
-        this.loadSounds();
-    }
 
-    loadSounds() {
         const soundFiles = {
             firstBlood: 'sounds/first_blood.wav',
             doubleKill: 'sounds/Double_Kill.wav',
@@ -59,37 +61,20 @@ class AudioManager {
         };
 
         for (const [name, path] of Object.entries(soundFiles)) {
-            this.sounds[name] = new Audio(path);
-            // Louder volume for gun sound, normal for announcer
-            this.sounds[name].volume = (name === 'sniperFire') ? 0.5 : 0.7;
+            const audio = new Audio(path);
+            audio.preload = 'auto';
+            audio.volume = (name === 'sniperFire') ? 0.5 : 0.7;
+            this.sounds[name] = audio;
         }
     }
 
+    init() {} // compat
+
     play(soundName) {
         if (!this.enabled || !this.sounds[soundName]) return;
-
-        const sound = this.sounds[soundName];
-        sound.currentTime = 0;
-        sound.play().catch(err => console.log('Audio play failed:', err));
-    }
-
-    playKillStreak(streak) {
-        // Kill streak announcements (every 5 kills)
-        if (streak === 5) this.play('killingSpree');
-        else if (streak === 10) this.play('rampage');
-        else if (streak === 15) this.play('dominating');
-        else if (streak === 20) this.play('unstoppable');
-        else if (streak === 25) this.play('godlike');
-    }
-
-    playMultiKill(count) {
-        // Multi-kill announcements (rapid kills)
-        if (count === 2) this.play('doubleKill');
-        else if (count === 3) this.play('multiKill');
-        else if (count === 4) this.play('megaKill');
-        else if (count === 5) this.play('ultraKill');
-        else if (count === 6) this.play('monsterKill');
-        else if (count >= 7) this.play('ludicrousKill');
+        const clone = this.sounds[soundName].cloneNode();
+        clone.volume = this.sounds[soundName].volume;
+        clone.play().catch(() => {});
     }
 }
 
@@ -1560,6 +1545,8 @@ class Player {
     }
 
     takeDamage(damage, attacker) {
+        // God mode — player can't die
+        if (this.isPlayer && gameState.debug.godMode) return;
         // Instant kill - no health system
         this.die(attacker);
     }
@@ -1574,30 +1561,37 @@ class Player {
         if (killer) {
             killer.kills++;
 
-            // Update UI if killer is player
+            // Determine if this kill triggers a special announcement
+            let hasSpecial = false;
+
+            // First blood — global
+            if (!gameState.firstBlood) {
+                gameState.firstBlood = true;
+                audioManager.play('firstBlood');
+                if (killer.isPlayer) showStreakPopup('FIRST BLOOD', '#ff4444');
+                hasSpecial = true;
+            }
+
+            // Player-specific streak/multi-kill tracking
             if (killer.isPlayer) {
                 gameState.kills = killer.kills;
                 document.getElementById('killCount').textContent = `Kills: ${gameState.kills}`;
 
-                // First blood
-                if (!gameState.firstBlood) {
-                    gameState.firstBlood = true;
-                    audioManager.play('firstBlood');
-                    showStreakPopup('FIRST BLOOD', '#ff4444');
-                }
-
-                // Always play headshot for kills (it's a sniper game!)
-                audioManager.play('headshot');
-
-                // Kill streak tracking
+                // Kill streak
                 gameState.killStreak++;
                 const streak = gameState.killStreak;
-                audioManager.playKillStreak(streak);
-                if (streak === 5) showStreakPopup('KILLING SPREE', '#ff8800');
-                else if (streak === 10) showStreakPopup('RAMPAGE', '#ff4400');
-                else if (streak === 15) showStreakPopup('DOMINATING', '#ff0044');
-                else if (streak === 20) showStreakPopup('UNSTOPPABLE', '#cc00ff');
-                else if (streak === 25) showStreakPopup('GODLIKE', '#ffdd00');
+                const streakMap = {
+                    5: ['killingSpree', 'KILLING SPREE', '#ff8800'],
+                    10: ['rampage', 'RAMPAGE', '#ff4400'],
+                    15: ['dominating', 'DOMINATING', '#ff0044'],
+                    20: ['unstoppable', 'UNSTOPPABLE', '#cc00ff'],
+                    25: ['godlike', 'GODLIKE', '#ffdd00'],
+                };
+                if (streakMap[streak]) {
+                    audioManager.play(streakMap[streak][0]);
+                    showStreakPopup(streakMap[streak][1], streakMap[streak][2]);
+                    hasSpecial = true;
+                }
 
                 // Multi-kill tracking (kills within 4 seconds)
                 if (gameState.multiKillTimer > 0) {
@@ -1605,25 +1599,48 @@ class Player {
                 } else {
                     gameState.multiKillCount = 1;
                 }
-                gameState.multiKillTimer = 4.0; // 4 second window
+                gameState.multiKillTimer = 4.0;
 
                 const mk = gameState.multiKillCount;
-                if (mk === 2) { audioManager.playMultiKill(mk); showStreakPopup('DOUBLE KILL', '#44ffaa'); }
-                else if (mk === 3) { audioManager.playMultiKill(mk); showStreakPopup('MULTI KILL', '#44ddff'); }
-                else if (mk === 4) { audioManager.playMultiKill(mk); showStreakPopup('MEGA KILL', '#4488ff'); }
-                else if (mk === 5) { audioManager.playMultiKill(mk); showStreakPopup('ULTRA KILL', '#aa44ff'); }
-                else if (mk === 6) { audioManager.playMultiKill(mk); showStreakPopup('MONSTER KILL', '#ff44aa'); }
-                else if (mk >= 7) { audioManager.playMultiKill(mk); showStreakPopup('LUDICROUS KILL', '#ff0000'); }
+                const multiMap = {
+                    2: ['doubleKill', 'DOUBLE KILL', '#44ffaa'],
+                    3: ['multiKill', 'MULTI KILL', '#44ddff'],
+                    4: ['megaKill', 'MEGA KILL', '#4488ff'],
+                    5: ['ultraKill', 'ULTRA KILL', '#aa44ff'],
+                    6: ['monsterKill', 'MONSTER KILL', '#ff44aa'],
+                };
+                if (mk >= 7) {
+                    audioManager.play('ludicrousKill');
+                    showStreakPopup('LUDICROUS KILL', '#ff0000');
+                    hasSpecial = true;
+                } else if (multiMap[mk]) {
+                    audioManager.play(multiMap[mk][0]);
+                    showStreakPopup(multiMap[mk][1], multiMap[mk][2]);
+                    hasSpecial = true;
+                }
+
+                // Only play headshot if no special announcement
+                if (!hasSpecial) audioManager.play('headshot');
+
+            } else {
+                // Bot got a kill — play special sounds globally (no popup text)
+                // Track per-bot streaks
+                if (!killer._streak) killer._streak = 0;
+                killer._streak++;
+                const bs = killer._streak;
+                const botStreakSounds = { 5: 'killingSpree', 10: 'rampage', 15: 'dominating', 20: 'unstoppable', 25: 'godlike' };
+                if (botStreakSounds[bs]) audioManager.play(botStreakSounds[bs]);
             }
 
             // Show kill feed
             addKillFeed(killer.username, this.username);
         }
 
-        // Reset kill streak when you die
+        // Reset kill streak when dying
         if (this.isPlayer) {
             gameState.killStreak = 0;
         }
+        this._streak = 0;
 
         // Update UI if this is the player
         if (this.isPlayer) {
@@ -1831,8 +1848,36 @@ document.addEventListener('keydown', (e) => {
         document.getElementById('scoreboard').classList.remove('hidden');
         updateScoreboard();
     }
+    if (e.key === '`') {
+        const panel = document.getElementById('debugPanel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
     if (e.shiftKey) gameState.attackWalk = true;
 });
+
+// Debug panel checkboxes
+document.getElementById('dbgGodMode').addEventListener('change', (e) => {
+    gameState.debug.godMode = e.target.checked;
+});
+document.getElementById('dbgShowFPS').addEventListener('change', (e) => {
+    gameState.debug.showFPS = e.target.checked;
+});
+
+// FPS counter
+let _fpsFrames = 0, _fpsLast = performance.now();
+function updateDebugFPS() {
+    _fpsFrames++;
+    const now = performance.now();
+    if (now - _fpsLast >= 1000) {
+        if (gameState.debug.showFPS) {
+            document.getElementById('debugFPS').textContent = `FPS: ${_fpsFrames}`;
+        }
+        _fpsFrames = 0;
+        _fpsLast = now;
+    }
+    requestAnimationFrame(updateDebugFPS);
+}
+updateDebugFPS();
 
 document.addEventListener('keyup', (e) => {
     gameState.keys[e.key.toLowerCase()] = false;
@@ -1968,6 +2013,7 @@ document.querySelectorAll('.teamBtn').forEach(btn => {
 });
 
 document.getElementById('startBtn').addEventListener('click', () => {
+    audioManager.init(); // Unlock audio on first user interaction
     const username = document.getElementById('usernameInput').value.trim() || 'Sniper';
 
     if (!selectedTeamValue) {
@@ -2063,8 +2109,9 @@ function minimapToWorld(clientX, clientY) {
 }
 
 function jumpCameraTo(worldX, worldZ) {
-    smoothCamX = worldX;
-    smoothCamZ = worldZ;
+    // Lerp toward target instead of snapping — less jarring
+    smoothCamX += (worldX - smoothCamX) * 0.4;
+    smoothCamZ += (worldZ - smoothCamZ) * 0.4;
 }
 
 // Works for both mouse and touch

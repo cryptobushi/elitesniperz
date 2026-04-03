@@ -18,8 +18,6 @@
             color: #fff;
             width: 100%;
             height: 100%;
-            /* iOS safe areas */
-            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
             touch-action: none;
             -webkit-touch-callout: none;
             -webkit-user-select: none;
@@ -28,8 +26,9 @@
 
         #gameCanvas {
             display: block;
-            width: 100vw;
-            height: 100vh;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             touch-action: none;
         }
 
@@ -256,14 +255,12 @@
 
         .hidden { display: none !important; }
 
-        /* === KILL FEED — bottom left, compact === */
+        /* === KILL FEED — above minimap, bottom left === */
         #killFeed {
             position: absolute;
-            bottom: env(safe-area-inset-bottom, 80px);
-            left: env(safe-area-inset-left, 8px);
-            width: min(220px, 45vw);
-            padding-bottom: 8px;
-            padding-left: 8px;
+            bottom: 140px;
+            left: 8px;
+            width: min(200px, 40vw);
             pointer-events: none;
         }
 
@@ -284,15 +281,13 @@
         /* === MINIMAP === */
         .minimap {
             position: absolute;
-            bottom: env(safe-area-inset-bottom, 12px);
-            left: env(safe-area-inset-left, 12px);
-            width: 80px;
-            height: 80px;
+            bottom: 8px;
+            left: 8px;
+            width: 120px;
+            height: 120px;
             background: rgba(0, 0, 0, 0.7);
             border: 1px solid #00ff0066;
             border-radius: 4px;
-            padding-bottom: 12px;
-            padding-left: 12px;
         }
 
         /* === MOBILE TWEAKS === */
@@ -304,7 +299,7 @@
             /* Very short landscape — tighten everything */
             #scoreboard { font-size: 0.6rem; min-width: 80px; padding: 6px; }
             .stat { padding: 2px 8px; font-size: 0.6rem; }
-            .minimap { width: 60px; height: 60px; }
+            .minimap { width: 100px; height: 100px; }
             .ability { width: 50px; padding: 6px; }
             .ability-key { font-size: 0.9rem; }
         }
@@ -378,6 +373,26 @@
 
         <div id="killFeed"></div>
         <div id="streakPopup"></div>
+
+        <div id="debugPanel" style="
+            position:absolute; top:50%; right:8px; transform:translateY(-50%);
+            background:rgba(0,0,0,0.85); border:1px solid #ff00ff66; border-radius:6px;
+            padding:8px 12px; font-size:0.65rem; color:#ff00ff; pointer-events:all;
+            display:none; z-index:800; min-width:120px;
+        ">
+            <div style="font-weight:bold; margin-bottom:6px; font-size:0.75rem;">DEBUG [~]</div>
+            <div id="debugFPS" style="color:#aaa; margin-bottom:4px;">FPS: --</div>
+            <label style="display:block; margin-bottom:4px; cursor:pointer;">
+                <input type="checkbox" id="dbgGodMode" checked> God Mode
+            </label>
+            <label style="display:block; margin-bottom:4px; cursor:pointer;">
+                <input type="checkbox" id="dbgShowFPS" checked> Show FPS
+            </label>
+            <button onclick="document.querySelectorAll('.kill-message').forEach(e=>e.remove())" style="
+                background:#ff00ff22; border:1px solid #ff00ff44; color:#ff00ff; padding:2px 8px;
+                font-size:0.6rem; cursor:pointer; border-radius:3px; margin-top:4px; width:100%;
+            ">Clear Kill Feed</button>
+        </div>
 
         <div id="deathPopup" class="hidden" style="
             position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
