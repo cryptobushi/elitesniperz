@@ -310,6 +310,28 @@
             0% { opacity: 0; }
             100% { opacity: 0.7; }
         }
+        #respawnBtn {
+            position: relative;
+            z-index: 1;
+            margin-top: 2rem;
+            background: none;
+            border: 1px solid #8b000066;
+            color: #8b0000;
+            font-family: 'Times New Roman', 'Georgia', serif;
+            font-size: clamp(0.8rem, 2.5vw, 1rem);
+            letter-spacing: 0.15em;
+            padding: 0.6rem 2rem;
+            cursor: pointer;
+            pointer-events: all;
+            opacity: 0;
+            animation: deathSubIn 1s ease-in 2.5s forwards;
+            -webkit-tap-highlight-color: transparent;
+            transition: border-color 0.3s, color 0.3s;
+        }
+        #respawnBtn:hover, #respawnBtn:active {
+            border-color: #8b0000;
+            color: #cc0000;
+        }
 
         .hidden { display: none !important; }
 
@@ -456,6 +478,7 @@
             <div id="deathOverlay"></div>
             <div id="deathText">YOU DIED</div>
             <div id="deathKiller"></div>
+            <button id="respawnBtn">RETURN TO SPAWN</button>
         </div>
         <canvas class="minimap hidden" id="minimap"></canvas>
     </div>

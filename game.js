@@ -2332,7 +2332,19 @@ function preGameRender() {
 // Start pre-game rendering immediately
 preGameRender();
 
-// Death screen auto-centers camera on respawn
+// Respawn button — immediate respawn
+document.getElementById('respawnBtn')?.addEventListener('click', () => {
+    document.getElementById('deathPopup').classList.add('hidden');
+    if (gameState.player && gameState.player.health <= 0) {
+        gameState.player.respawn();
+        const spawnX = gameState.player.team === 'red' ? -70 : 70;
+        const spawnZ = gameState.player.team === 'red' ? -70 : 70;
+        smoothCamX = spawnX;
+        smoothCamZ = spawnZ;
+        gameState.cameraTarget.x = spawnX;
+        gameState.cameraTarget.z = spawnZ;
+    }
+});
 
 // Also hide popup on respawn
 const _origRespawn = Player.prototype.respawn;
