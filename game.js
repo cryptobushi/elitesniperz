@@ -1950,9 +1950,15 @@ class Player {
             addKillFeed(killer.username, this.username);
         }
 
+        // Lose all items on death
+        this.inventory = {};
+        this._applyItems();
+
         // Reset kill streak when dying
         if (this.isPlayer) {
             gameState.killStreak = 0;
+            gameState.gold = this.gold;
+            updateGoldUI();
         }
         this._streak = 0;
 
@@ -1960,7 +1966,6 @@ class Player {
         if (this.isPlayer) {
             gameState.deaths++;
             document.getElementById('deathCount').textContent = `Deaths: ${gameState.deaths}`;
-            // Player died
 
             // Clear ALL move targets and commands
             gameState.moveTarget = null;
@@ -1969,13 +1974,24 @@ class Player {
             // Dark Souls death screen
             const popup = document.getElementById('deathPopup');
             const killerName = killer ? killer.username : 'the darkness';
-            document.getElementById('deathKiller').textContent = `Felled by ${killerName}`;
-            // Reset animations by removing and re-adding
+
+            // Show killer's items
+            let killerItems = '';
+            if (killer && Object.keys(killer.inventory).length > 0) {
+                const items = Object.keys(killer.inventory).map(id => {
+                    const item = SHOP_ITEMS[id];
+                    return item ? `${item.icon} ${item.name}` : '';
+                }).filter(Boolean).join('  ');
+                killerItems = `\n${items}`;
+            }
+            document.getElementById('deathKiller').innerHTML =
+                `Felled by ${killerName}` +
+                (killerItems ? `<div style="margin-top:0.4rem;font-size:0.7rem;color:#ffd700;">${killerItems}</div>` : '');
+
             popup.classList.add('hidden');
-            void popup.offsetHeight; // Force reflow
+            void popup.offsetHeight;
             popup.classList.remove('hidden');
 
-            // Auto-dismiss after animation
             setTimeout(() => popup.classList.add('hidden'), 5000);
         }
 
