@@ -271,51 +271,52 @@
             width: 100%; height: 100%;
             background: #000;
             opacity: 0;
-            animation: deathFadeIn 1.5s ease-in forwards;
+            animation: deathFadeIn 0.4s ease-out forwards;
         }
         @keyframes deathFadeIn {
             0% { opacity: 0; }
-            100% { opacity: 0.7; }
+            100% { opacity: 0.75; }
         }
         #deathText {
             position: relative;
             z-index: 1;
             font-family: 'Times New Roman', 'Georgia', serif;
-            font-size: clamp(2.5rem, 10vw, 5rem);
+            font-size: clamp(3rem, 12vw, 6rem);
             font-weight: 400;
             letter-spacing: 0.3em;
             color: #8b0000;
-            text-shadow: 0 0 40px rgba(139,0,0,0.5), 0 0 80px rgba(139,0,0,0.2);
+            text-shadow: 0 0 60px rgba(200,0,0,0.8), 0 0 120px rgba(139,0,0,0.4), 0 0 200px rgba(139,0,0,0.2);
             opacity: 0;
-            animation: deathTextIn 2.5s ease-in-out 0.8s forwards;
+            transform: scale(1.8);
+            animation: deathTextIn 1s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s forwards;
         }
         @keyframes deathTextIn {
-            0% { opacity: 0; letter-spacing: 0.6em; }
-            40% { opacity: 1; letter-spacing: 0.3em; }
-            80% { opacity: 1; }
-            100% { opacity: 0.9; }
+            0% { opacity: 0; transform: scale(1.8); letter-spacing: 0.8em; }
+            50% { opacity: 1; transform: scale(0.95); letter-spacing: 0.25em; }
+            70% { transform: scale(1.05); }
+            100% { opacity: 1; transform: scale(1); letter-spacing: 0.3em; }
         }
         #deathKiller {
             position: relative;
             z-index: 1;
             font-family: 'Times New Roman', 'Georgia', serif;
             font-size: clamp(0.8rem, 3vw, 1.2rem);
-            color: #666;
+            color: #777;
             letter-spacing: 0.15em;
             opacity: 0;
-            animation: deathSubIn 1s ease-in 2.5s forwards;
-            margin-top: 1rem;
+            animation: deathSubIn 0.5s ease-out 1s forwards;
+            margin-top: 0.8rem;
         }
         @keyframes deathSubIn {
-            0% { opacity: 0; }
-            100% { opacity: 0.7; }
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 0.8; transform: translateY(0); }
         }
         #respawnBtn {
             position: relative;
             z-index: 1;
-            margin-top: 2rem;
+            margin-top: 1.5rem;
             background: none;
-            border: 1px solid #8b000066;
+            border: 1px solid #8b000044;
             color: #8b0000;
             font-family: 'Times New Roman', 'Georgia', serif;
             font-size: clamp(0.8rem, 2.5vw, 1rem);
@@ -324,13 +325,14 @@
             cursor: pointer;
             pointer-events: all;
             opacity: 0;
-            animation: deathSubIn 1s ease-in 2.5s forwards;
+            animation: deathSubIn 0.5s ease-out 1.3s forwards;
             -webkit-tap-highlight-color: transparent;
-            transition: border-color 0.3s, color 0.3s;
+            transition: all 0.2s;
         }
         #respawnBtn:hover, #respawnBtn:active {
-            border-color: #8b0000;
-            color: #cc0000;
+            border-color: #cc0000;
+            color: #ff2222;
+            text-shadow: 0 0 20px rgba(255,0,0,0.4);
         }
 
         .hidden { display: none !important; }
