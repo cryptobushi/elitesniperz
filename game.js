@@ -1164,7 +1164,8 @@ class Player {
             // If enemy is within FOV cone and in range
             if (angle < fovRadians) {
                 const distance = this.position.distanceTo(enemy.position);
-                if (distance <= this.shootRange) {
+                const range = this.shootRange + (this.isPlayer && gameState.targetLock === enemy ? 10 : 0);
+                if (distance <= range) {
                     // Double-check fog of war visibility
                     const enemyVisible = fogOfWar.isVisible(enemy.position.x, enemy.position.z);
                     if (!enemyVisible) {
@@ -2937,6 +2938,43 @@ function animate() {
             }
         }
 
+        // Target lock crosshair + range boost
+        if (gameState.targetLock) {
+            const tgt = gameState.targetLock;
+            if (tgt.health <= 0 || !tgt.mesh.visible) {
+                // Target dead or hidden — clear lock
+                gameState.targetLock = null;
+                if (gameState._crosshair) { scene.remove(gameState._crosshair); gameState._crosshair = null; }
+            } else {
+                // Create crosshair if needed
+                if (!gameState._crosshair) {
+                    const g = new THREE.Group();
+                    const mat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.8 });
+                    // Four lines forming a crosshair
+                    for (let i = 0; i < 4; i++) {
+                        const line = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.06), mat);
+                        line.position.y = 0.4;
+                        const arm = new THREE.Group();
+                        arm.add(line);
+                        arm.rotation.z = (i / 4) * Math.PI * 2;
+                        g.add(arm);
+                    }
+                    // Center circle
+                    const ring = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.25, 16), mat);
+                    g.add(ring);
+                    g.rotation.x = -Math.PI / 2;
+                    scene.add(g);
+                    gameState._crosshair = g;
+                }
+                // Follow target
+                gameState._crosshair.position.set(tgt.position.x, tgt.position.y + 2.2, tgt.position.z);
+                gameState._crosshair.rotation.z += deltaTime * 2; // Slow spin
+            }
+        } else if (gameState._crosshair) {
+            scene.remove(gameState._crosshair);
+            gameState._crosshair = null;
+        }
+
         // Aim weapon at mouse
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(gameState.mousePos, camera);
@@ -2945,8 +2983,6 @@ function animate() {
         raycaster.ray.intersectPlane(plane, intersectPoint);
 
         gameState.player.weapon.lookAt(intersectPoint);
-
-        // Gold display updated via earnGold()
     }
 
     // Update bots
