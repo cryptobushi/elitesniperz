@@ -172,7 +172,6 @@ class MedievalSoundtrack {
         this.currentChord = 0;
 
         this._startBass();
-        this._startChords();
         this._startMelody();
         this._startHarpsichord();
         this._startPercussion();
@@ -2773,8 +2772,7 @@ function animate() {
 
         gameState.player.weapon.lookAt(intersectPoint);
 
-        // Update health display (always alive now)
-        document.getElementById('healthStat').textContent = `Status: ALIVE`;
+        // Gold display updated via earnGold()
     }
 
     // Update bots
