@@ -54,12 +54,14 @@ class AudioManager {
             dominating: 'sounds/Dominating.wav',
             unstoppable: 'sounds/Unstoppable.wav',
             godlike: 'sounds/GodLike.wav',
-            headshot: 'sounds/Headshot.wav'
+            headshot: 'sounds/Headshot.wav',
+            sniperFire: 'sounds/sniper_fire_h3_1.wav'
         };
 
         for (const [name, path] of Object.entries(soundFiles)) {
             this.sounds[name] = new Audio(path);
-            this.sounds[name].volume = 0.7;
+            // Louder volume for gun sound, normal for announcer
+            this.sounds[name].volume = (name === 'sniperFire') ? 0.5 : 0.7;
         }
     }
 
@@ -1204,6 +1206,9 @@ class Player {
                 return; // Wall blocking
             }
         }
+
+        // Play sniper fire sound
+        audioManager.play('sniperFire');
 
         // HUGE CANNON-LIKE SHOOTING ANIMATION
         this.createShootingEffect(target.position);
