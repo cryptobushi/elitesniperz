@@ -1525,8 +1525,8 @@ class Player {
         // HUGE CANNON-LIKE SHOOTING ANIMATION
         this.createShootingEffect(target.position);
 
-        // Instant kill (classic snipers!)
-        target.die(this);
+        // Instant kill (classic snipers!) — goes through takeDamage for shield check
+        target.takeDamage(999, this);
     }
 
     createShootingEffect(targetPos) {
