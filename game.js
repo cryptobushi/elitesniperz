@@ -89,8 +89,8 @@ const audioManager = new AudioManager();
 
 // Three.js Setup
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1a1a1a);
-scene.fog = new THREE.Fog(0x000000, 30, 80);
+scene.background = new THREE.Color(0x2a2a30);
+scene.fog = new THREE.Fog(0x2a2a30, 100, 300);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
 camera.position.set(0, 20, 20);
@@ -313,7 +313,7 @@ class FogOfWar {
         const fogMaterial = new THREE.MeshBasicMaterial({
             map: this.fogTexture,
             transparent: true,
-            opacity: 0.95,
+            opacity: 0.6,
             color: 0x000000,
             depthWrite: false,
             depthTest: false, // Don't test depth so it renders on top
@@ -1972,6 +1972,16 @@ document.addEventListener('mouseup', (e) => {
 document.addEventListener('contextmenu', (e) => {
     e.preventDefault(); // Prevent right-click menu
 });
+
+// Scroll wheel zoom
+document.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const zoomSpeed = 1.5;
+    const delta = e.deltaY > 0 ? zoomSpeed : -zoomSpeed;
+    const newZoom = THREE.MathUtils.clamp(gameState.cameraOffset.y + delta, 6, 40);
+    gameState.cameraOffset.y = newZoom;
+    gameState.cameraOffset.z = newZoom;
+}, { passive: false });
 
 // Create visual move marker
 function createMoveMarker(position) {
