@@ -105,7 +105,7 @@ class MedievalSoundtrack {
         this.ctx = null;
         this.masterGain = null;
         this.playing = false;
-        this.volume = 0.45;
+        this.volume = 0.85;
         this.timers = [];
     }
 
