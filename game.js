@@ -2998,6 +2998,7 @@ function animate() {
                     const sprite = new THREE.Sprite(spriteMat);
                     sprite.scale.set(3, 3, 1);
                     sprite.renderOrder = 9999;
+                    sprite.raycast = () => {}; // Prevent collision raycast errors
                     scene.add(sprite);
                     gameState._crosshair = sprite;
                 }
