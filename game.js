@@ -462,11 +462,13 @@ const createMap = () => {
     ground.receiveShadow = true;
     scene.add(ground);
 
+    // Terrain height helper
+    const terrainY = (x, z) => Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2;
+
     // Create trees
     const createTree = (x, z) => {
         const treeGroup = new THREE.Group();
 
-        // Trunk
         const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 3, 8);
         const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x4a3520 });
         const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
@@ -474,7 +476,6 @@ const createMap = () => {
         trunk.castShadow = true;
         treeGroup.add(trunk);
 
-        // Foliage
         const foliageGeometry = new THREE.ConeGeometry(1.5, 3, 8);
         const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x2d5016 });
         const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
@@ -482,8 +483,8 @@ const createMap = () => {
         foliage.castShadow = true;
         treeGroup.add(foliage);
 
-        treeGroup.position.set(x, 0, z);
-        treeGroup.userData.isWall = true; // Trees block movement
+        treeGroup.position.set(x, terrainY(x, z), z);
+        treeGroup.userData.isWall = true;
         scene.add(treeGroup);
         return treeGroup;
     };
@@ -508,7 +509,7 @@ const createMap = () => {
             metalness: 0
         });
         const rock = new THREE.Mesh(rockGeometry, rockMaterial);
-        rock.position.set(x, size * 0.7, z);
+        rock.position.set(x, terrainY(x, z) + size * 0.7, z);
         rock.rotation.set(Math.random(), Math.random(), Math.random());
         rock.castShadow = true;
         rock.receiveShadow = true;
@@ -534,7 +535,7 @@ const createMap = () => {
     const createWall = (x, y, width, height) => {
         const wallGeometry = new THREE.BoxGeometry(width, 4, height);
         const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-        wall.position.set(x, 2, y);
+        wall.position.set(x, terrainY(x, y) + 2, y);
         wall.castShadow = true;
         wall.receiveShadow = true;
         wall.userData.isWall = true;
