@@ -99,13 +99,13 @@ class AudioManager {
 
 const audioManager = new AudioManager();
 
-// === PROCEDURAL MEDIEVAL SOUNDTRACK ===
+// === RUNESCAPE-STYLE PROCEDURAL SOUNDTRACK ===
 class MedievalSoundtrack {
     constructor() {
         this.ctx = null;
         this.masterGain = null;
         this.playing = false;
-        this.volume = 0.5;
+        this.volume = 0.45;
         this.timers = [];
     }
 
@@ -118,18 +118,49 @@ class MedievalSoundtrack {
         this.masterGain.gain.value = this.volume;
         this.masterGain.connect(this.ctx.destination);
 
-        // Mixolydian mode — bright and energetic medieval
-        // D4, E4, F#4, G4, A4, B4, C5, D5, E5, F#5
-        this.scale = [293.66, 329.63, 369.99, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 739.99];
-        this.bassScale = [146.83, 164.81, 185.00, 196.00, 220.00, 246.94, 261.63, 293.66];
-        this.bpm = 160;
-        this.beat = 60000 / this.bpm; // ms per beat
+        this.bpm = 120;
+        this.beat = 60 / this.bpm; // seconds per beat
 
-        this._startDrone();
-        this._startMelody();
-        this._startCounterMelody();
+        // D minor pentatonic + natural minor for that RS feel
+        // D4=293.66 E4=329.63 F4=349.23 G4=392 A4=440 Bb4=466.16 C5=523.25 D5=587.33
+        this.notes = {
+            D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.00, A3: 220.00, Bb3: 233.08, C4: 261.63,
+            D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, Bb4: 466.16, C5: 523.25,
+            D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.00,
+        };
+
+        // Pre-composed melody phrases (scale degrees in D minor)
+        // Each phrase = [[note, duration_in_beats], ...]
+        this.melodyPhrases = [
+            // Heroic ascending — like "Newbie Melody"
+            [['D4',1],['F4',0.5],['A4',0.5],['D5',1.5],['C5',0.5],['A4',1],['Bb4',0.5],['A4',0.5],['G4',1],['F4',1]],
+            // Descending run
+            [['D5',1],['C5',0.5],['Bb4',0.5],['A4',1],['G4',0.5],['F4',0.5],['E4',0.5],['D4',1.5]],
+            // Call and response
+            [['A4',0.75],['Bb4',0.25],['A4',0.5],['G4',0.5],['F4',1],['E4',0.5],['F4',0.5],['G4',0.5],['A4',1.5]],
+            // Bold fanfare
+            [['D4',0.5],['D4',0.5],['A4',1],['A4',0.5],['Bb4',0.5],['A4',0.5],['G4',0.5],['F4',1],['D4',1]],
+            // Marching theme
+            [['D4',0.5],['F4',0.5],['G4',0.5],['A4',0.5],['Bb4',1],['A4',0.5],['G4',0.5],['A4',0.5],['F4',0.5],['D4',1]],
+            // Longing phrase
+            [['A4',1.5],['G4',0.5],['F4',1],['G4',1],['A4',0.5],['Bb4',0.5],['C5',1],['A4',1]],
+        ];
+
+        // Chord progressions: Dm - Bb - C - Dm, Dm - F - Gm - Am, etc.
+        this.chordProgs = [
+            [['D3','F3','A3'], ['Bb3','D4','F3'], ['C4','E3','G3'], ['D3','F3','A3']],
+            [['D3','F3','A3'], ['F3','A3','C4'], ['G3','Bb3','D4'], ['A3','C4','E4']],
+            [['D3','F3','A3'], ['G3','Bb3','D4'], ['Bb3','D4','F3'], ['A3','C4','E4']],
+        ];
+        this.currentChordProg = 0;
+        this.currentChord = 0;
+
         this._startBass();
+        this._startChords();
+        this._startMelody();
+        this._startHarpsichord();
         this._startPercussion();
+        this._startStrings();
     }
 
     stop() {
@@ -141,139 +172,58 @@ class MedievalSoundtrack {
         }
     }
 
-    // Pulsing hurdy-gurdy drone — rhythmic energy
-    _startDrone() {
-        const pulse = () => {
-            if (!this.playing) return;
-            const now = this.ctx.currentTime;
-            const dur = this.beat / 1000 * 2; // 2-beat pulse
+    // Synth voice — type, freq, start, duration, volume, attack, release
+    _voice(type, freq, time, dur, vol, attack = 0.01, release = 0.1) {
+        const now = this.ctx.currentTime + time;
+        const osc = this.ctx.createOscillator();
+        osc.type = type;
+        osc.frequency.value = freq;
 
-            const osc1 = this.ctx.createOscillator();
-            osc1.type = 'sawtooth';
-            osc1.frequency.value = 146.83; // D3
-            const g1 = this.ctx.createGain();
-            g1.gain.setValueAtTime(0.1, now);
-            g1.gain.linearRampToValueAtTime(0.06, now + dur);
-            osc1.connect(g1).connect(this.masterGain);
-            osc1.start(now);
-            osc1.stop(now + dur);
+        const env = this.ctx.createGain();
+        env.gain.setValueAtTime(0, now);
+        env.gain.linearRampToValueAtTime(vol, now + attack);
+        env.gain.setValueAtTime(vol, now + dur - release);
+        env.gain.linearRampToValueAtTime(0, now + dur);
 
-            const osc2 = this.ctx.createOscillator();
-            osc2.type = 'sawtooth';
-            osc2.frequency.value = 220.00; // A3
-            const g2 = this.ctx.createGain();
-            g2.gain.setValueAtTime(0.07, now);
-            g2.gain.linearRampToValueAtTime(0.03, now + dur);
-            osc2.connect(g2).connect(this.masterGain);
-            osc2.start(now);
-            osc2.stop(now + dur);
-
-            this.timers.push(setTimeout(pulse, this.beat * 2));
-        };
-        pulse();
+        osc.connect(env).connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + dur + 0.01);
     }
 
-    // Plucked lute-like melody
-    _pluck(freq, time, duration = 0.8, vol = 0.25) {
+    // Pluck sound — harpsichord / lute
+    _pluck(freq, time, dur, vol) {
         const now = this.ctx.currentTime + time;
         const osc = this.ctx.createOscillator();
         osc.type = 'triangle';
         osc.frequency.value = freq;
 
-        // Slight vibrato for medieval feel
-        const vibrato = this.ctx.createOscillator();
-        vibrato.frequency.value = 5;
-        const vibGain = this.ctx.createGain();
-        vibGain.gain.value = 2;
-        vibrato.connect(vibGain).connect(osc.frequency);
-        vibrato.start(now);
-        vibrato.stop(now + duration);
+        const osc2 = this.ctx.createOscillator();
+        osc2.type = 'square';
+        osc2.frequency.value = freq;
 
-        // Pluck envelope — sharp attack, quick decay
+        const mix = this.ctx.createGain();
+        mix.gain.value = 0.3; // Blend square for brightness
+
         const env = this.ctx.createGain();
         env.gain.setValueAtTime(0, now);
-        env.gain.linearRampToValueAtTime(vol, now + 0.01);
-        env.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        env.gain.linearRampToValueAtTime(vol, now + 0.005);
+        env.gain.exponentialRampToValueAtTime(0.001, now + dur);
 
-        osc.connect(env).connect(this.masterGain);
+        osc.connect(env);
+        osc2.connect(mix).connect(env);
+        env.connect(this.masterGain);
         osc.start(now);
-        osc.stop(now + duration);
+        osc2.start(now);
+        osc.stop(now + dur);
+        osc2.stop(now + dur);
     }
 
-    _startMelody() {
-        const b = this.beat / 1000; // beat in seconds
-        const playPhrase = () => {
-            if (!this.playing) return;
-
-            // Fast jig-like phrase (8-16 notes)
-            const len = 8 + Math.floor(Math.random() * 9);
-            let noteIdx = Math.floor(Math.random() * 6) + 2; // Start mid-range
-            let t = 0;
-
-            for (let i = 0; i < len; i++) {
-                const freq = this.scale[noteIdx];
-                // Mix of eighth and sixteenth notes for energy
-                const rhythm = [b/2, b/2, b/4, b/2, b/4, b/4, b, b/2][Math.floor(Math.random() * 8)];
-                this._pluck(freq, t, rhythm + 0.15, 0.22);
-                t += rhythm;
-
-                // Stepwise with occasional leaps — jig feel
-                const jump = [-3, -2, -1, -1, 1, 1, 2, 3][Math.floor(Math.random() * 8)];
-                noteIdx = Math.max(0, Math.min(this.scale.length - 1, noteIdx + jump));
-            }
-
-            // Short pause then next phrase
-            const pause = this.beat * (1 + Math.random() * 2);
-            this.timers.push(setTimeout(playPhrase, (t * 1000) + pause));
-        };
-        this.timers.push(setTimeout(playPhrase, 500));
-    }
-
-    // Counter-melody — higher octave arpeggios
-    _startCounterMelody() {
-        const b = this.beat / 1000;
-        const highScale = this.scale.map(f => f * 2); // One octave up
-        const playArp = () => {
-            if (!this.playing) return;
-
-            // Quick 3-5 note arpeggios
-            const len = 3 + Math.floor(Math.random() * 3);
-            const root = Math.floor(Math.random() * 5);
-            let t = 0;
-
-            for (let i = 0; i < len; i++) {
-                const idx = Math.min(root + i * 2, highScale.length - 1);
-                this._pluck(highScale[idx], t, b/2 + 0.1, 0.12);
-                t += b / 3;
-            }
-
-            const wait = this.beat * (3 + Math.random() * 5);
-            this.timers.push(setTimeout(playArp, (t * 1000) + wait));
-        };
-        this.timers.push(setTimeout(playArp, 3000));
-    }
-
-    // Pumping bass — on the beat
-    _startBass() {
-        const pattern = [0, 0, 3, 4, 0, 0, 4, 3]; // Root-heavy with 4th and 5th
-        let step = 0;
-        const playBass = () => {
-            if (!this.playing) return;
-            const idx = pattern[step % pattern.length];
-            this._pluck(this.bassScale[idx], 0, this.beat / 1000 + 0.1, 0.2);
-            step++;
-            this.timers.push(setTimeout(playBass, this.beat));
-        };
-        this.timers.push(setTimeout(playBass, 200));
-    }
-
-    // Driving percussion — tavern drum feel
     _drum(freq, vol, decay) {
         const now = this.ctx.currentTime;
         const noise = this.ctx.createBufferSource();
-        const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.15, this.ctx.sampleRate);
+        const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.2, this.ctx.sampleRate);
         const data = buf.getChannelData(0);
-        for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1);
+        for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
         noise.buffer = buf;
 
         const filter = this.ctx.createBiquadFilter();
@@ -289,16 +239,120 @@ class MedievalSoundtrack {
         noise.stop(now + decay);
     }
 
+    // Brass-like lead melody — the iconic RS sound
+    _startMelody() {
+        let phraseIdx = 0;
+        const playPhrase = () => {
+            if (!this.playing) return;
+
+            const phrase = this.melodyPhrases[phraseIdx % this.melodyPhrases.length];
+            phraseIdx++;
+            let t = 0;
+
+            for (const [noteName, beats] of phrase) {
+                const freq = this.notes[noteName];
+                const dur = beats * this.beat;
+                // Square wave + triangle = brassy MIDI trumpet
+                this._voice('square', freq, t, dur * 0.9, 0.1, 0.02, 0.05);
+                this._voice('triangle', freq, t, dur * 0.9, 0.08, 0.02, 0.05);
+                t += dur;
+            }
+
+            // Rest 2 bars then next phrase
+            const rest = this.beat * 8;
+            this.timers.push(setTimeout(playPhrase, (t + rest) * 1000));
+        };
+        this.timers.push(setTimeout(() => playPhrase(), 2000));
+    }
+
+    // Harpsichord arpeggios — classic RS accompaniment
+    _startHarpsichord() {
+        const arp = () => {
+            if (!this.playing) return;
+
+            const prog = this.chordProgs[this.currentChordProg];
+            const chord = prog[this.currentChord];
+            let t = 0;
+
+            // Arpeggiate the chord up and down (sixteenth notes)
+            const pattern = [...chord, ...chord.slice().reverse()];
+            for (const noteName of pattern) {
+                const freq = this.notes[noteName] * 2; // Up an octave
+                this._pluck(freq, t, this.beat * 0.4, 0.1);
+                t += this.beat / 4;
+            }
+
+            this.currentChord = (this.currentChord + 1) % prog.length;
+            if (this.currentChord === 0) {
+                this.currentChordProg = Math.floor(Math.random() * this.chordProgs.length);
+            }
+
+            this.timers.push(setTimeout(arp, this.beat * 2 * 1000));
+        };
+        arp();
+    }
+
+    // Sustained string pad — warmth underneath
+    _startStrings() {
+        const pad = () => {
+            if (!this.playing) return;
+
+            const prog = this.chordProgs[this.currentChordProg];
+            const chord = prog[this.currentChord];
+            const dur = this.beat * 4;
+
+            for (const noteName of chord) {
+                const freq = this.notes[noteName];
+                this._voice('sawtooth', freq, 0, dur, 0.04, 0.5, 0.5);
+                // Slight detune for richness
+                this._voice('sawtooth', freq * 1.003, 0, dur, 0.03, 0.5, 0.5);
+            }
+
+            this.timers.push(setTimeout(pad, dur * 1000));
+        };
+        this.timers.push(setTimeout(pad, 500));
+    }
+
+    // Walking bass line
+    _startBass() {
+        const bassPatterns = [
+            ['D3','D3','A3','G3'],
+            ['D3','F3','G3','A3'],
+            ['Bb3','A3','G3','F3'],
+            ['D3','G3','A3','D3'],
+        ];
+        let patIdx = 0;
+        let noteIdx = 0;
+
+        const playBass = () => {
+            if (!this.playing) return;
+            const pat = bassPatterns[patIdx % bassPatterns.length];
+            const noteName = pat[noteIdx % pat.length];
+            const freq = this.notes[noteName] / 2; // Down an octave for deep bass
+
+            this._voice('triangle', freq, 0, this.beat * 0.8, 0.15, 0.01, 0.1);
+            // Sub-octave for weight
+            this._voice('sine', freq / 2, 0, this.beat * 0.8, 0.1, 0.01, 0.1);
+
+            noteIdx++;
+            if (noteIdx % 4 === 0) patIdx++;
+
+            this.timers.push(setTimeout(playBass, this.beat * 1000));
+        };
+        playBass();
+    }
+
+    // Steady march percussion
     _startPercussion() {
-        // Pattern: KICK . snare . KICK kick snare .  (in eighth notes)
+        // 8 eighth-notes per bar: BOOM . tap . BOOM tap TAP .
         const pattern = [
-            { type: 'kick' },
+            { t: 'k', v: 0.2 },
             null,
-            { type: 'snare' },
+            { t: 's', v: 0.08 },
             null,
-            { type: 'kick' },
-            { type: 'kick', soft: true },
-            { type: 'snare' },
+            { t: 'k', v: 0.15 },
+            { t: 's', v: 0.06 },
+            { t: 's', v: 0.12 },
             null,
         ];
         let step = 0;
@@ -306,14 +360,11 @@ class MedievalSoundtrack {
             if (!this.playing) return;
             const p = pattern[step % pattern.length];
             if (p) {
-                if (p.type === 'kick') {
-                    this._drum(150, p.soft ? 0.1 : 0.18, 0.12);
-                } else {
-                    this._drum(800, 0.12, 0.08);
-                }
+                if (p.t === 'k') this._drum(120, p.v, 0.15);
+                else this._drum(1200, p.v, 0.06);
             }
             step++;
-            this.timers.push(setTimeout(tick, this.beat / 2));
+            this.timers.push(setTimeout(tick, (this.beat / 2) * 1000));
         };
         tick();
     }
