@@ -24,8 +24,74 @@ const gameState = {
     isDraggingCamera: false,
     lastMousePos: new THREE.Vector2(),
     // Click to move
-    moveTarget: null
+    moveTarget: null,
+    // Kill streak tracking
+    killStreak: 0,
+    multiKillTimer: 0,
+    multiKillCount: 0,
+    firstBlood: false
 };
+
+// Audio System
+class AudioManager {
+    constructor() {
+        this.sounds = {};
+        this.enabled = true;
+        this.loadSounds();
+    }
+
+    loadSounds() {
+        const soundFiles = {
+            firstBlood: 'sounds/first_blood.wav',
+            doubleKill: 'sounds/Double_Kill.wav',
+            multiKill: 'sounds/MultiKill.wav',
+            megaKill: 'sounds/MegaKill.wav',
+            ultraKill: 'sounds/UltraKill.wav',
+            monsterKill: 'sounds/MonsterKill.wav',
+            ludicrousKill: 'sounds/LudicrousKill.wav',
+            killingSpree: 'sounds/Killing_Spree.wav',
+            rampage: 'sounds/Rampage.wav',
+            dominating: 'sounds/Dominating.wav',
+            unstoppable: 'sounds/Unstoppable.wav',
+            godlike: 'sounds/GodLike.wav',
+            headshot: 'sounds/Headshot.wav'
+        };
+
+        for (const [name, path] of Object.entries(soundFiles)) {
+            this.sounds[name] = new Audio(path);
+            this.sounds[name].volume = 0.7;
+        }
+    }
+
+    play(soundName) {
+        if (!this.enabled || !this.sounds[soundName]) return;
+
+        const sound = this.sounds[soundName];
+        sound.currentTime = 0;
+        sound.play().catch(err => console.log('Audio play failed:', err));
+    }
+
+    playKillStreak(streak) {
+        // Kill streak announcements (every 5 kills)
+        if (streak === 5) this.play('killingSpree');
+        else if (streak === 10) this.play('rampage');
+        else if (streak === 15) this.play('dominating');
+        else if (streak === 20) this.play('unstoppable');
+        else if (streak === 25) this.play('godlike');
+    }
+
+    playMultiKill(count) {
+        // Multi-kill announcements (rapid kills)
+        if (count === 2) this.play('doubleKill');
+        else if (count === 3) this.play('multiKill');
+        else if (count === 4) this.play('megaKill');
+        else if (count === 5) this.play('ultraKill');
+        else if (count === 6) this.play('monsterKill');
+        else if (count >= 7) this.play('ludicrousKill');
+    }
+}
+
+const audioManager = new AudioManager();
 
 // Three.js Setup
 const scene = new THREE.Scene();
@@ -1482,10 +1548,40 @@ class Player {
             if (killer.isPlayer) {
                 gameState.kills = killer.kills;
                 document.getElementById('killCount').textContent = `Kills: ${gameState.kills}`;
+
+                // First blood
+                if (!gameState.firstBlood) {
+                    gameState.firstBlood = true;
+                    audioManager.play('firstBlood');
+                }
+
+                // Always play headshot for kills (it's a sniper game!)
+                audioManager.play('headshot');
+
+                // Kill streak tracking
+                gameState.killStreak++;
+                audioManager.playKillStreak(gameState.killStreak);
+
+                // Multi-kill tracking (kills within 4 seconds)
+                if (gameState.multiKillTimer > 0) {
+                    gameState.multiKillCount++;
+                } else {
+                    gameState.multiKillCount = 1;
+                }
+                gameState.multiKillTimer = 4.0; // 4 second window
+
+                if (gameState.multiKillCount >= 2) {
+                    audioManager.playMultiKill(gameState.multiKillCount);
+                }
             }
 
             // Show kill feed
             addKillFeed(killer.username, this.username);
+        }
+
+        // Reset kill streak when you die
+        if (this.isPlayer) {
+            gameState.killStreak = 0;
         }
 
         // Update UI if this is the player
@@ -1982,6 +2078,14 @@ function animate() {
     lastTime = currentTime;
 
     if (!gameState.gameStarted) return;
+
+    // Multi-kill timer countdown
+    if (gameState.multiKillTimer > 0) {
+        gameState.multiKillTimer -= deltaTime;
+        if (gameState.multiKillTimer <= 0) {
+            gameState.multiKillCount = 0;
+        }
+    }
 
     // Camera controls
     // Edge scrolling
