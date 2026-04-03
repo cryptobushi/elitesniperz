@@ -2982,19 +2982,34 @@ function animate() {
 
     fogOfWar.update(gameState.player, allUnits, farsightPositions);
 
-    // Hide enemy units — visible if in vision OR revealed by shooting
+    // Hide enemy units — brief linger after leaving vision, then gone
+    const VISION_LINGER = 1.0; // seconds to stay visible after leaving fog
     gameState.bots.forEach(bot => {
         if (bot.team !== gameState.team) {
-            const inVision = fogOfWar.isVisible(bot.position.x, bot.position.z) || bot._revealed;
-            bot.mesh.visible = inVision && bot.health > 0;
-            // Reset opacity when visible
-            if (bot.mesh.visible) {
+            const inFog = fogOfWar.isVisible(bot.position.x, bot.position.z);
+            const revealed = bot._revealed; // from shooting
+
+            if (inFog || revealed) {
+                bot._visTimer = VISION_LINGER;
+                bot.mesh.visible = bot.health > 0;
                 bot.mesh.traverse(child => {
                     if (child.material && !child.isSprite) {
                         child.material.transparent = false;
                         child.material.opacity = 1;
                     }
                 });
+            } else if ((bot._visTimer || 0) > 0) {
+                bot._visTimer -= deltaTime;
+                const fade = Math.max(0, bot._visTimer / VISION_LINGER);
+                bot.mesh.visible = fade > 0 && bot.health > 0;
+                bot.mesh.traverse(child => {
+                    if (child.material && !child.isSprite) {
+                        child.material.transparent = true;
+                        child.material.opacity = fade;
+                    }
+                });
+            } else {
+                bot.mesh.visible = false;
             }
         } else {
             bot.mesh.visible = bot.health > 0;
