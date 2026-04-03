@@ -66,7 +66,7 @@ scene.add(hemiLight);
 // Add initial preview scene
 const previewGeometry = new THREE.PlaneGeometry(80, 80);
 const previewMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2a2a2a,
+    color: 0x2a3a2a,
     roughness: 0.8
 });
 const previewGround = new THREE.Mesh(previewGeometry, previewMaterial);
@@ -91,7 +91,7 @@ const createMap = () => {
     groundGeometry.computeVertexNormals();
 
     const groundMaterial = new THREE.MeshStandardMaterial({
-        color: 0x353535,
+        color: 0x3a4a2a,
         roughness: 0.9,
         metalness: 0.1
     });
@@ -106,7 +106,7 @@ const createMap = () => {
 
         // Trunk
         const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 3, 8);
-        const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x3a3a3a });
+        const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x4a3520 });
         const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
         trunk.position.y = 1.5;
         trunk.castShadow = true;
@@ -114,7 +114,7 @@ const createMap = () => {
 
         // Foliage
         const foliageGeometry = new THREE.ConeGeometry(1.5, 3, 8);
-        const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x444444 });
+        const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x2d5016 });
         const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
         foliage.position.y = 4;
         foliage.castShadow = true;
@@ -209,177 +209,61 @@ const createMap = () => {
 
     // Team spawn markers
     const redSpawnGeometry = new THREE.CircleGeometry(5, 32);
-    const redSpawnMaterial = new THREE.MeshBasicMaterial({ color: 0xaa4444, transparent: true, opacity: 0.3 });
+    const redSpawnMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.3 });
     const redSpawn = new THREE.Mesh(redSpawnGeometry, redSpawnMaterial);
     redSpawn.rotation.x = -Math.PI / 2;
     redSpawn.position.set(-70, 0.1, -70);
     scene.add(redSpawn);
 
     const blueSpawnGeometry = new THREE.CircleGeometry(5, 32);
-    const blueSpawnMaterial = new THREE.MeshBasicMaterial({ color: 0x4444aa, transparent: true, opacity: 0.3 });
+    const blueSpawnMaterial = new THREE.MeshBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0.3 });
     const blueSpawn = new THREE.Mesh(blueSpawnGeometry, blueSpawnMaterial);
     blueSpawn.rotation.x = -Math.PI / 2;
     blueSpawn.position.set(70, 0.1, 70);
     scene.add(blueSpawn);
 };
 
-// Fog of War System
+// Fog of War System — vision-only (map always visible, enemies hidden outside radius)
 class FogOfWar {
     constructor() {
-        this.fogTexture = null;
-        this.fogMesh = null;
-        this.canvas = document.createElement('canvas');
-        this.canvas.width = 256;
-        this.canvas.height = 256;
-        this.ctx = this.canvas.getContext('2d');
-        this.visibilityMap = new Array(256 * 256).fill(0);
-
-        // Explored areas (partially revealed, darker fog)
-        this.exploredCanvas = document.createElement('canvas');
-        this.exploredCanvas.width = 256;
-        this.exploredCanvas.height = 256;
-        this.exploredCtx = this.exploredCanvas.getContext('2d');
-        this.exploredCtx.fillStyle = 'rgba(0, 0, 0, 1)';
-        this.exploredCtx.fillRect(0, 0, 256, 256);
-
-        this.init();
+        this.visionRadius = 25;
+        this.farsightRadius = 45;
+        // Track vision sources each frame
+        this.visionSources = [];
     }
 
     init() {
-        this.fogTexture = new THREE.CanvasTexture(this.canvas);
-        this.fogTexture.magFilter = THREE.LinearFilter;
-        this.fogTexture.minFilter = THREE.LinearFilter;
-
-        const fogMaterial = new THREE.MeshBasicMaterial({
-            map: this.fogTexture,
-            transparent: true,
-            opacity: 0.95,
-            color: 0x000000,
-            depthWrite: false,
-            depthTest: false, // Don't test depth so it renders on top
-            blending: THREE.NormalBlending
-        });
-
-        const fogGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE);
-        this.fogMesh = new THREE.Mesh(fogGeometry, fogMaterial);
-        this.fogMesh.rotation.x = -Math.PI / 2;
-        this.fogMesh.position.y = 10; // Raised high above terrain to cover everything
-        this.fogMesh.renderOrder = 10000; // Render last
-        scene.add(this.fogMesh);
+        // No visual fog mesh — map is always fully visible
     }
 
     update(player, allUnits, farsightPositions = []) {
-        const revealRadius = 25; // Much larger vision radius (in world units)
-        const farsightRadius = 45; // Far sight radius
+        this.visionSources = [];
 
-        // Mark explored areas (areas you've been to before)
+        // Player vision
         if (player && player.health > 0) {
-            this.markExplored(player.position.x, player.position.z, revealRadius);
+            this.visionSources.push({ x: player.position.x, z: player.position.z, r: this.visionRadius });
         }
+
+        // Teammate vision
         allUnits.forEach(unit => {
             if (unit.team === gameState.team && unit.health > 0 && unit !== player) {
-                this.markExplored(unit.position.x, unit.position.z, revealRadius);
+                this.visionSources.push({ x: unit.position.x, z: unit.position.z, r: this.visionRadius });
             }
         });
 
-        // Start with explored fog (dark gray, not pure black)
-        this.ctx.drawImage(this.exploredCanvas, 0, 0);
-
-        // Clear fog around player (current vision)
-        if (player && player.health > 0) {
-            this.revealArea(player.position.x, player.position.z, revealRadius);
-        }
-
-        // Clear fog around ALL teammates (including bots)
-        allUnits.forEach(unit => {
-            if (unit.team === gameState.team && unit.health > 0 && unit !== player) {
-                this.revealArea(unit.position.x, unit.position.z, revealRadius);
-            }
-        });
-
-        // Clear fog around farsight areas
+        // Farsight vision
         farsightPositions.forEach(pos => {
-            this.revealArea(pos.x, pos.z, farsightRadius);
+            this.visionSources.push({ x: pos.x, z: pos.z, r: this.farsightRadius });
         });
-
-        this.fogTexture.needsUpdate = true;
-    }
-
-    markExplored(worldX, worldZ, radius) {
-        // Mark this area as explored (permanently partially revealed)
-        const x = ((worldX + MAP_SIZE / 2) / MAP_SIZE) * 256;
-        const y = ((worldZ + MAP_SIZE / 2) / MAP_SIZE) * 256;
-        const radiusPixels = (radius / MAP_SIZE) * 256;
-
-        this.exploredCtx.globalCompositeOperation = 'destination-out';
-
-        // Create semi-transparent explored area
-        const gradient = this.exploredCtx.createRadialGradient(x, y, 0, x, y, radiusPixels);
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.5)'); // 50% revealed
-        gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.4)');
-        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-        this.exploredCtx.fillStyle = gradient;
-        this.exploredCtx.beginPath();
-        this.exploredCtx.arc(x, y, radiusPixels, 0, Math.PI * 2);
-        this.exploredCtx.fill();
-
-        this.exploredCtx.globalCompositeOperation = 'source-over';
-    }
-
-    revealArea(worldX, worldZ, radius) {
-        // Convert world coordinates to texture coordinates
-        const x = ((worldX + MAP_SIZE / 2) / MAP_SIZE) * 256;
-        const y = ((worldZ + MAP_SIZE / 2) / MAP_SIZE) * 256;
-        const radiusPixels = (radius / MAP_SIZE) * 256;
-
-        // Create irregular vision area (not a perfect circle)
-        this.ctx.globalCompositeOperation = 'destination-out';
-
-        // Draw multiple overlapping circles with slight offsets to create irregular shape
-        const numCircles = 8;
-        for (let i = 0; i < numCircles; i++) {
-            const angle = (i / numCircles) * Math.PI * 2;
-            const offset = radiusPixels * 0.15; // 15% variation
-            const offsetX = Math.cos(angle) * offset * (Math.random() * 0.5 + 0.5);
-            const offsetY = Math.sin(angle) * offset * (Math.random() * 0.5 + 0.5);
-
-            const gradient = this.ctx.createRadialGradient(
-                x + offsetX, y + offsetY, 0,
-                x + offsetX, y + offsetY, radiusPixels * 0.9
-            );
-            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
-            gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.25)');
-            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-            this.ctx.fillStyle = gradient;
-            this.ctx.beginPath();
-            this.ctx.arc(x + offsetX, y + offsetY, radiusPixels * 0.9, 0, Math.PI * 2);
-            this.ctx.fill();
-        }
-
-        // Main central clear area
-        const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, radiusPixels);
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.9)');
-        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-        this.ctx.fillStyle = gradient;
-        this.ctx.beginPath();
-        this.ctx.arc(x, y, radiusPixels, 0, Math.PI * 2);
-        this.ctx.fill();
-
-        this.ctx.globalCompositeOperation = 'source-over';
     }
 
     isVisible(worldX, worldZ) {
-        const x = Math.floor(((worldX + MAP_SIZE / 2) / MAP_SIZE) * 256);
-        const y = Math.floor(((worldZ + MAP_SIZE / 2) / MAP_SIZE) * 256);
-
-        if (x < 0 || x >= 256 || y < 0 || y >= 256) return false;
-
-        const imageData = this.ctx.getImageData(x, y, 1, 1);
-        return imageData.data[3] < 200; // Check alpha channel
+        for (const src of this.visionSources) {
+            const dx = worldX - src.x;
+            const dz = worldZ - src.z;
+            if (dx * dx + dz * dz <= src.r * src.r) return true;
+        }
+        return false;
     }
 }
 
@@ -452,7 +336,7 @@ class Player {
         // Torso
         const torsoGeometry = new THREE.BoxGeometry(0.6, 0.8, 0.4);
         const torsoMaterial = new THREE.MeshStandardMaterial({
-            color: team === 'red' ? 0x884444 : 0x445588,
+            color: team === 'red' ? 0xcc0000 : 0x0066cc,
             roughness: 0.7,
             metalness: 0.2
         });
@@ -465,7 +349,7 @@ class Player {
         // Head
         const headGeometry = new THREE.SphereGeometry(0.25, 12, 12);
         const headMaterial = new THREE.MeshStandardMaterial({
-            color: 0xb0b0b0,
+            color: 0xffdbac,
             roughness: 0.9
         });
         const head = new THREE.Mesh(headGeometry, headMaterial);
@@ -476,7 +360,7 @@ class Player {
         // Helmet/Hat
         const helmetGeometry = new THREE.CylinderGeometry(0.28, 0.28, 0.15, 12);
         const helmetMaterial = new THREE.MeshStandardMaterial({
-            color: team === 'red' ? 0x665050 : 0x505066,
+            color: team === 'red' ? 0x880000 : 0x003388,
             roughness: 0.6
         });
         const helmet = new THREE.Mesh(helmetGeometry, helmetMaterial);
@@ -487,7 +371,7 @@ class Player {
         // Arms
         const armGeometry = new THREE.CapsuleGeometry(0.12, 0.6, 6, 8);
         const armMaterial = new THREE.MeshStandardMaterial({
-            color: team === 'red' ? 0x775555 : 0x555577,
+            color: team === 'red' ? 0xaa0000 : 0x0055aa,
             roughness: 0.7
         });
         const leftArm = new THREE.Mesh(armGeometry, armMaterial);
@@ -542,7 +426,7 @@ class Player {
         // Scope lens
         const lensGeometry = new THREE.CircleGeometry(0.07, 16);
         const lensMaterial = new THREE.MeshStandardMaterial({
-            color: 0x555555,
+            color: 0x2244aa,
             roughness: 0.1,
             metalness: 1,
             emissive: 0x0000aa,
@@ -565,7 +449,7 @@ class Player {
         // Wooden stock
         const stockGeometry = new THREE.BoxGeometry(0.15, 0.25, 0.6);
         const stockMaterial = new THREE.MeshStandardMaterial({
-            color: 0x3a3a3a,
+            color: 0x4a2a10,
             roughness: 0.8,
             metalness: 0.1
         });
@@ -672,7 +556,7 @@ class Player {
             capeShape.closePath();
             const capeGeometry = new THREE.ShapeGeometry(capeShape);
             const capeMaterial = new THREE.MeshStandardMaterial({
-                color: team === 'red' ? 0x554444 : 0x444455,
+                color: team === 'red' ? 0x660000 : 0x002266,
                 side: THREE.DoubleSide,
                 roughness: 0.9,
             });
@@ -1181,7 +1065,7 @@ class Player {
         // MASSIVE MUZZLE FLASH
         const flashGeometry = new THREE.SphereGeometry(2, 12, 12);
         const flashMaterial = new THREE.MeshBasicMaterial({
-            color: 0xcccccc,
+            color: 0xffdd00,
             transparent: true,
             opacity: 1
         });
@@ -1192,7 +1076,7 @@ class Player {
         // Secondary flash (outer)
         const flash2Geometry = new THREE.SphereGeometry(3, 12, 12);
         const flash2Material = new THREE.MeshBasicMaterial({
-            color: 0x999999,
+            color: 0xff6600,
             transparent: true,
             opacity: 0.6
         });
@@ -1283,7 +1167,7 @@ class Player {
             targetPos.clone()
         ]);
         const bulletMaterial = new THREE.LineBasicMaterial({
-            color: this.team === 'red' ? 0xaa7777 : 0x7777aa,
+            color: this.team === 'red' ? 0xff0000 : 0x0088ff,
             linewidth: 5
         });
         const bullet = new THREE.Line(bulletGeometry, bulletMaterial);
@@ -1296,7 +1180,7 @@ class Player {
                 targetPos.clone()
             ]);
             const tracerMaterial = new THREE.LineBasicMaterial({
-                color: this.team === 'red' ? 0x998888 : 0x889099,
+                color: this.team === 'red' ? 0xffaaaa : 0xaaccff,
                 transparent: true,
                 opacity: 0.8 - (i * 0.2),
                 linewidth: 8 - (i * 2)
@@ -1341,7 +1225,7 @@ class Player {
         // Secondary impact flash
         const impact2Geometry = new THREE.SphereGeometry(4, 12, 12);
         const impact2Material = new THREE.MeshBasicMaterial({
-            color: 0x999999,
+            color: 0xff6600,
             transparent: true,
             opacity: 0.7
         });
@@ -2025,9 +1909,9 @@ function animate() {
     gameState.cameraTarget.z = THREE.MathUtils.clamp(gameState.cameraTarget.z, -mapBound, mapBound);
 
     // Smooth camera movement
-    camera.position.x = THREE.MathUtils.lerp(camera.position.x, gameState.cameraTarget.x + gameState.cameraOffset.x, 0.1);
+    camera.position.x = THREE.MathUtils.lerp(camera.position.x, gameState.cameraTarget.x + gameState.cameraOffset.x, 0.18);
     camera.position.y = gameState.cameraOffset.y;
-    camera.position.z = THREE.MathUtils.lerp(camera.position.z, gameState.cameraTarget.z + gameState.cameraOffset.z, 0.1);
+    camera.position.z = THREE.MathUtils.lerp(camera.position.z, gameState.cameraTarget.z + gameState.cameraOffset.z, 0.18);
     camera.lookAt(gameState.cameraTarget);
 
     // Update player movement (click to move)
@@ -2202,8 +2086,8 @@ if (isMobile) {
                     const dx = t.clientX - data.lastX;
                     const dy = t.clientY - data.lastY;
                     // Move the smooth target — actual camera lerps to it
-                    smoothCamX -= dx * 0.06;
-                    smoothCamZ -= dy * 0.06;
+                    smoothCamX -= dx * 0.12;
+                    smoothCamZ -= dy * 0.12;
                 }
 
                 data.lastX = t.clientX;
@@ -2259,7 +2143,7 @@ if (isMobile) {
 // Smooth camera lerp — always runs (mobile + minimap clicks on desktop)
 function smoothCameraUpdate() {
     requestAnimationFrame(smoothCameraUpdate);
-    const lerp = 0.15;
+    const lerp = 0.25;
     gameState.cameraTarget.x += (smoothCamX - gameState.cameraTarget.x) * lerp;
     gameState.cameraTarget.z += (smoothCamZ - gameState.cameraTarget.z) * lerp;
 }
