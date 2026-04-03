@@ -632,7 +632,7 @@ class FogOfWar {
     }
 
     update(player, allUnits, farsightPositions = []) {
-        const revealRadius = 20;
+        const revealRadius = 55;
         const farsightRadius = 45; // Far sight radius
 
         // Mark explored areas (areas you've been to before)
