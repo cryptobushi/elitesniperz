@@ -2991,15 +2991,20 @@ function animate() {
 
             if (inFog || revealed) {
                 bot._visTimer = VISION_LINGER;
+                // Instant appear — no fade in
+                if (!bot.mesh.visible || bot._fading) {
+                    bot._fading = false;
+                    bot.mesh.traverse(child => {
+                        if (child.material && !child.isSprite) {
+                            child.material.transparent = false;
+                            child.material.opacity = 1;
+                        }
+                    });
+                }
                 bot.mesh.visible = bot.health > 0;
-                bot.mesh.traverse(child => {
-                    if (child.material && !child.isSprite) {
-                        child.material.transparent = false;
-                        child.material.opacity = 1;
-                    }
-                });
             } else if ((bot._visTimer || 0) > 0) {
                 bot._visTimer -= deltaTime;
+                bot._fading = true;
                 const fade = Math.max(0, bot._visTimer / VISION_LINGER);
                 bot.mesh.visible = fade > 0 && bot.health > 0;
                 bot.mesh.traverse(child => {
