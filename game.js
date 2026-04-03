@@ -2963,27 +2963,40 @@ function animate() {
             } else {
                 // Create crosshair if needed
                 if (!gameState._crosshair) {
-                    const g = new THREE.Group();
-                    const mat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.8 });
-                    // Four lines forming a crosshair
-                    for (let i = 0; i < 4; i++) {
-                        const line = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.06), mat);
-                        line.position.y = 0.4;
-                        const arm = new THREE.Group();
-                        arm.add(line);
-                        arm.rotation.z = (i / 4) * Math.PI * 2;
-                        g.add(arm);
-                    }
-                    // Center circle
-                    const ring = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.25, 16), mat);
-                    g.add(ring);
-                    g.rotation.x = -Math.PI / 2;
-                    scene.add(g);
-                    gameState._crosshair = g;
+                    // Use a sprite so it always faces camera
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 128;
+                    canvas.height = 128;
+                    const c = canvas.getContext('2d');
+                    c.strokeStyle = '#ff0000';
+                    c.lineWidth = 3;
+                    // Outer circle
+                    c.beginPath();
+                    c.arc(64, 64, 40, 0, Math.PI * 2);
+                    c.stroke();
+                    // Cross lines
+                    c.beginPath();
+                    c.moveTo(64, 10); c.lineTo(64, 45);
+                    c.moveTo(64, 83); c.lineTo(64, 118);
+                    c.moveTo(10, 64); c.lineTo(45, 64);
+                    c.moveTo(83, 64); c.lineTo(118, 64);
+                    c.stroke();
+                    // Center dot
+                    c.fillStyle = '#ff0000';
+                    c.beginPath();
+                    c.arc(64, 64, 4, 0, Math.PI * 2);
+                    c.fill();
+
+                    const tex = new THREE.CanvasTexture(canvas);
+                    const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.9, depthTest: false });
+                    const sprite = new THREE.Sprite(spriteMat);
+                    sprite.scale.set(3, 3, 1);
+                    sprite.renderOrder = 9999;
+                    scene.add(sprite);
+                    gameState._crosshair = sprite;
                 }
-                // Follow target
-                gameState._crosshair.position.set(tgt.position.x, tgt.position.y + 2.2, tgt.position.z);
-                gameState._crosshair.rotation.z += deltaTime * 2; // Slow spin
+                // Follow target above head
+                gameState._crosshair.position.set(tgt.position.x, tgt.position.y + 2.5, tgt.position.z);
             }
         } else {
             if (gameState._crosshair) { scene.remove(gameState._crosshair); gameState._crosshair = null; }
