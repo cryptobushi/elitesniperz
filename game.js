@@ -1175,11 +1175,11 @@ class Player {
                     // Check line of sight (walls blocking)
                     const raycaster = new THREE.Raycaster();
                     raycaster.set(this.position, toEnemy);
-                    const intersects = raycaster.intersectObjects(scene.children, true);
+                    const intersects = raycaster.intersectObjects(gameState._wallObjects || [], false);
 
                     let blocked = false;
                     for (let intersect of intersects) {
-                        if (intersect.object.userData.isWall && intersect.distance < distance) {
+                        if (intersect.distance < distance) {
                             blocked = true;
                             break;
                         }
@@ -1479,17 +1479,26 @@ class Player {
             return true;
         }
 
-        // Check walls — raycast with larger check radius
+        // Check walls — raycast only against wall objects
         const dir = new THREE.Vector3().subVectors(newPos, this.position);
         if (dir.length() < 0.001) return false;
         dir.normalize();
 
+        // Collect wall objects (cached per frame for performance)
+        if (!gameState._wallObjects || gameState._wallCacheFrame !== gameState._frame) {
+            gameState._wallObjects = [];
+            scene.traverse(child => {
+                if (child.userData.isWall) gameState._wallObjects.push(child);
+            });
+            gameState._wallCacheFrame = gameState._frame;
+        }
+
         const raycaster = new THREE.Raycaster();
         raycaster.set(this.position, dir);
-        const intersects = raycaster.intersectObjects(scene.children, true);
+        const intersects = raycaster.intersectObjects(gameState._wallObjects, false);
 
         for (let intersect of intersects) {
-            if (intersect.object.userData.isWall && intersect.distance < 1.5) {
+            if (intersect.distance < 1.5) {
                 return true;
             }
         }
@@ -1519,9 +1528,9 @@ class Player {
         const direction = new THREE.Vector3().subVectors(target.position, this.position).normalize();
         raycaster.set(this.position, direction);
 
-        const intersects = raycaster.intersectObjects(scene.children, true);
+        const intersects = raycaster.intersectObjects(gameState._wallObjects || [], false);
         for (let intersect of intersects) {
-            if (intersect.object.userData.isWall && intersect.distance < distance) {
+            if (intersect.distance < distance) {
                 return; // Wall blocking
             }
         }
@@ -2861,6 +2870,7 @@ let lastTime = performance.now();
 function animate() {
     requestAnimationFrame(animate);
 
+    gameState._frame = (gameState._frame || 0) + 1;
     const currentTime = performance.now();
     const deltaTime = (currentTime - lastTime) / 1000;
     lastTime = currentTime;
