@@ -2008,6 +2008,10 @@ class Player {
 
     respawn() {
         this.health = this.maxHealth;
+        this.velocity.set(0, 0, 0);
+        this.targetPosition = null;
+        this.attackWalkTarget = null;
+        if (this.isPlayer) gameState.moveTarget = null;
 
         if (this.team === 'red') {
             const x = -70 + Math.random() * 10 - 5;
