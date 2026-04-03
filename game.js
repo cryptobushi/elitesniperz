@@ -1113,6 +1113,12 @@ class Player {
             this.shootCooldown -= deltaTime;
         }
 
+        // Reveal timer (shooting reveals you)
+        if (this._revealTimer > 0) {
+            this._revealTimer -= deltaTime;
+            if (this._revealTimer <= 0) this._revealed = false;
+        }
+
         // Auto-shoot at enemies in FOV
         if (this.health > 0 && this.shootCooldown <= 0) {
             this.autoShootAtEnemies();
@@ -1524,6 +1530,11 @@ class Player {
 
         // HUGE CANNON-LIKE SHOOTING ANIMATION
         this.createShootingEffect(target.position);
+
+        // Reveal shooter to the target (and their team) for 2 seconds
+        if (!this._revealTimer) this._revealTimer = 0;
+        this._revealed = true;
+        this._revealTimer = 2.0;
 
         // Instant kill (classic snipers!) — goes through takeDamage for shield check
         target.takeDamage(999, this);
@@ -2971,10 +2982,10 @@ function animate() {
 
     fogOfWar.update(gameState.player, allUnits, farsightPositions);
 
-    // Hide enemy units — instant hide when leaving vision, no linger
+    // Hide enemy units — visible if in vision OR revealed by shooting
     gameState.bots.forEach(bot => {
         if (bot.team !== gameState.team) {
-            const inVision = fogOfWar.isVisible(bot.position.x, bot.position.z);
+            const inVision = fogOfWar.isVisible(bot.position.x, bot.position.z) || bot._revealed;
             bot.mesh.visible = inVision && bot.health > 0;
             // Reset opacity when visible
             if (bot.mesh.visible) {
