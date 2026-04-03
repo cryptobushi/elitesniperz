@@ -2645,9 +2645,8 @@ function minimapToWorld(clientX, clientY) {
 }
 
 function jumpCameraTo(worldX, worldZ) {
-    // Lerp toward target instead of snapping — less jarring
-    smoothCamX += (worldX - smoothCamX) * 0.4;
-    smoothCamZ += (worldZ - smoothCamZ) * 0.4;
+    gameState.cameraTarget.x += (worldX - gameState.cameraTarget.x) * 0.4;
+    gameState.cameraTarget.z += (worldZ - gameState.cameraTarget.z) * 0.4;
 }
 
 // Works for both mouse and touch
@@ -2772,8 +2771,7 @@ function animate() {
     // Spacebar to center on player
     if (gameState.keys[' '] && gameState.player) {
         gameState.cameraTarget.copy(gameState.player.position);
-        smoothCamX = gameState.player.position.x;
-        smoothCamZ = gameState.player.position.z;
+        // space-to-center handled by cameraTarget.copy above
     }
 
     // Clamp camera to map bounds
@@ -2881,8 +2879,7 @@ document.getElementById('respawnBtn')?.addEventListener('click', () => {
         gameState.player.respawn();
         const spawnX = gameState.player.team === 'red' ? -70 : 70;
         const spawnZ = gameState.player.team === 'red' ? -70 : 70;
-        smoothCamX = spawnX;
-        smoothCamZ = spawnZ;
+        // Respawn camera handled by cameraTarget
         gameState.cameraTarget.x = spawnX;
         gameState.cameraTarget.z = spawnZ;
     }
@@ -2898,8 +2895,7 @@ Player.prototype.respawn = function() {
 };
 
 // Smooth camera globals — used by mobile touch + minimap
-let smoothCamX = gameState.cameraTarget.x;
-let smoothCamZ = gameState.cameraTarget.z;
+// smoothCam removed — camera moves directly via cameraTarget
 
 // === MOBILE TOUCH — drag anywhere to scroll camera, tap to move/attack ===
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('ontouchstart' in window);
@@ -2907,19 +2903,19 @@ const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('onto
 if (isMobile) {
     const canvas = document.getElementById('gameCanvas');
     let touchStartPos = null;
-    let touchStartTime = 0;
-    let isDragging = false;
-    // Track each finger separately
     const touches = new Map();
-    const DRAG_THRESHOLD = 30;
+    const DRAG_THRESHOLD = 15;
     const TAP_TIME = 200;
-    const HOLD_TIME = 400; // ms — hold this long to enter fast scroll mode
-    let holdScrollInterval = null;
 
-    // Smoothed camera uses global smoothCamX/Z
+    // Camera velocity for flick momentum
+    let camVelX = 0, camVelZ = 0;
 
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault();
+        // Kill any existing momentum on new touch
+        camVelX = 0;
+        camVelZ = 0;
+
         for (const t of e.changedTouches) {
             touches.set(t.identifier, {
                 startX: t.clientX, startY: t.clientY,
@@ -2927,7 +2923,6 @@ if (isMobile) {
                 startTime: Date.now(), isDrag: false,
             });
         }
-        // Pinch setup
         if (e.touches.length === 2) {
             const dx = e.touches[0].clientX - e.touches[1].clientX;
             const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -2939,7 +2934,6 @@ if (isMobile) {
     canvas.addEventListener('touchmove', (e) => {
         e.preventDefault();
 
-        // Single finger or first finger of two = camera drag
         if (e.touches.length >= 1) {
             const t = e.touches[0];
             const data = touches.get(t.identifier);
@@ -2949,30 +2943,28 @@ if (isMobile) {
 
                 if (!data.isDrag && (Math.abs(totalDx) > DRAG_THRESHOLD || Math.abs(totalDy) > DRAG_THRESHOLD)) {
                     data.isDrag = true;
-                    _isTouchDragging = true;
-                    // Sync smoothCam to current camera before dragging
-                    smoothCamX = gameState.cameraTarget.x;
-                    smoothCamZ = gameState.cameraTarget.z;
                 }
 
                 if (data.isDrag) {
                     const dx = t.clientX - data.lastX;
                     const dy = t.clientY - data.lastY;
-                    smoothCamX -= dx * 0.12;
-                    smoothCamZ -= dy * 0.12;
+                    // Move camera directly — no smoothCam indirection
+                    gameState.cameraTarget.x -= dx * 0.15;
+                    gameState.cameraTarget.z -= dy * 0.15;
+                    // Store velocity for momentum
+                    camVelX = -dx * 0.15;
+                    camVelZ = -dy * 0.15;
                 }
 
                 data.lastX = t.clientX;
                 data.lastY = t.clientY;
 
-                // Update mousePos using canvas bounds
                 const rect = canvas.getBoundingClientRect();
                 gameState.mousePos.x = ((t.clientX - rect.left) / rect.width) * 2 - 1;
                 gameState.mousePos.y = -((t.clientY - rect.top) / rect.height) * 2 + 1;
             }
         }
 
-        // Pinch zoom with 2 fingers
         if (e.touches.length === 2 && gameState._pinchStart) {
             const dx = e.touches[0].clientX - e.touches[1].clientX;
             const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -2990,8 +2982,6 @@ if (isMobile) {
         for (const t of e.changedTouches) {
             const data = touches.get(t.identifier);
             if (data && !data.isDrag && (Date.now() - data.startTime < TAP_TIME)) {
-                // TAP — move character to this position
-                // Use canvas bounding rect to get accurate coordinates
                 const rect = canvas.getBoundingClientRect();
                 const x = data.startX - rect.left;
                 const y = data.startY - rect.top;
@@ -3001,36 +2991,31 @@ if (isMobile) {
                 setTimeout(() => {
                     document.dispatchEvent(new MouseEvent('mouseup', { clientX: data.startX, clientY: data.startY, button: 0, bubbles: true }));
                 }, 50);
+                // No momentum on tap
+                camVelX = 0;
+                camVelZ = 0;
             }
             touches.delete(t.identifier);
         }
 
         if (e.touches.length === 0) {
             gameState._pinchStart = null;
-            _isTouchDragging = false;
         }
     }, { passive: false });
 
-}
-
-// Smooth camera lerp — always runs (mobile + minimap clicks on desktop)
-let _isTouchDragging = false;
-function smoothCameraUpdate() {
-    requestAnimationFrame(smoothCameraUpdate);
-    // Always keep smoothCam synced with cameraTarget unless actively touch-dragging
-    if (!_isTouchDragging) {
-        smoothCamX = gameState.cameraTarget.x;
-        smoothCamZ = gameState.cameraTarget.z;
-    } else {
-        // Touch drag: cameraTarget lerps toward touch-driven smoothCam
-        const lerp = 0.08;
-        gameState.cameraTarget.x += (smoothCamX - gameState.cameraTarget.x) * lerp;
-        gameState.cameraTarget.z += (smoothCamZ - gameState.cameraTarget.z) * lerp;
+    // Momentum decay loop — runs every frame on mobile
+    function applyMomentum() {
+        requestAnimationFrame(applyMomentum);
+        if (Math.abs(camVelX) > 0.01 || Math.abs(camVelZ) > 0.01) {
+            gameState.cameraTarget.x += camVelX;
+            gameState.cameraTarget.z += camVelZ;
+            camVelX *= 0.9;
+            camVelZ *= 0.9;
+        }
     }
+    applyMomentum();
 }
-smoothCameraUpdate();
 
-// Desktop — smoothCam follows cameraTarget directly (no lerp layer needed)
 if (!isMobile) {
 
     // Ability buttons work via tap on the HTML elements (pointer-events: all)
