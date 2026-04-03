@@ -37,11 +37,12 @@ const gameState = {
     }
 };
 
-// Audio System — preloaded HTML Audio, cloneNode for overlap
+// Audio System — pre-loaded pool for instant overlapping playback
 class AudioManager {
     constructor() {
-        this.sounds = {};
+        this.pools = {};
         this.enabled = true;
+        this.POOL_SIZE = 4;
 
         const soundFiles = {
             firstBlood: 'sounds/first_blood.wav',
@@ -60,21 +61,30 @@ class AudioManager {
             sniperFire: 'sounds/sniper_fire_h3_1.wav'
         };
 
+        const volumes = { sniperFire: 0.5 };
+
         for (const [name, path] of Object.entries(soundFiles)) {
-            const audio = new Audio(path);
-            audio.preload = 'auto';
-            audio.volume = (name === 'sniperFire') ? 0.5 : 0.7;
-            this.sounds[name] = audio;
+            const vol = volumes[name] || 0.7;
+            const pool = [];
+            for (let i = 0; i < this.POOL_SIZE; i++) {
+                const a = new Audio(path);
+                a.preload = 'auto';
+                a.volume = vol;
+                pool.push(a);
+            }
+            this.pools[name] = { instances: pool, index: 0 };
         }
     }
 
-    init() {} // compat
+    init() {}
 
     play(soundName) {
-        if (!this.enabled || !this.sounds[soundName]) return;
-        const clone = this.sounds[soundName].cloneNode();
-        clone.volume = this.sounds[soundName].volume;
-        clone.play().catch(() => {});
+        if (!this.enabled || !this.pools[soundName]) return;
+        const pool = this.pools[soundName];
+        const audio = pool.instances[pool.index];
+        pool.index = (pool.index + 1) % this.POOL_SIZE;
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
     }
 }
 
