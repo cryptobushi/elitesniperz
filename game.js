@@ -2960,6 +2960,9 @@ if (isMobile) {
                     const dy = t.clientY - data.lastY;
                     smoothCamX -= dx * 0.12;
                     smoothCamZ -= dy * 0.12;
+                    // Track velocity for momentum
+                    data.velX = -dx * 0.12;
+                    data.velZ = -dy * 0.12;
                 }
 
                 data.lastX = t.clientX;
@@ -3007,7 +3010,27 @@ if (isMobile) {
 
         if (e.touches.length === 0) {
             gameState._pinchStart = null;
-            _isTouchDragging = false;
+
+            // Apply momentum from last drag velocity
+            const lastData = [...touches.values()].find(d => d.isDrag);
+            if (lastData && (lastData.velX || lastData.velZ)) {
+                let vx = lastData.velX * 8;
+                let vz = lastData.velZ * 8;
+                const momentum = () => {
+                    if (Math.abs(vx) < 0.01 && Math.abs(vz) < 0.01) {
+                        _isTouchDragging = false;
+                        return;
+                    }
+                    smoothCamX += vx;
+                    smoothCamZ += vz;
+                    vx *= 0.92; // Friction
+                    vz *= 0.92;
+                    requestAnimationFrame(momentum);
+                };
+                momentum();
+            } else {
+                _isTouchDragging = false;
+            }
         }
     }, { passive: false });
 
