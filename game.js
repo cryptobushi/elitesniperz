@@ -1957,6 +1957,7 @@ class Player {
         // Reset kill streak when dying
         if (this.isPlayer) {
             gameState.killStreak = 0;
+            resetStreakChart();
             gameState.gold = this.gold;
             updateGoldUI();
         }
@@ -2117,53 +2118,47 @@ function updateGoldUI() {
     if (el) el.textContent = `Gold: ${gameState.gold}`;
 }
 
-let _goldPopupEl = null;
 function showGoldPopup(text) {
-    if (_goldPopupEl) _goldPopupEl.remove();
+    // Add a candle to the chart for every kill
+    const h = 15 + Math.random() * 20 + _chartCandles.length * 5;
+    _chartCandles.push({ h, text, color: '#00ff44' });
+    if (_chartCandles.length > 20) _chartCandles.shift();
 
+    // Rebuild chart with new candle
     const popup = document.getElementById('streakPopup');
-    const el = document.createElement('div');
-    el.style.cssText = `
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        pointer-events: none;
-        animation: goldFloat 1.5s ease-out forwards;
-    `;
-    el.innerHTML = `
-        <div style="
-            width: 4px; height: 30px;
-            background: linear-gradient(to top, #00aa00, #00ff44);
-            box-shadow: 0 0 8px #00ff44, 0 0 16px #00aa0066;
-            margin-bottom: 2px;
-            animation: candleGrow 0.2s ease-out forwards;
-            transform-origin: bottom;
-        "></div>
-        <div style="
-            width: 16px; height: 24px;
-            background: linear-gradient(to top, #00cc00, #00ff44);
-            box-shadow: 0 0 12px #00ff44, 0 0 24px #00aa0066;
-            border-radius: 1px;
-            animation: candleGrow 0.15s ease-out forwards;
-            transform-origin: bottom;
-        "></div>
-        <div style="
-            width: 4px; height: 8px;
-            background: linear-gradient(to top, #00aa00, #009900);
-            margin-top: 2px;
-        "></div>
-        <div style="
-            color: #00ff44;
-            font-size: clamp(1.2rem, 4vw, 2rem);
-            font-weight: 900;
-            text-shadow: 0 0 15px #00ff44, 0 0 30px #00aa0066;
-            margin-top: 4px;
-            font-family: 'Courier New', monospace;
-        ">${text} 📈</div>
-    `;
-    popup.appendChild(el);
-    _goldPopupEl = el;
-    setTimeout(() => { if (_goldPopupEl === el) { el.remove(); _goldPopupEl = null; } }, 1800);
+    popup.innerHTML = '';
+
+    const chart = document.createElement('div');
+    chart.style.cssText = 'display:flex;align-items:flex-end;justify-content:center;gap:3px;pointer-events:none;';
+
+    _chartCandles.forEach((c, i) => {
+        const isNew = i === _chartCandles.length - 1;
+        const w = Math.max(8, 18 - _chartCandles.length * 0.4);
+        const wickH = Math.round(c.h * 0.3);
+        const glow = isNew ? 'box-shadow:0 0 15px #00ff44,0 0 30px #00ff4444;' : 'box-shadow:0 0 4px #00aa0044;';
+        const anim = isNew ? 'animation:candleGrow 0.12s cubic-bezier(0,0.8,0.2,1.3) forwards;transform-origin:bottom;' : '';
+
+        chart.innerHTML += `<div style="display:flex;flex-direction:column;align-items:center;">
+            <div style="width:2px;height:${wickH}px;background:#00cc00;"></div>
+            <div style="width:${w}px;height:${c.h}px;background:linear-gradient(to top,#00aa00,#00ff44);border-radius:1px;${glow}${anim}"></div>
+            <div style="width:2px;height:${Math.round(wickH*0.3)}px;background:#009900;margin-top:1px;"></div>
+        </div>`;
+    });
+
+    popup.appendChild(chart);
+
+    // Gold text
+    const label = document.createElement('div');
+    label.style.cssText = 'color:#00ff44;font-size:clamp(1rem,3vw,1.5rem);font-weight:900;text-shadow:0 0 15px #00ff44;pointer-events:none;margin-top:4px;font-family:monospace;';
+    label.textContent = text + ' 📈';
+    popup.appendChild(label);
+
+    clearTimeout(popup._fadeTimer);
+    popup._fadeTimer = setTimeout(() => {
+        popup.style.transition = 'opacity 1s';
+        popup.style.opacity = '0';
+        setTimeout(() => { popup.style.transition = ''; popup.style.opacity = '1'; popup.innerHTML = ''; }, 1000);
+    }, 2000);
 }
 
 function updateShopUI() {
@@ -2240,65 +2235,90 @@ function makeCandle(bodyH, color, glowColor, wickH = 0) {
 }
 
 // UI Functions
+// Persistent chart that builds up with each kill
+let _chartCandles = [];
+let _chartContainer = null;
+
 function showStreakPopup(text, color) {
     const popup = document.getElementById('streakPopup');
 
-    const candleSizes = {
-        'FIRST BLOOD': 50,
-        'KILLING SPREE': 70,
-        'RAMPAGE': 100,
-        'DOMINATING': 140,
-        'UNSTOPPABLE': 180,
-        'GODLIKE': 240,
-        'DOUBLE KILL': 60,
-        'MULTI KILL': 80,
-        'MEGA KILL': 110,
-        'ULTRA KILL': 150,
-        'MONSTER KILL': 200,
-        'LUDICROUS KILL': 260,
-        'SHIELD BLOCKED!': 30,
-    };
-    const bodyH = candleSizes[text] || 50;
-    const intensity = Math.min(bodyH / 260, 1);
+    // Add a new candle to the chart
+    const h = 20 + Math.random() * 30 + _chartCandles.length * 8;
+    _chartCandles.push({ h, text, color });
+
+    // Cap at 20 candles, shift old ones off
+    if (_chartCandles.length > 20) _chartCandles.shift();
 
     // Screen flash
     const flash = document.createElement('div');
-    flash.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:${color};opacity:${0.15 + intensity * 0.2};pointer-events:none;z-index:9998;animation:screenFlash 0.4s ease-out forwards;`;
+    flash.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:${color};opacity:0.2;pointer-events:none;z-index:9998;animation:screenFlash 0.3s ease-out forwards;`;
     document.body.appendChild(flash);
-    setTimeout(() => flash.remove(), 500);
+    setTimeout(() => flash.remove(), 400);
 
-    // Sparkle particles around the candle
-    let particles = '';
-    const numParticles = Math.floor(5 + intensity * 15);
-    for (let i = 0; i < numParticles; i++) {
-        const angle = (i / numParticles) * 360;
-        const dist = 20 + Math.random() * 60;
-        const size = 2 + Math.random() * 4;
-        const delay = Math.random() * 0.3;
-        particles += `<div style="position:absolute;width:${size}px;height:${size}px;background:#00ff44;border-radius:50%;box-shadow:0 0 ${size*3}px #00ff44;opacity:0;animation:sparkle 0.8s ${delay}s ease-out forwards;left:50%;top:50%;transform:translate(-50%,-50%) rotate(${angle}deg) translateY(-${dist}px);"></div>`;
-    }
-
-    const el = document.createElement('div');
-    el.style.cssText = `display:flex;flex-direction:column;align-items:center;pointer-events:none;animation:goldFloat 2.5s ease-out forwards;position:relative;`;
-    el.innerHTML = `
-        <div style="position:relative;">
-            ${particles}
-            ${makeCandle(bodyH, '#00aa00', '#00ff44')}
-        </div>
-        <div style="
-            color:${color};
-            font-size:clamp(1.5rem, 7vw, 3.5rem);
-            font-weight:900;
-            text-shadow:0 0 30px ${color}, 0 0 60px ${color}aa, 0 0 100px ${color}44;
-            letter-spacing:0.15em;
-            margin-top:8px;
-            animation:streakIn 0.12s cubic-bezier(0,0.8,0.2,1.3) forwards;
-        ">${text}</div>
-        <div style="color:#00ff4488;font-size:${1 + intensity}rem;margin-top:2px;">📈${'🟢'.repeat(Math.ceil(intensity * 5))}</div>
-    `;
+    // Build the stacking chart
     popup.innerHTML = '';
-    popup.appendChild(el);
-    setTimeout(() => el.remove(), 3000);
+
+    const chart = document.createElement('div');
+    chart.style.cssText = `
+        display:flex; align-items:flex-end; justify-content:center;
+        gap:3px; pointer-events:none; padding-bottom:10px;
+    `;
+
+    _chartCandles.forEach((c, i) => {
+        const isNew = i === _chartCandles.length - 1;
+        const w = Math.max(8, 18 - _chartCandles.length * 0.4);
+        const wickH = Math.round(c.h * 0.3);
+        const glow = isNew ? `box-shadow:0 0 20px #00ff44,0 0 40px #00ff4466;` : `box-shadow:0 0 6px #00aa0066;`;
+        const anim = isNew ? `animation:candleGrow 0.15s cubic-bezier(0,0.8,0.2,1.3) forwards;transform-origin:bottom;` : '';
+
+        chart.innerHTML += `<div style="display:flex;flex-direction:column;align-items:center;">
+            <div style="width:2px;height:${wickH}px;background:#00cc00;${isNew ? 'box-shadow:0 0 4px #00ff44;' : ''}"></div>
+            <div style="width:${w}px;height:${c.h}px;background:linear-gradient(to top,#00aa00,#00ff44);border-radius:1px;${glow}${anim}"></div>
+            <div style="width:2px;height:${Math.round(wickH*0.3)}px;background:#009900;margin-top:1px;"></div>
+        </div>`;
+    });
+
+    popup.appendChild(chart);
+
+    // Text below chart
+    const label = document.createElement('div');
+    label.style.cssText = `
+        color:${color};
+        font-size:clamp(1.3rem, 6vw, 3rem);
+        font-weight:900;
+        text-shadow:0 0 30px ${color}, 0 0 60px ${color}88;
+        letter-spacing:0.12em;
+        margin-top:6px;
+        pointer-events:none;
+        animation:streakIn 0.12s cubic-bezier(0,0.8,0.2,1.3) forwards;
+    `;
+    label.textContent = text;
+    popup.appendChild(label);
+
+    // Emoji row
+    const emojis = document.createElement('div');
+    emojis.style.cssText = 'pointer-events:none;font-size:1.2rem;margin-top:4px;';
+    emojis.textContent = '📈' + '🟢'.repeat(Math.min(_chartCandles.length, 10));
+    popup.appendChild(emojis);
+
+    // Fade the whole thing after a bit
+    clearTimeout(popup._fadeTimer);
+    popup._fadeTimer = setTimeout(() => {
+        popup.style.transition = 'opacity 1s';
+        popup.style.opacity = '0';
+        setTimeout(() => {
+            popup.style.transition = '';
+            popup.style.opacity = '1';
+            popup.innerHTML = '';
+        }, 1000);
+    }, 3000);
+}
+
+// Reset chart on death
+function resetStreakChart() {
+    _chartCandles = [];
+    const popup = document.getElementById('streakPopup');
+    if (popup) popup.innerHTML = '';
 }
 
 function addKillFeed(killer, victim) {
