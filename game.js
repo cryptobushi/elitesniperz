@@ -223,38 +223,83 @@ const createMap = () => {
     scene.add(blueSpawn);
 };
 
-// Fog of War System — vision-only (map always visible, enemies hidden outside radius)
+// Fog of War — subtle darkening outside vision, enemies hidden outside radius
 class FogOfWar {
     constructor() {
         this.visionRadius = 25;
         this.farsightRadius = 45;
-        // Track vision sources each frame
         this.visionSources = [];
+
+        this.canvas = document.createElement('canvas');
+        this.canvas.width = 256;
+        this.canvas.height = 256;
+        this.ctx = this.canvas.getContext('2d');
+
+        this.init();
     }
 
     init() {
-        // No visual fog mesh — map is always fully visible
+        this.fogTexture = new THREE.CanvasTexture(this.canvas);
+        this.fogTexture.magFilter = THREE.LinearFilter;
+        this.fogTexture.minFilter = THREE.LinearFilter;
+
+        const fogMaterial = new THREE.MeshBasicMaterial({
+            map: this.fogTexture,
+            transparent: true,
+            opacity: 0.45,
+            color: 0x000000,
+            depthWrite: false,
+            depthTest: false,
+            blending: THREE.NormalBlending
+        });
+
+        const fogGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE);
+        this.fogMesh = new THREE.Mesh(fogGeometry, fogMaterial);
+        this.fogMesh.rotation.x = -Math.PI / 2;
+        this.fogMesh.position.y = 10;
+        this.fogMesh.renderOrder = 10000;
+        scene.add(this.fogMesh);
     }
 
     update(player, allUnits, farsightPositions = []) {
         this.visionSources = [];
 
-        // Player vision
+        // Collect vision sources
         if (player && player.health > 0) {
             this.visionSources.push({ x: player.position.x, z: player.position.z, r: this.visionRadius });
         }
-
-        // Teammate vision
         allUnits.forEach(unit => {
             if (unit.team === gameState.team && unit.health > 0 && unit !== player) {
                 this.visionSources.push({ x: unit.position.x, z: unit.position.z, r: this.visionRadius });
             }
         });
-
-        // Farsight vision
         farsightPositions.forEach(pos => {
             this.visionSources.push({ x: pos.x, z: pos.z, r: this.farsightRadius });
         });
+
+        // Draw fog: fill dark, then punch transparent holes for vision
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+        this.ctx.fillRect(0, 0, 256, 256);
+
+        this.ctx.globalCompositeOperation = 'destination-out';
+        for (const src of this.visionSources) {
+            const x = ((src.x + MAP_SIZE / 2) / MAP_SIZE) * 256;
+            const y = ((src.z + MAP_SIZE / 2) / MAP_SIZE) * 256;
+            const rPx = (src.r / MAP_SIZE) * 256;
+
+            const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, rPx);
+            gradient.addColorStop(0, 'rgba(255,255,255,1)');
+            gradient.addColorStop(0.75, 'rgba(255,255,255,0.8)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+
+            this.ctx.fillStyle = gradient;
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, rPx, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+        this.ctx.globalCompositeOperation = 'source-over';
+
+        this.fogTexture.needsUpdate = true;
     }
 
     isVisible(worldX, worldZ) {
