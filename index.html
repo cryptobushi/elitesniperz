@@ -550,7 +550,16 @@
 
         <div id="deathPopup" class="hidden">
             <div id="deathOverlay"></div>
+            <div id="deathCandle" style="
+                position:relative; z-index:1; display:flex; flex-direction:column;
+                align-items:center; animation:deathSubIn 0.5s ease-out 0.1s forwards; opacity:0;
+            ">
+                <div style="width:5px;height:40px;background:linear-gradient(to bottom,#cc0000,#ff2222);box-shadow:0 0 10px #ff2222;margin-bottom:2px;animation:candleGrow 0.3s ease-out 0.3s both;transform-origin:top;"></div>
+                <div style="width:24px;height:80px;background:linear-gradient(to bottom,#cc0000,#ff2222);box-shadow:0 0 20px #ff2222,0 0 40px #cc000066;border-radius:2px;animation:candleGrow 0.25s ease-out 0.2s both;transform-origin:top;"></div>
+                <div style="width:5px;height:16px;background:#990000;margin-top:2px;"></div>
+            </div>
             <div id="deathText">YOU DIED</div>
+            <div style="position:relative;z-index:1;color:#ff222288;font-size:0.8rem;margin-top:0.3rem;animation:deathSubIn 0.5s ease-out 1.2s forwards;opacity:0;">📉</div>
             <div id="deathKiller"></div>
             <button id="respawnBtn">RETURN TO SPAWN</button>
         </div>

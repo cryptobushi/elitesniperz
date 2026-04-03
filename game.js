@@ -2226,16 +2226,55 @@ function checkShopProximity() {
     }
 }
 
+// Candle builder — green for kills/streaks, red for death
+function makeCandle(bodyH, color, glowColor, wickH = 0) {
+    const topWick = wickH || Math.round(bodyH * 0.4);
+    return `
+        <div style="width:4px;height:${topWick}px;background:linear-gradient(to top,${color},${glowColor});box-shadow:0 0 8px ${glowColor};margin-bottom:2px;animation:candleGrow 0.2s ease-out forwards;transform-origin:bottom;"></div>
+        <div style="width:${Math.min(8 + bodyH/3, 28)}px;height:${bodyH}px;background:linear-gradient(to top,${color},${glowColor});box-shadow:0 0 ${Math.min(bodyH/2,20)}px ${glowColor},0 0 ${Math.min(bodyH,40)}px ${color}66;border-radius:2px;animation:candleGrow 0.15s ease-out forwards;transform-origin:bottom;"></div>
+        <div style="width:4px;height:${Math.round(topWick*0.4)}px;background:${color};margin-top:2px;"></div>
+    `;
+}
+
 // UI Functions
 function showStreakPopup(text, color) {
     const popup = document.getElementById('streakPopup');
+
+    // Map streak text to candle size
+    const candleSizes = {
+        'FIRST BLOOD': 30,
+        'KILLING SPREE': 40,
+        'RAMPAGE': 55,
+        'DOMINATING': 70,
+        'UNSTOPPABLE': 90,
+        'GODLIKE': 120,
+        'DOUBLE KILL': 35,
+        'MULTI KILL': 45,
+        'MEGA KILL': 60,
+        'ULTRA KILL': 80,
+        'MONSTER KILL': 100,
+        'LUDICROUS KILL': 130,
+        'SHIELD BLOCKED!': 25,
+    };
+    const bodyH = candleSizes[text] || 30;
+
     const el = document.createElement('div');
-    el.className = 'streak-text';
-    el.style.color = color;
-    el.textContent = text;
+    el.style.cssText = `display:flex;flex-direction:column;align-items:center;pointer-events:none;animation:goldFloat 2s ease-out forwards;`;
+    el.innerHTML = `
+        ${makeCandle(bodyH, '#00aa00', '#00ff44')}
+        <div style="
+            color:${color};
+            font-size:clamp(1.2rem, 5vw, 2.5rem);
+            font-weight:900;
+            text-shadow:0 0 20px ${color}, 0 0 40px ${color}88;
+            letter-spacing:0.1em;
+            margin-top:6px;
+            animation:streakIn 0.15s ease-out forwards;
+        ">${text}</div>
+    `;
     popup.innerHTML = '';
     popup.appendChild(el);
-    setTimeout(() => el.remove(), 2200);
+    setTimeout(() => el.remove(), 2500);
 }
 
 function addKillFeed(killer, victim) {
