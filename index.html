@@ -161,6 +161,8 @@
             color: #00ff00;
             border-radius: 3px;
             backdrop-filter: blur(4px);
+            pointer-events: all;
+            -webkit-tap-highlight-color: transparent;
         }
 
         /* === SCOREBOARD — compact === */
@@ -275,7 +277,7 @@
 
         @media (max-height: 400px) {
             /* Very short landscape — tighten everything */
-            #scoreboard { display: none !important; }
+            #scoreboard { font-size: 0.6rem; min-width: 80px; padding: 6px; }
             .stat { padding: 2px 8px; font-size: 0.6rem; }
             .minimap { width: 60px; height: 60px; }
             .ability { width: 50px; padding: 6px; }
@@ -331,6 +333,11 @@
             <div class="ability" data-ability="farsight">
                 <div class="ability-key">E</div>
                 <div class="ability-name">Sight</div>
+                <div class="ability-cd"></div>
+            </div>
+            <div class="ability" id="scoreBtn">
+                <div class="ability-key">TAB</div>
+                <div class="ability-name">Score</div>
                 <div class="ability-cd"></div>
             </div>
         </div>

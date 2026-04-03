@@ -1779,12 +1779,20 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         useFarsight();
     }
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        document.getElementById('scoreboard').classList.remove('hidden');
+        updateScoreboard();
+    }
     if (e.shiftKey) gameState.attackWalk = true;
 });
 
 document.addEventListener('keyup', (e) => {
     gameState.keys[e.key.toLowerCase()] = false;
     if (!e.shiftKey) gameState.attackWalk = false;
+    if (e.key === 'Tab') {
+        document.getElementById('scoreboard').classList.add('hidden');
+    }
 });
 
 document.addEventListener('mousemove', (e) => {
@@ -1928,7 +1936,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
 
     document.getElementById('usernameModal').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
-    document.getElementById('scoreboard').classList.remove('hidden');
+    // Scoreboard starts hidden — Tab or tap kill count to toggle
     document.getElementById('abilities').classList.remove('hidden');
     document.getElementById('controls').classList.remove('hidden');
     document.querySelector('.minimap').classList.remove('hidden');
@@ -1943,6 +1951,11 @@ document.querySelectorAll('.ability').forEach(el => {
         const ability = el.dataset.ability;
         if (ability === 'windwalk') useWindwalk();
         if (ability === 'farsight') useFarsight();
+        if (el.id === 'scoreBtn') {
+            const sb = document.getElementById('scoreboard');
+            sb.classList.toggle('hidden');
+            if (!sb.classList.contains('hidden')) updateScoreboard();
+        }
     });
 });
 
