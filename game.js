@@ -1131,70 +1131,40 @@ class Player {
     }
 
     autoShootAtEnemies() {
-        // Get all potential enemies
         const allEnemies = [...gameState.bots];
         if (gameState.player && gameState.player.team !== this.team) {
             allEnemies.push(gameState.player);
         }
 
-        const visibleEnemies = allEnemies.filter(enemy =>
-            enemy &&
-            enemy !== this &&
-            enemy.team !== this.team &&
-            enemy.health > 0 &&
-            enemy.mesh.visible // This checks fog of war visibility
-        );
+        // Find closest enemy in range
+        let closest = null;
+        let closestDist = Infinity;
 
-        if (visibleEnemies.length === 0) return;
+        for (const enemy of allEnemies) {
+            if (!enemy || enemy === this || enemy.team === this.team) continue;
+            if (enemy.health <= 0 || !enemy.mesh.visible) continue;
 
-        // Get weapon direction (where the rifle is pointing)
-        const weaponDirection = new THREE.Vector3(0, 0, 1);
-        if (this.weapon) {
-            weaponDirection.applyQuaternion(this.weapon.getWorldQuaternion(new THREE.Quaternion()));
-        }
-
-        const fovAngle = 30; // 30 degree FOV cone
-        const fovRadians = (fovAngle * Math.PI) / 180;
-
-        // Check each enemy
-        for (let enemy of visibleEnemies) {
-            const toEnemy = new THREE.Vector3().subVectors(enemy.position, this.position).normalize();
-            const angle = weaponDirection.angleTo(toEnemy);
-
-            // If enemy is within FOV cone and in range
-            if (angle < fovRadians) {
-                const distance = this.position.distanceTo(enemy.position);
-                const hasTarget = this.isPlayer && (gameState.targetLock === enemy || gameState._hoverTarget === enemy);
-                const range = this.shootRange + (hasTarget ? 10 : 0);
-                if (distance <= range) {
-                    // Double-check fog of war visibility
-                    const enemyVisible = fogOfWar.isVisible(enemy.position.x, enemy.position.z);
-                    if (!enemyVisible) {
-                        continue; // Skip this enemy, can't see them in fog
-                    }
-
-                    // Check line of sight (walls blocking)
-                    const raycaster = new THREE.Raycaster();
-                    raycaster.set(this.position, toEnemy);
-                    const intersects = raycaster.intersectObjects(gameState._wallObjects || [], false);
-
-                    let blocked = false;
-                    for (let intersect of intersects) {
-                        if (intersect.distance < distance) {
-                            blocked = true;
-                            break;
-                        }
-                    }
-
-                    if (!blocked) {
-                        // SHOOT!
-                        this.shoot(enemy);
-                        this.shootCooldown = this.shootCooldownTime;
-                        return; // Only shoot one target per check
-                    }
-                }
+            const dist = this.position.distanceTo(enemy.position);
+            if (dist < closestDist && dist <= this.shootRange) {
+                closest = enemy;
+                closestDist = dist;
             }
         }
+
+        if (!closest) return;
+
+        // Wall LOS check
+        const dir = new THREE.Vector3().subVectors(closest.position, this.position).normalize();
+        const ray = new THREE.Raycaster();
+        ray.set(this.position, dir);
+        const hits = ray.intersectObjects(gameState._wallObjects || [], false);
+        for (const hit of hits) {
+            if (hit.distance < closestDist) return; // Blocked by wall
+        }
+
+        // Face and shoot
+        this.shoot(closest);
+        this.shootCooldown = this.shootCooldownTime;
     }
 
     botAI(deltaTime) {
@@ -2947,79 +2917,6 @@ function animate() {
             if (reached) {
                 gameState.moveTarget = null;
             }
-        }
-
-        // Hover detection — show crosshair on enemy near cursor
-        const hoverRay = new THREE.Raycaster();
-        hoverRay.setFromCamera(gameState.mousePos, camera);
-        const hoverPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-        const hoverPoint = new THREE.Vector3();
-        hoverRay.ray.intersectPlane(hoverPlane, hoverPoint);
-
-        let hoverTarget = null;
-        gameState._hoverTarget = null;
-        let closestDist = 3;
-        gameState.bots.forEach(bot => {
-            if (bot.team !== gameState.team && bot.health > 0 && bot.mesh.visible) {
-                const d = hoverPoint.distanceTo(bot.position);
-                if (d < closestDist) {
-                    closestDist = d;
-                    hoverTarget = bot;
-                    gameState._hoverTarget = bot;
-                }
-            }
-        });
-
-        // Use hover target or click-locked target
-        const activeTarget = gameState.targetLock || hoverTarget;
-
-        // Target lock crosshair + range boost
-        if (activeTarget) {
-            const tgt = activeTarget;
-            if (tgt.health <= 0 || !tgt.mesh.visible) {
-                gameState.targetLock = null;
-                if (gameState._crosshair) { scene.remove(gameState._crosshair); gameState._crosshair = null; }
-            } else {
-                // Create crosshair if needed
-                if (!gameState._crosshair) {
-                    // Use a sprite so it always faces camera
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 128;
-                    canvas.height = 128;
-                    const c = canvas.getContext('2d');
-                    c.strokeStyle = '#ff0000';
-                    c.lineWidth = 3;
-                    // Outer circle
-                    c.beginPath();
-                    c.arc(64, 64, 40, 0, Math.PI * 2);
-                    c.stroke();
-                    // Cross lines
-                    c.beginPath();
-                    c.moveTo(64, 10); c.lineTo(64, 45);
-                    c.moveTo(64, 83); c.lineTo(64, 118);
-                    c.moveTo(10, 64); c.lineTo(45, 64);
-                    c.moveTo(83, 64); c.lineTo(118, 64);
-                    c.stroke();
-                    // Center dot
-                    c.fillStyle = '#ff0000';
-                    c.beginPath();
-                    c.arc(64, 64, 4, 0, Math.PI * 2);
-                    c.fill();
-
-                    const tex = new THREE.CanvasTexture(canvas);
-                    const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.9, depthTest: false });
-                    const sprite = new THREE.Sprite(spriteMat);
-                    sprite.scale.set(3, 3, 1);
-                    sprite.renderOrder = 9999;
-                    sprite.raycast = () => {}; // Prevent collision raycast errors
-                    scene.add(sprite);
-                    gameState._crosshair = sprite;
-                }
-                // Follow target above head
-                gameState._crosshair.position.set(tgt.position.x, tgt.position.y + 2.5, tgt.position.z);
-            }
-        } else {
-            if (gameState._crosshair) { scene.remove(gameState._crosshair); gameState._crosshair = null; }
         }
 
         // Aim weapon at mouse
