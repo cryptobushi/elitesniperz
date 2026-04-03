@@ -2137,7 +2137,8 @@ function _renderChart(label, labelColor) {
     const clr = labelColor || '#00ff44';
 
     const chart = document.createElement('div');
-    chart.style.cssText = 'display:flex;align-items:flex-end;justify-content:center;gap:2px;pointer-events:none;height:200px;position:relative;';
+    const chartW = Math.min(350, _chartCandles.length * 16);
+    chart.style.cssText = `display:flex;align-items:flex-end;pointer-events:none;height:200px;width:${chartW}px;`;
 
     // Find min/max for scaling
     let minVal = Infinity, maxVal = -Infinity;
@@ -2147,6 +2148,7 @@ function _renderChart(label, labelColor) {
     });
     const range = maxVal - minVal || 1;
     const scale = 180 / range;
+    const w = Math.max(4, Math.min(12, (chartW - _chartCandles.length * 2) / _chartCandles.length));
 
     _chartCandles.forEach((c, i) => {
         const isNew = i === _chartCandles.length - 1;
@@ -2154,19 +2156,19 @@ function _renderChart(label, labelColor) {
         const bodyTop = Math.max(c.open, c.close);
         const bodyBot = Math.min(c.open, c.close);
         const bodyH = Math.max(2, (bodyTop - bodyBot) * scale);
-        const wickTopH = (c.high - bodyTop) * scale;
-        const wickBotH = (bodyBot - c.low) * scale;
-        const bottom = (bodyBot - minVal) * scale;
-        const w = Math.max(6, Math.min(14, 200 / _chartCandles.length));
+        const wickTopH = Math.max(0, (c.high - bodyTop) * scale);
+        const wickBotH = Math.max(0, (bodyBot - c.low) * scale);
+        const bottom = (c.low - minVal) * scale;
+        const totalH = wickBotH + bodyH + wickTopH;
         const color = isGreen ? '#00cc44' : '#cc2222';
         const glowColor = isGreen ? '#00ff44' : '#ff2222';
         const glow = isNew ? `box-shadow:0 0 12px ${glowColor},0 0 24px ${glowColor}66;` : '';
         const anim = isNew ? 'animation:candleGrow 0.12s cubic-bezier(0,0.8,0.2,1.3) forwards;transform-origin:bottom;' : '';
 
-        chart.innerHTML += `<div style="position:relative;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;">
-            <div style="position:absolute;bottom:${bottom + bodyH}px;width:2px;height:${wickTopH}px;background:${color};"></div>
-            <div style="position:absolute;bottom:${bottom}px;width:${w}px;height:${bodyH}px;background:${color};border-radius:1px;${glow}${anim}"></div>
-            <div style="position:absolute;bottom:${Math.max(0, bottom - wickBotH)}px;width:2px;height:${wickBotH}px;background:${color};"></div>
+        chart.innerHTML += `<div style="flex-shrink:0;width:${w + 2}px;display:flex;flex-direction:column;align-items:center;align-self:flex-end;margin-bottom:${bottom}px;">
+            <div style="width:2px;height:${wickTopH}px;background:${color};"></div>
+            <div style="width:${w}px;height:${bodyH}px;background:${color};border-radius:1px;${glow}${anim}"></div>
+            <div style="width:2px;height:${wickBotH}px;background:${color};"></div>
         </div>`;
     });
 
