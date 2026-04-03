@@ -2800,18 +2800,7 @@ function animate() {
         // space-to-center handled by cameraTarget.copy above
     }
 
-    // On mobile, only pull camera back if player is very far off screen
-    if (isMobile && gameState.player && gameState.player.health > 0) {
-        const px = gameState.player.position.x;
-        const pz = gameState.player.position.z;
-        const dx = px - gameState.cameraTarget.x;
-        const dz = pz - gameState.cameraTarget.z;
-        const dist = Math.sqrt(dx * dx + dz * dz);
-        if (dist > 25) {
-            gameState.cameraTarget.x += dx * 0.01;
-            gameState.cameraTarget.z += dz * 0.01;
-        }
-    }
+    // No auto-follow on mobile — camera stays where you put it
 
     // Clamp camera to map bounds
     const mapBound = MAP_SIZE / 2 - 5;
