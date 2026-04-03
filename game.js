@@ -934,13 +934,28 @@ class Player {
 
                     if (!moved) {
                         this._stuckFrames++;
-                        if (this._stuckFrames > 15) {
-                            // Pick completely new direction
+                        if (this._stuckFrames > 10) {
+                            // Find nearest bot and run AWAY from it + the wall
+                            let escapeDir = new THREE.Vector3((Math.random() - 0.5), 0, (Math.random() - 0.5)).normalize();
+
+                            for (const other of gameState.bots) {
+                                if (other === this || other.health <= 0) continue;
+                                const dist = this.position.distanceTo(other.position);
+                                if (dist < 5) {
+                                    // Run away from nearby bot
+                                    escapeDir.add(new THREE.Vector3().subVectors(this.position, other.position).normalize());
+                                }
+                            }
+                            escapeDir.normalize();
+
                             this.targetPosition = new THREE.Vector3(
-                                this.position.x + (Math.random() - 0.5) * 40,
+                                this.position.x + escapeDir.x * 25,
                                 0.5,
-                                this.position.z + (Math.random() - 0.5) * 40
+                                this.position.z + escapeDir.z * 25
                             );
+                            // Clamp to map bounds
+                            this.targetPosition.x = Math.max(-MAP_SIZE/2 + 10, Math.min(MAP_SIZE/2 - 10, this.targetPosition.x));
+                            this.targetPosition.z = Math.max(-MAP_SIZE/2 + 10, Math.min(MAP_SIZE/2 - 10, this.targetPosition.z));
                             this._stuckFrames = 0;
                         }
                     } else {
@@ -1073,18 +1088,31 @@ class Player {
 
     checkCollision(newPos) {
         // Check bounds
-        if (Math.abs(newPos.x) > MAP_SIZE / 2 - 1 || Math.abs(newPos.z) > MAP_SIZE / 2 - 1) {
+        if (Math.abs(newPos.x) > MAP_SIZE / 2 - 2 || Math.abs(newPos.z) > MAP_SIZE / 2 - 2) {
             return true;
         }
 
-        // Check walls
+        // Check walls — raycast with larger check radius
+        const dir = new THREE.Vector3().subVectors(newPos, this.position);
+        if (dir.length() < 0.001) return false;
+        dir.normalize();
+
         const raycaster = new THREE.Raycaster();
-        raycaster.set(this.position, new THREE.Vector3().subVectors(newPos, this.position).normalize());
+        raycaster.set(this.position, dir);
         const intersects = raycaster.intersectObjects(scene.children, true);
 
         for (let intersect of intersects) {
-            if (intersect.object.userData.isWall && intersect.distance < 1) {
+            if (intersect.object.userData.isWall && intersect.distance < 1.5) {
                 return true;
+            }
+        }
+
+        // Check bot-to-bot collision (bots only, not player)
+        if (!this.isPlayer) {
+            for (const other of gameState.bots) {
+                if (other === this || other.health <= 0) continue;
+                const dist = newPos.distanceTo(other.position);
+                if (dist < 1.2) return true; // Don't walk into other bots
             }
         }
 
