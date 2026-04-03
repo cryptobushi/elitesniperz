@@ -3012,6 +3012,13 @@ if (isMobile) {
 // Smooth camera lerp — always runs (mobile + minimap clicks on desktop)
 function smoothCameraUpdate() {
     requestAnimationFrame(smoothCameraUpdate);
+    if (!isMobile) {
+        // Desktop: smoothCam follows cameraTarget (no lerp pull)
+        smoothCamX = gameState.cameraTarget.x;
+        smoothCamZ = gameState.cameraTarget.z;
+        return;
+    }
+    // Mobile: cameraTarget lerps toward smoothCam (touch drag target)
     const lerp = 0.08;
     gameState.cameraTarget.x += (smoothCamX - gameState.cameraTarget.x) * lerp;
     gameState.cameraTarget.z += (smoothCamZ - gameState.cameraTarget.z) * lerp;
