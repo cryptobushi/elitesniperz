@@ -2949,12 +2949,15 @@ if (isMobile) {
 
                 if (!data.isDrag && (Math.abs(totalDx) > DRAG_THRESHOLD || Math.abs(totalDy) > DRAG_THRESHOLD)) {
                     data.isDrag = true;
+                    _isTouchDragging = true;
+                    // Sync smoothCam to current camera before dragging
+                    smoothCamX = gameState.cameraTarget.x;
+                    smoothCamZ = gameState.cameraTarget.z;
                 }
 
                 if (data.isDrag) {
                     const dx = t.clientX - data.lastX;
                     const dy = t.clientY - data.lastY;
-                    // Move the smooth target — actual camera lerps to it
                     smoothCamX -= dx * 0.12;
                     smoothCamZ -= dy * 0.12;
                 }
@@ -3004,24 +3007,26 @@ if (isMobile) {
 
         if (e.touches.length === 0) {
             gameState._pinchStart = null;
+            _isTouchDragging = false;
         }
     }, { passive: false });
 
 }
 
 // Smooth camera lerp — always runs (mobile + minimap clicks on desktop)
+let _isTouchDragging = false;
 function smoothCameraUpdate() {
     requestAnimationFrame(smoothCameraUpdate);
-    if (!isMobile) {
-        // Desktop: smoothCam follows cameraTarget (no lerp pull)
+    // Always keep smoothCam synced with cameraTarget unless actively touch-dragging
+    if (!_isTouchDragging) {
         smoothCamX = gameState.cameraTarget.x;
         smoothCamZ = gameState.cameraTarget.z;
-        return;
+    } else {
+        // Touch drag: cameraTarget lerps toward touch-driven smoothCam
+        const lerp = 0.08;
+        gameState.cameraTarget.x += (smoothCamX - gameState.cameraTarget.x) * lerp;
+        gameState.cameraTarget.z += (smoothCamZ - gameState.cameraTarget.z) * lerp;
     }
-    // Mobile: cameraTarget lerps toward smoothCam (touch drag target)
-    const lerp = 0.08;
-    gameState.cameraTarget.x += (smoothCamX - gameState.cameraTarget.x) * lerp;
-    gameState.cameraTarget.z += (smoothCamZ - gameState.cameraTarget.z) * lerp;
 }
 smoothCameraUpdate();
 
