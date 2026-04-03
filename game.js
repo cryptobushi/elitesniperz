@@ -2938,18 +2938,24 @@ function animate() {
             }
         }
 
-        // Hover detection — show crosshair on enemy under cursor
+        // Hover detection — show crosshair on enemy near cursor
         const hoverRay = new THREE.Raycaster();
         hoverRay.setFromCamera(gameState.mousePos, camera);
-        const enemyBodies = gameState.bots
-            .filter(b => b.team !== gameState.team && b.health > 0 && b.mesh.visible)
-            .map(b => ({ bot: b, mesh: b.mesh.children[0] }));
-        const hoverHits = hoverRay.intersectObjects(enemyBodies.map(e => e.mesh), false);
+        const hoverPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+        const hoverPoint = new THREE.Vector3();
+        hoverRay.ray.intersectPlane(hoverPlane, hoverPoint);
+
         let hoverTarget = null;
-        if (hoverHits.length > 0) {
-            const hit = enemyBodies.find(e => e.mesh === hoverHits[0].object);
-            if (hit) hoverTarget = hit.bot;
-        }
+        let closestDist = 3; // Must be within 3 units of cursor
+        gameState.bots.forEach(bot => {
+            if (bot.team !== gameState.team && bot.health > 0 && bot.mesh.visible) {
+                const d = hoverPoint.distanceTo(bot.position);
+                if (d < closestDist) {
+                    closestDist = d;
+                    hoverTarget = bot;
+                }
+            }
+        });
 
         // Use hover target or click-locked target
         const activeTarget = gameState.targetLock || hoverTarget;
