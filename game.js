@@ -2949,11 +2949,10 @@ if (isMobile) {
                     const dx = t.clientX - data.lastX;
                     const dy = t.clientY - data.lastY;
                     // Move camera directly — no smoothCam indirection
-                    gameState.cameraTarget.x -= dx * 0.15;
-                    gameState.cameraTarget.z -= dy * 0.15;
-                    // Store velocity for momentum
-                    camVelX = -dx * 0.15;
-                    camVelZ = -dy * 0.15;
+                    gameState.cameraTarget.x -= dx * 0.06;
+                    gameState.cameraTarget.z -= dy * 0.06;
+                    camVelX = -dx * 0.06;
+                    camVelZ = -dy * 0.06;
                 }
 
                 data.lastX = t.clientX;
