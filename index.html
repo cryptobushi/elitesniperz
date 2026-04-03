@@ -2,291 +2,294 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elite Snipers - Web Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="screen-orientation" content="landscape">
+    <title>Elite Snipers</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        body {
+        html, body {
             font-family: 'Courier New', monospace;
             background: #000;
             overflow: hidden;
             color: #fff;
+            width: 100%;
+            height: 100%;
+            /* iOS safe areas */
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         #gameCanvas {
             display: block;
             width: 100vw;
             height: 100vh;
+            touch-action: none;
         }
 
         #ui {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             pointer-events: none;
         }
 
+        /* === LANDSCAPE LOCK OVERLAY === */
+        #rotateOverlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #000;
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #00ff00;
+            font-size: 1.2rem;
+            text-align: center;
+            padding: 2rem;
+        }
+        #rotateOverlay .icon { font-size: 4rem; margin-bottom: 1rem; animation: rotate 2s infinite; }
+        @keyframes rotate { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }
+
+        @media (orientation: portrait) {
+            #rotateOverlay { display: flex; }
+        }
+
+        /* === START MODAL === */
         #usernameModal {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             background: rgba(0, 0, 0, 0.95);
-            border: 3px solid #00ff00;
-            padding: 30px;
+            border: 2px solid #00ff00;
+            padding: 1.5rem;
             text-align: center;
             pointer-events: all;
             z-index: 1000;
+            width: min(90%, 400px);
+            border-radius: 8px;
         }
 
         #usernameModal h1 {
             color: #00ff00;
-            margin-bottom: 10px;
-            font-size: 32px;
+            margin-bottom: 0.5rem;
+            font-size: clamp(1.2rem, 5vw, 2rem);
             text-shadow: 0 0 10px #00ff00;
         }
 
         #usernameModal p {
-            color: #aaa;
-            margin-bottom: 20px;
-            font-size: 14px;
+            color: #888;
+            margin-bottom: 1rem;
+            font-size: clamp(0.7rem, 2.5vw, 0.9rem);
         }
 
         #usernameInput {
             background: #111;
             border: 2px solid #00ff00;
             color: #00ff00;
-            padding: 10px 20px;
-            font-size: 18px;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
             font-family: 'Courier New', monospace;
-            margin-bottom: 20px;
-            width: 250px;
+            margin-bottom: 1rem;
+            width: 100%;
+            border-radius: 4px;
+            -webkit-appearance: none;
         }
 
         #teamSelect {
-            margin-bottom: 20px;
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            justify-content: center;
         }
 
         .teamBtn {
             background: #111;
             border: 2px solid #00ff00;
             color: #00ff00;
-            padding: 10px 30px;
-            font-size: 16px;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.9rem;
             font-family: 'Courier New', monospace;
             cursor: pointer;
-            margin: 0 10px;
-            transition: all 0.2s;
+            flex: 1;
+            border-radius: 4px;
+            -webkit-tap-highlight-color: transparent;
         }
-
-        .teamBtn:hover {
-            background: #00ff00;
-            color: #000;
-        }
-
-        .teamBtn.red {
-            border-color: #ff0000;
-            color: #ff0000;
-        }
-
-        .teamBtn.red:hover {
-            background: #ff0000;
-            color: #fff;
-        }
-
-        .teamBtn.blue {
-            border-color: #0088ff;
-            color: #0088ff;
-        }
-
-        .teamBtn.blue:hover {
-            background: #0088ff;
-            color: #fff;
-        }
+        .teamBtn.red { border-color: #ff0000; color: #ff0000; }
+        .teamBtn.blue { border-color: #0088ff; color: #0088ff; }
+        .teamBtn:active, .teamBtn.red:active { background: #ff000033; }
+        .teamBtn.blue:active { background: #0088ff33; }
 
         #startBtn {
-            background: #111;
-            border: 2px solid #00ff00;
-            color: #00ff00;
-            padding: 12px 40px;
-            font-size: 18px;
+            background: #00ff00;
+            border: none;
+            color: #000;
+            padding: 0.75rem;
+            font-size: 1rem;
+            font-weight: bold;
             font-family: 'Courier New', monospace;
             cursor: pointer;
-            transition: all 0.2s;
+            width: 100%;
+            border-radius: 4px;
+            -webkit-tap-highlight-color: transparent;
         }
+        #startBtn:active { opacity: 0.8; }
 
-        #startBtn:hover {
-            background: #00ff00;
-            color: #000;
-        }
-
+        /* === HUD — mobile-first compact === */
         #hud {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            pointer-events: none;
+            top: env(safe-area-inset-top, 8px);
+            left: env(safe-area-inset-left, 8px);
+            padding-top: 8px;
+            padding-left: 8px;
         }
 
         .stat {
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #00ff00;
-            padding: 8px 15px;
-            margin-bottom: 10px;
-            font-size: 16px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #00ff0066;
+            padding: 4px 10px;
+            margin-bottom: 4px;
+            font-size: clamp(0.65rem, 2vw, 0.85rem);
             color: #00ff00;
+            border-radius: 3px;
+            backdrop-filter: blur(4px);
         }
 
+        /* === SCOREBOARD — compact === */
         #scoreboard {
             position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #00ff00;
-            padding: 15px;
-            min-width: 200px;
+            top: env(safe-area-inset-top, 8px);
+            right: env(safe-area-inset-right, 8px);
+            padding-top: 8px;
+            padding-right: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #00ff0066;
+            padding: 8px;
+            min-width: 100px;
+            font-size: 0.7rem;
+            border-radius: 3px;
+            backdrop-filter: blur(4px);
         }
+        .score-team { margin-bottom: 6px; }
+        .score-team h3 { font-size: 0.75rem; margin-bottom: 2px; }
+        .score-team.red h3 { color: #ff0000; }
+        .score-team.blue h3 { color: #0088ff; }
+        .player-score { font-size: 0.65rem; color: #aaa; margin-left: 6px; }
 
-        .score-team {
-            margin-bottom: 15px;
-        }
-
-        .score-team h3 {
-            margin-bottom: 5px;
-            font-size: 18px;
-        }
-
-        .score-team.red h3 {
-            color: #ff0000;
-        }
-
-        .score-team.blue h3 {
-            color: #0088ff;
-        }
-
-        .player-score {
-            font-size: 14px;
-            color: #aaa;
-            margin-left: 10px;
-        }
-
+        /* === ABILITIES — bottom corners === */
         #abilities {
             position: absolute;
-            bottom: 20px;
+            bottom: env(safe-area-inset-bottom, 12px);
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 15px;
+            gap: 10px;
+            padding-bottom: 12px;
         }
 
         .ability {
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.7);
             border: 2px solid #00ff00;
-            padding: 15px;
-            width: 80px;
+            padding: 8px;
+            width: 60px;
             text-align: center;
             pointer-events: all;
             cursor: pointer;
-            transition: all 0.2s;
+            border-radius: 8px;
+            backdrop-filter: blur(4px);
+            -webkit-tap-highlight-color: transparent;
         }
+        .ability:active { background: rgba(0, 255, 0, 0.3); }
+        .ability.cooldown { opacity: 0.4; }
+        .ability-key { color: #00ff00; font-size: 1.1rem; font-weight: bold; }
+        .ability-name { color: #aaa; font-size: 0.55rem; margin-top: 2px; }
+        .ability-cd { color: #ff0000; font-size: 0.7rem; margin-top: 2px; }
 
-        .ability:hover {
-            background: rgba(0, 255, 0, 0.2);
-            transform: scale(1.05);
-        }
-
-        .ability.cooldown {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .ability-key {
-            color: #00ff00;
-            font-size: 20px;
-            font-weight: bold;
-        }
-
-        .ability-name {
-            color: #aaa;
-            font-size: 12px;
-            margin-top: 5px;
-        }
-
-        .ability-cd {
-            color: #ff0000;
-            font-size: 14px;
-            margin-top: 5px;
-        }
-
+        /* === CONTROLS HINT — hidden on mobile === */
         #controls {
             position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #00ff00;
-            padding: 15px;
-            font-size: 12px;
-            color: #aaa;
+            bottom: 12px;
+            right: 12px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #00ff0044;
+            padding: 8px 12px;
+            font-size: 0.6rem;
+            color: #666;
+            border-radius: 3px;
         }
+        #controls h4 { color: #00ff0088; margin-bottom: 4px; font-size: 0.65rem; }
+        #controls div { margin-bottom: 1px; }
 
-        #controls h4 {
-            color: #00ff00;
-            margin-bottom: 8px;
-        }
+        .hidden { display: none !important; }
 
-        #controls div {
-            margin-bottom: 3px;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
+        /* === KILL FEED === */
         #killFeed {
             position: absolute;
-            top: 20px;
+            top: env(safe-area-inset-top, 8px);
             left: 50%;
             transform: translateX(-50%);
-            width: 400px;
+            width: min(300px, 60vw);
+            padding-top: 8px;
         }
 
         .kill-message {
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #00ff00;
-            padding: 8px 15px;
-            margin-bottom: 5px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #00ff0066;
+            padding: 4px 10px;
+            margin-bottom: 3px;
             text-align: center;
+            font-size: 0.7rem;
+            border-radius: 3px;
             animation: fadeIn 0.3s, fadeOut 0.5s 2.5s;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
 
-        @keyframes fadeOut {
-            from { opacity: 1; }
-            to { opacity: 0; }
-        }
-
+        /* === MINIMAP === */
         .minimap {
             position: absolute;
-            bottom: 20px;
-            left: 20px;
-            width: 150px;
-            height: 150px;
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #00ff00;
+            bottom: env(safe-area-inset-bottom, 12px);
+            left: env(safe-area-inset-left, 12px);
+            width: 80px;
+            height: 80px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #00ff0066;
+            border-radius: 4px;
+            padding-bottom: 12px;
+            padding-left: 12px;
+        }
+
+        /* === MOBILE TWEAKS === */
+        @media (max-width: 768px) {
+            #controls { display: none !important; }
+        }
+
+        @media (max-height: 400px) {
+            /* Very short landscape — tighten everything */
+            #scoreboard { display: none !important; }
+            .stat { padding: 2px 8px; font-size: 0.6rem; }
+            .minimap { width: 60px; height: 60px; }
+            .ability { width: 50px; padding: 6px; }
+            .ability-key { font-size: 0.9rem; }
         }
     </style>
 </head>
 <body>
+    <!-- Force landscape overlay -->
+    <div id="rotateOverlay">
+        <div class="icon">📱</div>
+        <div>Rotate your device to<br><strong>LANDSCAPE</strong><br>to play</div>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
 
     <div id="ui">
@@ -295,8 +298,8 @@
             <p>A tribute to the legendary Warcraft III custom game</p>
             <input type="text" id="usernameInput" placeholder="Enter your name..." maxlength="12">
             <div id="teamSelect">
-                <button class="teamBtn red" data-team="red">RED TEAM</button>
-                <button class="teamBtn blue" data-team="blue">BLUE TEAM</button>
+                <button class="teamBtn red" data-team="red">RED</button>
+                <button class="teamBtn blue" data-team="blue">BLUE</button>
             </div>
             <button id="startBtn">START GAME</button>
         </div>
@@ -310,11 +313,11 @@
 
         <div id="scoreboard" class="hidden">
             <div class="score-team red">
-                <h3>RED TEAM</h3>
+                <h3>RED</h3>
                 <div id="redScores"></div>
             </div>
             <div class="score-team blue">
-                <h3>BLUE TEAM</h3>
+                <h3>BLUE</h3>
                 <div id="blueScores"></div>
             </div>
         </div>
@@ -322,12 +325,12 @@
         <div id="abilities" class="hidden">
             <div class="ability" data-ability="windwalk">
                 <div class="ability-key">Q</div>
-                <div class="ability-name">Windwalk</div>
+                <div class="ability-name">Wind</div>
                 <div class="ability-cd"></div>
             </div>
             <div class="ability" data-ability="farsight">
                 <div class="ability-key">E</div>
-                <div class="ability-name">Far Sight</div>
+                <div class="ability-name">Sight</div>
                 <div class="ability-cd"></div>
             </div>
         </div>
@@ -336,14 +339,32 @@
             <h4>CONTROLS</h4>
             <div>Left Click - Move/Attack</div>
             <div>Right Click - Drag Camera</div>
-            <div>WASD/Edge - Scroll Map</div>
-            <div>Space - Center Camera</div>
-            <div>Q - Windwalk</div>
-            <div>E - Far Sight</div>
+            <div>WASD - Scroll</div>
+            <div>Space - Center</div>
+            <div>Q - Windwalk | E - Far Sight</div>
         </div>
 
         <div id="killFeed"></div>
 
+        <div id="deathPopup" class="hidden" style="
+            position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+            background:rgba(0,0,0,0.9); border:2px solid #ff0000; border-radius:10px;
+            padding:1.5rem 2rem; text-align:center; pointer-events:all; z-index:900;
+            min-width:200px;
+        ">
+            <div id="deathPopupClose" style="
+                position:absolute; top:8px; right:12px; color:#666; font-size:1.2rem;
+                cursor:pointer; -webkit-tap-highlight-color:transparent;
+            ">✕</div>
+            <div style="color:#ff0000; font-size:1.5rem; font-weight:bold; text-shadow:0 0 10px #ff000066;">YOU DIED</div>
+            <div id="deathKiller" style="color:#888; font-size:0.8rem; margin:0.5rem 0;"></div>
+            <button id="respawnBtn" style="
+                background:#ff0000; border:none; color:#fff; padding:0.6rem 1.5rem;
+                font-size:0.9rem; font-family:'Courier New',monospace; font-weight:bold;
+                border-radius:5px; cursor:pointer; margin-top:0.5rem;
+                -webkit-tap-highlight-color:transparent;
+            ">RETURN TO SPAWN</button>
+        </div>
         <canvas class="minimap hidden" id="minimap"></canvas>
     </div>
 

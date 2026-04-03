@@ -20,7 +20,7 @@ const gameState = {
     targetLock: null,
     // Camera controls
     cameraTarget: new THREE.Vector3(0, 0, 0),
-    cameraOffset: new THREE.Vector3(0, 20, 20), // Closer zoom
+    cameraOffset: new THREE.Vector3(0, 14, 14), // Zoomed in closer
     isDraggingCamera: false,
     lastMousePos: new THREE.Vector2(),
     // Click to move
@@ -650,6 +650,40 @@ class Player {
         group.add(healthBar);
         this.healthBar = healthBar;
 
+        // Player-only features: ground halo + cape
+        if (this.isPlayer) {
+            // White ground halo ring
+            const haloGeometry = new THREE.RingGeometry(0.6, 0.8, 32);
+            const haloMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.5,
+            });
+            const halo = new THREE.Mesh(haloGeometry, haloMaterial);
+            halo.rotation.x = -Math.PI / 2;
+            halo.position.y = -0.45;
+            halo.raycast = () => {};
+            group.add(halo);
+
+            // Cape — cloth hanging from shoulders
+            const capeShape = new THREE.Shape();
+            capeShape.moveTo(-0.25, 0);
+            capeShape.lineTo(0.25, 0);
+            capeShape.lineTo(0.2, -1.2);
+            capeShape.lineTo(-0.2, -1.2);
+            capeShape.closePath();
+            const capeGeometry = new THREE.ShapeGeometry(capeShape);
+            const capeMaterial = new THREE.MeshStandardMaterial({
+                color: team === 'red' ? 0x660000 : 0x002266,
+                side: THREE.DoubleSide,
+                roughness: 0.9,
+            });
+            const cape = new THREE.Mesh(capeGeometry, capeMaterial);
+            cape.position.set(0, 0.8, -0.22);
+            cape.rotation.x = 0.15; // Slight backward tilt
+            cape.castShadow = true;
+            group.add(cape);
+            this.cape = cape;
+        }
+
         group.position.y = 0.5;
         scene.add(group);
         this.mesh = group;
@@ -776,56 +810,145 @@ class Player {
     }
 
     botAI(deltaTime) {
-        // Bot AI: aggressive roaming and combat
+        // Bot AI: roam, camp, explore, avoid piling up
 
-        // ALWAYS keep moving - constantly pick new targets
-        if (!this.targetPosition || this.position.distanceTo(this.targetPosition) < 5) {
-            // Pick new random position AWAY from walls
-            const maxAttempts = 10;
-            let validPosition = false;
+        // Initialize bot state
+        if (!this._botState) {
+            this._botState = 'explore'; // explore, camp, chase
+            this._campTimer = 0;
+            this._campDuration = 0;
+            this._stuckFrames = 0;
+            this._lastPos = this.position.clone();
+        }
 
-            for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                const x = (Math.random() - 0.5) * (MAP_SIZE * 0.8); // Stay within 80% of map
-                const z = (Math.random() - 0.5) * (MAP_SIZE * 0.8);
+        // === STATE: CAMPING — sit still for a while, watch for enemies ===
+        if (this._botState === 'camp') {
+            this._campTimer += deltaTime;
+            this.velocity.set(0, 0, 0); // Stop moving
 
-                this.targetPosition = new THREE.Vector3(x, 0.5, z);
-
-                // Check if position is valid (not too close to walls/edges)
-                const distFromEdge = Math.min(
-                    Math.abs(x - MAP_SIZE/2),
-                    Math.abs(x + MAP_SIZE/2),
-                    Math.abs(z - MAP_SIZE/2),
-                    Math.abs(z + MAP_SIZE/2)
-                );
-
-                if (distFromEdge > 10) {
-                    validPosition = true;
-                    break;
-                }
+            // Slowly rotate to look around while camping
+            if (this.rifleGroup) {
+                const lookAngle = Math.sin(Date.now() * 0.001) * Math.PI * 0.5;
+                const lookTarget = this.position.clone().add(new THREE.Vector3(Math.sin(lookAngle), 0, Math.cos(lookAngle)).multiplyScalar(5));
+                this.rifleGroup.lookAt(lookTarget);
             }
 
-            // Fallback to center if no valid position found
-            if (!validPosition) {
-                this.targetPosition = new THREE.Vector3(
-                    (Math.random() - 0.5) * 40,
-                    0.5,
-                    (Math.random() - 0.5) * 40
-                );
+            if (this._campTimer >= this._campDuration) {
+                this._botState = 'explore';
+                this.targetPosition = null;
             }
         }
 
-        // Always move towards target
-        const direction = new THREE.Vector3()
-            .subVectors(this.targetPosition, this.position);
-        direction.y = 0; // Only consider XZ plane
-        direction.normalize();
+        // === STATE: EXPLORE — pick a destination and walk there ===
+        if (this._botState === 'explore' || this._botState === 'chase') {
+            // Pick new target if needed
+            if (!this.targetPosition || this.position.distanceTo(this.targetPosition) < 3) {
+                // Chance to camp instead of picking a new target
+                if (Math.random() < 0.25 && this._botState !== 'chase') {
+                    this._botState = 'camp';
+                    this._campTimer = 0;
+                    this._campDuration = 3 + Math.random() * 8; // Camp 3-11 seconds
+                    this.velocity.set(0, 0, 0);
+                } else {
+                    // Pick new position — avoid other bots
+                    for (let attempt = 0; attempt < 15; attempt++) {
+                        const x = (Math.random() - 0.5) * (MAP_SIZE * 0.8);
+                        const z = (Math.random() - 0.5) * (MAP_SIZE * 0.8);
+                        const candidate = new THREE.Vector3(x, 0.5, z);
 
-        this.velocity.copy(direction).multiplyScalar(this.speed * deltaTime);
-        const newPos = this.position.clone().add(this.velocity);
-        if (!this.checkCollision(newPos)) {
-            this.position.x = newPos.x;
-            this.position.z = newPos.z;
-            this.position.y = this.getTerrainHeight(this.position.x, this.position.z);
+                        // Check distance from edges
+                        if (Math.abs(x) > MAP_SIZE / 2 - 15 || Math.abs(z) > MAP_SIZE / 2 - 15) continue;
+
+                        // Avoid piling on other bots — skip if another bot is within 8 units of target
+                        let tooClose = false;
+                        for (const other of gameState.bots) {
+                            if (other === this || other.health <= 0) continue;
+                            if (other.position.distanceTo(candidate) < 8) { tooClose = true; break; }
+                        }
+                        if (tooClose) continue;
+
+                        this.targetPosition = candidate;
+                        break;
+                    }
+
+                    // Fallback
+                    if (!this.targetPosition) {
+                        this.targetPosition = new THREE.Vector3(
+                            this.position.x + (Math.random() - 0.5) * 50,
+                            0.5,
+                            this.position.z + (Math.random() - 0.5) * 50
+                        );
+                    }
+                }
+            }
+
+            if (this.targetPosition && this._botState !== 'camp') {
+                // Move toward target with wall sliding + bot avoidance
+                const direction = new THREE.Vector3().subVectors(this.targetPosition, this.position);
+                direction.y = 0;
+                direction.normalize();
+
+                // Avoid nearby bots — steer away from teammates within 3 units
+                const avoidForce = new THREE.Vector3();
+                for (const other of gameState.bots) {
+                    if (other === this || other.health <= 0) continue;
+                    const dist = this.position.distanceTo(other.position);
+                    if (dist < 3 && dist > 0.1) {
+                        const away = new THREE.Vector3().subVectors(this.position, other.position).normalize();
+                        avoidForce.add(away.multiplyScalar(1.5 / dist));
+                    }
+                }
+                direction.add(avoidForce).normalize();
+
+                const speed = this.speed * deltaTime;
+                this.velocity.copy(direction).multiplyScalar(speed);
+                const newPos = this.position.clone().add(this.velocity);
+
+                if (!this.checkCollision(newPos)) {
+                    this.position.x = newPos.x;
+                    this.position.z = newPos.z;
+                } else {
+                    // Wall slide
+                    let moved = false;
+                    const slideX = this.position.clone(); slideX.x += this.velocity.x;
+                    const slideZ = this.position.clone(); slideZ.z += this.velocity.z;
+
+                    if (!this.checkCollision(slideX)) {
+                        this.position.x = slideX.x; moved = true;
+                    } else if (!this.checkCollision(slideZ)) {
+                        this.position.z = slideZ.z; moved = true;
+                    } else {
+                        const angle = Math.atan2(direction.z, direction.x);
+                        for (const offset of [Math.PI/4, -Math.PI/4, Math.PI/3, -Math.PI/3, Math.PI/2, -Math.PI/2]) {
+                            const alt = this.position.clone();
+                            alt.x += Math.cos(angle + offset) * speed;
+                            alt.z += Math.sin(angle + offset) * speed;
+                            if (!this.checkCollision(alt)) {
+                                this.position.x = alt.x;
+                                this.position.z = alt.z;
+                                moved = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!moved) {
+                        this._stuckFrames++;
+                        if (this._stuckFrames > 15) {
+                            // Pick completely new direction
+                            this.targetPosition = new THREE.Vector3(
+                                this.position.x + (Math.random() - 0.5) * 40,
+                                0.5,
+                                this.position.z + (Math.random() - 0.5) * 40
+                            );
+                            this._stuckFrames = 0;
+                        }
+                    } else {
+                        this._stuckFrames = 0;
+                    }
+                }
+                this.position.y = this.getTerrainHeight(this.position.x, this.position.z);
+            }
         }
 
         // Look for enemies (including all bots and player)
@@ -884,7 +1007,7 @@ class Player {
 
     moveTowards(target, deltaTime) {
         const direction = new THREE.Vector3().subVectors(target, this.position);
-        direction.y = 0; // Only move on XZ plane
+        direction.y = 0;
         const distance = direction.length();
 
         if (distance < 0.5) {
@@ -892,14 +1015,53 @@ class Player {
         }
 
         direction.normalize();
-        this.velocity.copy(direction).multiplyScalar(this.speed * deltaTime);
+        const speed = this.speed * deltaTime;
+        this.velocity.copy(direction).multiplyScalar(speed);
 
         const newPos = this.position.clone().add(this.velocity);
+
         if (!this.checkCollision(newPos)) {
+            // Clear path — move directly
             this.position.x = newPos.x;
             this.position.z = newPos.z;
-            this.position.y = this.getTerrainHeight(this.position.x, this.position.z);
+        } else {
+            // Wall hit — try sliding along it
+            // Try X axis only
+            const slideX = this.position.clone();
+            slideX.x += this.velocity.x;
+            if (!this.checkCollision(slideX)) {
+                this.position.x = slideX.x;
+            } else {
+                // Try Z axis only
+                const slideZ = this.position.clone();
+                slideZ.z += this.velocity.z;
+                if (!this.checkCollision(slideZ)) {
+                    this.position.z = slideZ.z;
+                } else {
+                    // Try diagonal alternatives — slide 45 degrees each way
+                    const angle1 = Math.atan2(direction.z, direction.x) + Math.PI / 4;
+                    const alt1 = this.position.clone();
+                    alt1.x += Math.cos(angle1) * speed;
+                    alt1.z += Math.sin(angle1) * speed;
+
+                    const angle2 = Math.atan2(direction.z, direction.x) - Math.PI / 4;
+                    const alt2 = this.position.clone();
+                    alt2.x += Math.cos(angle2) * speed;
+                    alt2.z += Math.sin(angle2) * speed;
+
+                    if (!this.checkCollision(alt1)) {
+                        this.position.x = alt1.x;
+                        this.position.z = alt1.z;
+                    } else if (!this.checkCollision(alt2)) {
+                        this.position.x = alt2.x;
+                        this.position.z = alt2.z;
+                    }
+                    // If all blocked, character stays put
+                }
+            }
         }
+
+        this.position.y = this.getTerrainHeight(this.position.x, this.position.z);
 
         // Face movement direction
         if (this.rifleGroup) {
@@ -907,7 +1069,7 @@ class Player {
             this.rifleGroup.lookAt(lookTarget);
         }
 
-        return false; // Still moving
+        return false;
     }
 
     checkCollision(newPos) {
@@ -1308,6 +1470,12 @@ class Player {
             // Clear ALL move targets and commands
             gameState.moveTarget = null;
             gameState.targetLock = null;
+
+            // Show death popup
+            const popup = document.getElementById('deathPopup');
+            const killerName = killer ? killer.username : 'Unknown';
+            document.getElementById('deathKiller').textContent = `Killed by ${killerName}`;
+            popup.classList.remove('hidden');
         }
 
         // Hide during death
@@ -1695,6 +1863,64 @@ const minimapCtx = minimapCanvas.getContext('2d');
 minimapCanvas.width = 150;
 minimapCanvas.height = 150;
 
+// Minimap interaction — tap or hold+drag to scroll camera to that map position
+function minimapToWorld(clientX, clientY) {
+    const rect = minimapCanvas.getBoundingClientRect();
+    const mx = (clientX - rect.left) / rect.width;  // 0-1
+    const my = (clientY - rect.top) / rect.height;   // 0-1
+    return {
+        x: (mx - 0.5) * MAP_SIZE,
+        z: (my - 0.5) * MAP_SIZE,
+    };
+}
+
+function jumpCameraTo(worldX, worldZ) {
+    smoothCamX = worldX;
+    smoothCamZ = worldZ;
+}
+
+// Works for both mouse and touch
+minimapCanvas.style.pointerEvents = 'all';
+minimapCanvas.style.touchAction = 'none';
+
+let minimapDragging = false;
+minimapCanvas.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    minimapDragging = true;
+    const pos = minimapToWorld(e.clientX, e.clientY);
+    jumpCameraTo(pos.x, pos.z);
+});
+document.addEventListener('mousemove', (e) => {
+    if (!minimapDragging) return;
+    const pos = minimapToWorld(e.clientX, e.clientY);
+    jumpCameraTo(pos.x, pos.z);
+});
+document.addEventListener('mouseup', () => { minimapDragging = false; });
+
+minimapCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    minimapDragging = true;
+    const t = e.touches[0];
+    const pos = minimapToWorld(t.clientX, t.clientY);
+    jumpCameraTo(pos.x, pos.z);
+}, { passive: false });
+
+minimapCanvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!minimapDragging) return;
+    const t = e.touches[0];
+    const pos = minimapToWorld(t.clientX, t.clientY);
+    jumpCameraTo(pos.x, pos.z);
+}, { passive: false });
+
+minimapCanvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    minimapDragging = false;
+}, { passive: false });
+
 function updateMinimap() {
     minimapCtx.fillStyle = '#000';
     minimapCtx.fillRect(0, 0, 150, 150);
@@ -1865,4 +2091,185 @@ function preGameRender() {
 // Start pre-game rendering immediately
 preGameRender();
 
-console.log('Elite Snipers - Loading complete!');
+// Death popup handlers
+document.getElementById('respawnBtn')?.addEventListener('click', () => {
+    document.getElementById('deathPopup').classList.add('hidden');
+    // Teleport camera to spawn point
+    if (gameState.player) {
+        const spawnX = gameState.player.team === 'red' ? -70 : 70;
+        const spawnZ = gameState.player.team === 'red' ? -70 : 70;
+        smoothCamX = spawnX;
+        smoothCamZ = spawnZ;
+        gameState.cameraTarget.x = spawnX;
+        gameState.cameraTarget.z = spawnZ;
+    }
+});
+document.getElementById('deathPopupClose')?.addEventListener('click', () => {
+    document.getElementById('deathPopup').classList.add('hidden');
+});
+
+// Also hide popup on respawn
+const _origRespawn = Player.prototype.respawn;
+Player.prototype.respawn = function() {
+    _origRespawn.call(this);
+    if (this.isPlayer) {
+        document.getElementById('deathPopup')?.classList.add('hidden');
+    }
+};
+
+// Smooth camera globals — used by mobile touch + minimap
+let smoothCamX = gameState.cameraTarget.x;
+let smoothCamZ = gameState.cameraTarget.z;
+
+// === MOBILE TOUCH — drag anywhere to scroll camera, tap to move/attack ===
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('ontouchstart' in window);
+
+if (isMobile) {
+    const canvas = document.getElementById('gameCanvas');
+    let touchStartPos = null;
+    let touchStartTime = 0;
+    let isDragging = false;
+    // Track each finger separately
+    const touches = new Map();
+    const DRAG_THRESHOLD = 30;
+    const TAP_TIME = 200;
+    const HOLD_TIME = 400; // ms — hold this long to enter fast scroll mode
+    let holdScrollInterval = null;
+
+    // Smoothed camera uses global smoothCamX/Z
+
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        for (const t of e.changedTouches) {
+            touches.set(t.identifier, {
+                startX: t.clientX, startY: t.clientY,
+                lastX: t.clientX, lastY: t.clientY,
+                startTime: Date.now(), isDrag: false,
+            });
+        }
+        // Pinch setup
+        if (e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            gameState._pinchStart = Math.sqrt(dx * dx + dy * dy);
+            gameState._pinchZoomStart = gameState.cameraOffset.y;
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+
+        // Single finger or first finger of two = camera drag
+        if (e.touches.length >= 1) {
+            const t = e.touches[0];
+            const data = touches.get(t.identifier);
+            if (data) {
+                const totalDx = t.clientX - data.startX;
+                const totalDy = t.clientY - data.startY;
+
+                if (!data.isDrag && (Math.abs(totalDx) > DRAG_THRESHOLD || Math.abs(totalDy) > DRAG_THRESHOLD)) {
+                    data.isDrag = true;
+                }
+
+                if (data.isDrag) {
+                    const dx = t.clientX - data.lastX;
+                    const dy = t.clientY - data.lastY;
+                    // Move the smooth target — actual camera lerps to it
+                    smoothCamX -= dx * 0.06;
+                    smoothCamZ -= dy * 0.06;
+                }
+
+                data.lastX = t.clientX;
+                data.lastY = t.clientY;
+
+                // Update mousePos using canvas bounds
+                const rect = canvas.getBoundingClientRect();
+                gameState.mousePos.x = ((t.clientX - rect.left) / rect.width) * 2 - 1;
+                gameState.mousePos.y = -((t.clientY - rect.top) / rect.height) * 2 + 1;
+            }
+        }
+
+        // Pinch zoom with 2 fingers
+        if (e.touches.length === 2 && gameState._pinchStart) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const scale = gameState._pinchStart / dist;
+            const newZoom = Math.max(8, Math.min(30, gameState._pinchZoomStart * scale));
+            gameState.cameraOffset.y = newZoom;
+            gameState.cameraOffset.z = newZoom;
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+
+        for (const t of e.changedTouches) {
+            const data = touches.get(t.identifier);
+            if (data && !data.isDrag && (Date.now() - data.startTime < TAP_TIME)) {
+                // TAP — move character to this position
+                // Use canvas bounding rect to get accurate coordinates
+                const rect = canvas.getBoundingClientRect();
+                const x = data.startX - rect.left;
+                const y = data.startY - rect.top;
+                gameState.mousePos.x = (x / rect.width) * 2 - 1;
+                gameState.mousePos.y = -(y / rect.height) * 2 + 1;
+                document.dispatchEvent(new MouseEvent('mousedown', { clientX: data.startX, clientY: data.startY, button: 0, bubbles: true }));
+                setTimeout(() => {
+                    document.dispatchEvent(new MouseEvent('mouseup', { clientX: data.startX, clientY: data.startY, button: 0, bubbles: true }));
+                }, 50);
+            }
+            touches.delete(t.identifier);
+        }
+
+        if (e.touches.length === 0) {
+            gameState._pinchStart = null;
+        }
+    }, { passive: false });
+
+}
+
+// Smooth camera lerp — always runs (mobile + minimap clicks on desktop)
+function smoothCameraUpdate() {
+    requestAnimationFrame(smoothCameraUpdate);
+    const lerp = 0.15;
+    gameState.cameraTarget.x += (smoothCamX - gameState.cameraTarget.x) * lerp;
+    gameState.cameraTarget.z += (smoothCamZ - gameState.cameraTarget.z) * lerp;
+}
+smoothCameraUpdate();
+
+// Keep smoothCam in sync when game moves camera (space to center, etc)
+if (!isMobile) {
+    // On desktop, smoothCam just follows cameraTarget directly
+    setInterval(() => {
+        smoothCamX = gameState.cameraTarget.x;
+        smoothCamZ = gameState.cameraTarget.z;
+    }, 100);
+
+    // Ability buttons work via tap on the HTML elements (pointer-events: all)
+    document.querySelectorAll('.ability').forEach(btn => {
+        btn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            const ability = btn.dataset.ability;
+            if (ability === 'windwalk') { gameState.keys['q'] = true; setTimeout(() => gameState.keys['q'] = false, 100); }
+            if (ability === 'farsight') { gameState.keys['e'] = true; setTimeout(() => gameState.keys['e'] = false, 100); }
+        }, { passive: false });
+    });
+
+    // Fullscreen on game start
+    document.getElementById('startBtn')?.addEventListener('click', () => {
+        setTimeout(() => {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else if (document.documentElement.webkitRequestFullscreen) {
+                document.documentElement.webkitRequestFullscreen();
+            }
+            // Lock to landscape
+            if (screen.orientation?.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
+        }, 500);
+    });
+}
+
+console.log('Elite Snipers - Loading complete!' + (isMobile ? ' (Mobile)' : ''));
