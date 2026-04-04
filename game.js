@@ -2683,6 +2683,8 @@ document.addEventListener('mousemove', (e) => {
 
 document.addEventListener('mousedown', (e) => {
     if (!gameState.gameStarted) return;
+    // Don't register movement when clicking UI elements
+    if (e.target.closest('#shopPanel, #scoreboard, #deathPopup, #abilities, #terminal, #minimap, #debugPanel')) return;
 
     // Right click or middle mouse for camera drag
     if (e.button === 1 || e.button === 2) {
