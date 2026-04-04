@@ -3244,6 +3244,11 @@ function preGameRender() {
 preGameRender();
 
 // Respawn button — immediate respawn
+// Block touches on shop panel from reaching canvas
+document.getElementById('shopPanel').addEventListener('touchstart', (e) => { e.stopPropagation(); }, { passive: false });
+document.getElementById('shopPanel').addEventListener('touchmove', (e) => { e.stopPropagation(); }, { passive: false });
+document.getElementById('shopPanel').addEventListener('touchend', (e) => { e.stopPropagation(); }, { passive: false });
+
 // Tap anywhere on death screen to respawn
 document.getElementById('deathPopup')?.addEventListener('click', () => {
     document.getElementById('deathPopup').classList.add('hidden');
