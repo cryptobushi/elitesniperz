@@ -3458,7 +3458,7 @@ function _netDebug(text) {
 function connectToServer() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const url = protocol + '//' + window.location.host;
-    _netDebug('Connecting to ' + url + '...');
+    _netDebug('WS: ' + url + ' host=' + window.location.host + ' port=' + window.location.port);
 
     _ws = new WebSocket(url);
     _ws.binaryType = 'arraybuffer';
