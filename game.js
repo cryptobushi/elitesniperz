@@ -107,10 +107,14 @@ function decodeBinaryState(buf) {
             continue;
         }
 
+        const isBlue = (flags & 8) !== 0;
+        const team = isBlue ? 'blue' : 'red';
+
         let remote = remotePlayers.get(id);
         if (!remote) {
-            const info = _roster.get(id) || { name: 'Bot', team: 'red' };
-            const player = getPooledPlayer(info.name, info.team);
+            const info = _roster.get(id);
+            const name = info ? info.name : ((flags & 4) ? 'Bot' : 'Player');
+            const player = getPooledPlayer(name, team);
             player._remoteId = id;
             remote = { player };
             remotePlayers.set(id, remote);
@@ -140,14 +144,22 @@ function decodeBinaryState(buf) {
 // Online mode: binary state decoded in decodeBinaryState() on ws.onmessage
 
 function handleServerKill(msg) {
+    // Play sniper fire sound for all kills
+    audioManager.play('sniperFire');
+
+    // Find killer and victim meshes for visual effect
+    const killerMesh = msg.killerId === myPlayerId ? gameState.player : remotePlayers.get(msg.killerId)?.player;
+    const victimMesh = msg.victimId === myPlayerId ? gameState.player : remotePlayers.get(msg.victimId)?.player;
+
+    if (killerMesh && victimMesh) {
+        killerMesh.createShootingEffect(victimMesh.position);
+    }
+
     if (msg.killerId === myPlayerId) {
-        // I got a kill
         showGoldPopup(`+${msg.gold}c`);
         if (msg.firstBlood) showStreakPopup('FIRST BLOOD', '#ff4444');
         audioManager.play('headshot');
-        audioManager.play('sniperFire');
 
-        // Check streaks
         const streakMap = { 5: ['killingSpree', 'KILLING SPREE', '#ff8800'], 10: ['rampage', 'RAMPAGE', '#ff4400'],
             15: ['dominating', 'DOMINATING', '#ff0044'], 20: ['unstoppable', 'UNSTOPPABLE', '#cc00ff'],
             25: ['godlike', 'GODLIKE', '#ffdd00'] };

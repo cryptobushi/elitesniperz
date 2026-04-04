@@ -55,11 +55,12 @@ function encodeState(){
         view.setInt16(off, p.kills, true); off+=2;
         view.setInt16(off, p.deaths, true); off+=2;
         view.setFloat32(off, p.price, true); off+=4;
-        // flags: bit0=windwalk, bit1=spawnProt, bit2=isBot
+        // flags: bit0=windwalk, bit1=spawnProt, bit2=isBot, bit3=blue team
         let flags = 0;
         if(p.windwalk) flags |= 1;
         if(p.spawnProt > 0) flags |= 2;
         if(p.isBot) flags |= 4;
+        if(p.team === 'blue') flags |= 8;
         view.setUint8(off, flags); off+=1;
         // streak + gold packed
         view.setInt16(off, p.streak, true); off+=2;
