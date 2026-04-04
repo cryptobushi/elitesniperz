@@ -1974,6 +1974,9 @@ class Player {
             void popup.offsetHeight;
             popup.classList.remove('hidden');
 
+            // Draw the death chart — your price history ending in a crash
+            drawDeathChart();
+
             setTimeout(() => popup.classList.add('hidden'), 5000);
         }
 
@@ -2265,6 +2268,49 @@ function showGoldPopup(text) {
         });
     });
     setTimeout(() => el.remove(), 900);
+}
+
+function drawDeathChart() {
+    const canvas = document.getElementById('deathChart');
+    if (!canvas || _priceHistory.length < 2) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const prices = _priceHistory.slice(-60);
+    const min = Math.min(...prices) * 0.9;
+    const max = Math.max(...prices) * 1.1;
+    const range = max - min || 1;
+
+    // Line chart — green then crashes red at the end
+    const crashStart = Math.max(0, prices.length - 3);
+    ctx.beginPath();
+    ctx.strokeStyle = '#00ff44';
+    ctx.lineWidth = 2;
+    prices.forEach((p, i) => {
+        if (i === crashStart) {
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.strokeStyle = '#ff2222';
+            ctx.lineWidth = 2.5;
+            const x = (i / (prices.length - 1)) * w;
+            const y = h - ((p - min) / range) * h;
+            ctx.moveTo(x, y);
+        }
+        const x = (i / (prices.length - 1)) * w;
+        const y = h - ((p - min) / range) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Fill under with red at end
+    const lastY = h - ((prices[prices.length - 1] - min) / range) * h;
+    ctx.lineTo(w, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,34,34,0.1)';
+    ctx.fill();
 }
 
 function resetStreakChart() {
