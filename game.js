@@ -2887,6 +2887,11 @@ document.querySelectorAll('.ability').forEach(el => {
     });
 });
 
+// Tap anywhere on scoreboard overlay to close it (mobile)
+document.getElementById('scoreboard').addEventListener('click', () => {
+    document.getElementById('scoreboard').classList.add('hidden');
+});
+
 function startGame() {
     console.log('startGame() called');
     try {
