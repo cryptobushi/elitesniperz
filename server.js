@@ -13,24 +13,18 @@ const MAP_SIZE = 200, TICK_RATE = 128, MAX_PLAYERS = 10;
 const SHOOT_RANGE = 45, SHOOT_COOLDOWN = 1.0, SPAWN_PROTECTION = 1.5;
 const BOT_NAMES = ['Archon','Vex','Nyx','Zara','Kael','Drax','Luna','Hex','Rune','Ash'];
 
-// === WALLS — same as client map, stored as AABB [minX, minZ, maxX, maxZ] ===
-const WALLS = [];
-function addWall(cx, cz, w, d) {
-    WALLS.push([cx - w/2, cz - d/2, cx + w/2, cz + d/2]);
-}
-// Outer walls
-addWall(0, MAP_SIZE/2, MAP_SIZE, 2);
-addWall(0, -MAP_SIZE/2, MAP_SIZE, 2);
-addWall(MAP_SIZE/2, 0, 2, MAP_SIZE);
-addWall(-MAP_SIZE/2, 0, 2, MAP_SIZE);
-// Center structure
-addWall(0, 0, 15, 3);
-addWall(0, 10, 3, 10);
-addWall(0, -10, 3, 10);
-addWall(15, 8, 12, 3);
-addWall(-15, 8, 12, 3);
-addWall(15, -8, 12, 3);
-addWall(-15, -8, 12, 3);
+// === MAP DATA — shared static map ===
+const mapData = require('./map-data.json');
+
+// Build AABB collision list from all geometry
+const WALLS = []; // [minX, minZ, maxX, maxZ]
+// Walls
+mapData.walls.forEach(w => WALLS.push([w.x - w.w/2, w.z - w.d/2, w.x + w.w/2, w.z + w.d/2]));
+// Trees (trunk radius ~0.4)
+mapData.trees.forEach(t => WALLS.push([t.x - 0.5, t.z - 0.5, t.x + 0.5, t.z + 0.5]));
+// Rocks
+mapData.rocks.forEach(r => WALLS.push([r.x - r.s, r.z - r.s, r.x + r.s, r.z + r.s]));
+console.log(`Loaded ${WALLS.length} collision objects from map-data.json`);
 
 // Collision check — point vs walls (with radius)
 function collidesWithWall(x, z, r = 1.0) {
@@ -143,6 +137,7 @@ function updateBot(bot, dt){
 
 // === SHOOTING ===
 function tryShoot(attacker){
+    if(attacker.health<=0)return; // Dead can't shoot
     let closest=null,closestDist=Infinity;
     players.forEach(p=>{
         if(p!==attacker&&p.team!==attacker.team&&p.health>0){

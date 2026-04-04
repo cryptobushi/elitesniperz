@@ -90,6 +90,8 @@ function decodeBinaryState(buf) {
 
         if (id === myPlayerId) {
             if (gameState.player) {
+                const wasDead = gameState.player.health <= 0;
+                const nowDead = !alive;
                 gameState.player.health = alive ? 100 : 0;
                 gameState.player.kills = kills;
                 gameState.player.deaths = deaths;
@@ -103,6 +105,30 @@ function decodeBinaryState(buf) {
                 document.getElementById('deathCount').textContent = deaths;
                 updateGoldUI();
                 pumpPrice(0);
+
+                // Death transition — show death screen
+                if (nowDead && !wasDead) {
+                    gameState.player.mesh.visible = false;
+                    document.getElementById('hud').classList.add('hidden');
+                    document.getElementById('abilities').classList.add('hidden');
+                    document.querySelector('.minimap').classList.add('hidden');
+                    const popup = document.getElementById('deathPopup');
+                    popup.classList.add('hidden');
+                    void popup.offsetHeight;
+                    popup.classList.remove('hidden');
+                    drawDeathChart();
+                    resetStreakChart();
+                    setTimeout(() => popup.classList.add('hidden'), 5000);
+                }
+                // Respawn transition — show HUD again
+                if (!nowDead && wasDead) {
+                    gameState.player.mesh.visible = true;
+                    gameState.player.velocity.set(0, 0, 0);
+                    gameState.moveTarget = null;
+                    document.getElementById('hud').classList.remove('hidden');
+                    document.getElementById('abilities').classList.remove('hidden');
+                    document.querySelector('.minimap').classList.remove('hidden');
+                }
             }
             continue;
         }
@@ -731,22 +757,17 @@ const createMap = () => {
         return treeGroup;
     };
 
-    // Safe zone check — nothing spawns near team spawns
-    const nearSpawn = (x, z) => {
-        const d1 = Math.sqrt((x+70)*(x+70) + (z+70)*(z+70)); // Red spawn
-        const d2 = Math.sqrt((x-70)*(x-70) + (z-70)*(z-70)); // Blue spawn
-        return d1 < 20 || d2 < 20;
-    };
-
-    // Plant trees randomly across the map
-    for (let i = 0; i < 80; i++) {
-        const x = (Math.random() - 0.5) * MAP_SIZE * 0.9;
-        const z = (Math.random() - 0.5) * MAP_SIZE * 0.9;
-        const distFromCenter = Math.sqrt(x*x + z*z);
-        if (distFromCenter > 15 && distFromCenter < MAP_SIZE * 0.45 && !nearSpawn(x, z)) {
-            createTree(x, z);
-        }
-    }
+    // Plant trees from static map data
+    const _mapTrees = [
+        [-30,20],[25,-15],[-45,-30],[50,25],[-20,45],[35,-40],[-55,5],[15,50],
+        [-10,-35],[60,-10],[-35,60],[40,45],[-50,-45],[20,-60],[-15,-50],[55,-35],
+        [-40,25],[30,15],[-25,-15],[45,-5],[-60,40],[10,35],[-5,-55],[50,55],
+        [-30,-60],[65,30],[-45,50],[20,-30],[-55,-15],[35,65],[-20,30],[55,-50],
+        [-65,15],[40,-15],[-10,60],[25,-45],[-35,-25],[60,50],[-50,35],[15,-55],
+        [-25,-45],[45,20],[-40,-10],[30,55],[-15,15],[50,-25],[-55,-50],[20,40],
+        [-30,50],[65,-20],[-45,-5],[35,-55],[-60,55],[10,-40],[-5,25],[55,10]
+    ];
+    _mapTrees.forEach(([x,z]) => createTree(x, z));
 
     // Rocks/Boulders for cover
     const createRock = (x, z, size) => {
@@ -766,14 +787,15 @@ const createMap = () => {
         return rock;
     };
 
-    // Add rocks
-    for (let i = 0; i < 40; i++) {
-        const x = (Math.random() - 0.5) * MAP_SIZE * 0.85;
-        const z = (Math.random() - 0.5) * MAP_SIZE * 0.85;
-        if (nearSpawn(x, z)) continue;
-        const size = 0.8 + Math.random() * 1.5;
-        createRock(x, z, size);
-    }
+    // Rocks from static map data
+    const _mapRocks = [
+        [-25,10,1.2],[30,-20,1.5],[-40,-35,0.9],[50,15,1.8],[-15,40,1.1],[35,-50,1.4],
+        [-55,20,1.0],[20,55,1.6],[-10,-25,0.8],[60,-5,1.3],[-35,55,1.5],[45,35,1.0],
+        [-50,-40,1.7],[15,-55,0.9],[-20,-50,1.2],[55,-30,1.1],[-45,15,1.4],[25,25,0.8],
+        [-30,-10,1.6],[40,-40,1.3],[-60,45,1.0],[10,30,1.5],[-5,-45,1.2],[50,50,1.8],
+        [-25,-55,0.9],[65,20,1.1],[-40,40,1.4],[20,-35,1.0],[-55,-20,1.3],[35,60,1.5]
+    ];
+    _mapRocks.forEach(([x,z,s]) => createRock(x, z, s));
 
     // Walls/Boundaries
     const wallMaterial = new THREE.MeshStandardMaterial({
@@ -807,17 +829,13 @@ const createMap = () => {
     createWall(15, -8, 12, 3);
     createWall(-15, -8, 12, 3);
 
-    // Additional scattered walls for cover
-    for (let i = 0; i < 15; i++) {
-        const x = (Math.random() - 0.5) * MAP_SIZE * 0.7;
-        const z = (Math.random() - 0.5) * MAP_SIZE * 0.7;
-        const width = 3 + Math.random() * 5;
-        const height = 3 + Math.random() * 5;
-        const distFromCenter = Math.sqrt(x*x + z*z);
-        if (distFromCenter > 25 && !nearSpawn(x, z)) {
-            createWall(x, z, width, height);
-        }
-    }
+    // Static scattered walls from map data
+    const _mapWalls = [
+        [-45,35,6,4],[30,-50,5,7],[-60,-20,4,5],[55,40,7,3],[-25,55,5,6],
+        [40,-25,3,8],[-50,-55,6,4],[60,15,4,5],[-35,-40,5,3],[25,60,7,4],
+        [-55,10,4,6],[45,-60,5,5],[-20,-65,6,3],[35,30,3,7],[-40,65,5,4]
+    ];
+    _mapWalls.forEach(([x,z,w,h]) => createWall(x, z, w, h));
 
     // Team spawn markers
     const redSpawnGeometry = new THREE.CircleGeometry(5, 32);
@@ -2616,8 +2634,11 @@ function updateScoreboard() {
     const sb = document.getElementById('scoreboard');
     if (!sb || sb.classList.contains('hidden')) return;
 
-    // Collect all players
+    // Collect all players (offline bots + online remote players)
     const all = [...gameState.bots];
+    if (isOnlineMode) {
+        remotePlayers.forEach(r => all.push(r.player));
+    }
     if (gameState.player) all.push(gameState.player);
 
     // Sort by price descending
