@@ -90,8 +90,8 @@ function encodeState(viewerTeam) {
     });
 
     const count = visible.length;
-    const buf = new ArrayBuffer(2 + count * BYTES_PER_PLAYER);
-    const view = new DataView(buf);
+    const ab = new ArrayBuffer(2 + count * BYTES_PER_PLAYER);
+    const view = new DataView(ab);
     view.setUint16(0, count, true);
     let off = 2;
     for (let i = 0; i < visible.length; i++) {
@@ -114,7 +114,7 @@ function encodeState(viewerTeam) {
         view.setInt16(off, p.streak, true); off += 2;
         view.setInt16(off, Math.min(p.gold, 32767), true); off += 2;
     }
-    return buf;
+    return Buffer.from(ab);
 }
 
 // === APPLY ITEMS ===

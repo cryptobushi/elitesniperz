@@ -3498,8 +3498,10 @@ function connectToServer() {
 }
 
 function handleBinaryState(buf) {
+    if (!gameState.gameStarted) return;
     const view = new DataView(buf);
     const count = view.getUint16(0, true);
+    if (!handleBinaryState._logged) { console.log('First binary state: ' + count + ' players, ' + buf.byteLength + ' bytes'); handleBinaryState._logged = true; }
     let off = 2;
 
     const seenIds = new Set();
@@ -3568,6 +3570,7 @@ function handleBinaryState(buf) {
             if (!remote) {
                 // Create new remote player mesh
                 const name = (_roster[id] && _roster[id].username) || (isBot ? 'Bot' : 'Player');
+                console.log('Creating remote: ' + name + ' id=' + id + ' team=' + team);
                 const rPlayer = new Player(name, team, false);
                 rPlayer.position.set(x, Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.5, z);
                 rPlayer.kills = kills;
