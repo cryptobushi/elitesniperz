@@ -2451,7 +2451,7 @@ function updateScoreboard() {
         if (p._priceHist.length > 30) p._priceHist.shift();
     });
 
-    let html = `
+    let html = `<div class="sb-table-wrap">
         <div class="sb-title">WATCHLIST</div>
         <table class="sb-table">
             <tr><th>#</th><th>TICKER</th><th>K/D</th><th>CHART</th><th>PRICE</th></tr>
@@ -2475,7 +2475,8 @@ function updateScoreboard() {
     });
 
     html += '</table>';
-    html += '<div style="color:#444;font-size:0.6rem;margin-top:1rem;">TAB to close</div>';
+    html += '<div style="color:#444;font-size:0.6rem;margin-top:0.8rem;text-align:center;">TAB to close</div>';
+    html += '</div>';
     sb.innerHTML = html;
 
     // Draw sparkline charts
