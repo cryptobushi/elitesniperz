@@ -1212,10 +1212,12 @@ class Player {
                         const z = (Math.random() - 0.5) * (MAP_SIZE * 0.8);
                         const candidate = new THREE.Vector3(x, 0.5, z);
 
-                        // Check distance from edges
                         if (Math.abs(x) > MAP_SIZE / 2 - 15 || Math.abs(z) > MAP_SIZE / 2 - 15) continue;
 
-                        // Avoid piling on other bots — skip if another bot is within 8 units of target
+                        // Skip if target is inside a wall
+                        if (this.checkCollision(candidate)) continue;
+
+                        // Avoid piling on other bots
                         let tooClose = false;
                         for (const other of gameState.bots) {
                             if (other === this || other.health <= 0) continue;
@@ -1263,45 +1265,35 @@ class Player {
                 if (!this.checkCollision(newPos)) {
                     this.position.x = newPos.x;
                     this.position.z = newPos.z;
+                    this._wallSlideFrames = 0;
                 } else {
                     // Wall slide
+                    this._wallSlideFrames = (this._wallSlideFrames || 0) + 1;
                     let moved = false;
-                    const slideX = this.position.clone(); slideX.x += this.velocity.x;
-                    const slideZ = this.position.clone(); slideZ.z += this.velocity.z;
 
-                    if (!this.checkCollision(slideX)) {
-                        this.position.x = slideX.x; moved = true;
-                    } else if (!this.checkCollision(slideZ)) {
-                        this.position.z = slideZ.z; moved = true;
-                    } else {
-                        const angle = Math.atan2(direction.z, direction.x);
-                        for (const offset of [Math.PI/4, -Math.PI/4, Math.PI/3, -Math.PI/3, Math.PI/2, -Math.PI/2]) {
-                            const alt = this.position.clone();
-                            alt.x += Math.cos(angle + offset) * speed;
-                            alt.z += Math.sin(angle + offset) * speed;
-                            if (!this.checkCollision(alt)) {
-                                this.position.x = alt.x;
-                                this.position.z = alt.z;
-                                moved = true;
-                                break;
-                            }
+                    // Try perpendicular directions to get around the wall
+                    const angle = Math.atan2(direction.z, direction.x);
+                    for (const offset of [Math.PI/2, -Math.PI/2, Math.PI/3, -Math.PI/3, Math.PI*2/3, -Math.PI*2/3]) {
+                        const alt = this.position.clone();
+                        alt.x += Math.cos(angle + offset) * speed;
+                        alt.z += Math.sin(angle + offset) * speed;
+                        if (!this.checkCollision(alt)) {
+                            this.position.x = alt.x;
+                            this.position.z = alt.z;
+                            moved = true;
+                            break;
                         }
                     }
 
-                    if (!moved) {
-                        this._stuckFrames++;
-                        if (this._stuckFrames > 5) {
-                            // Stuck — abandon target, pick random new position
-                            this.targetPosition = new THREE.Vector3(
-                                (Math.random() - 0.5) * MAP_SIZE * 0.7,
-                                0.5,
-                                (Math.random() - 0.5) * MAP_SIZE * 0.7
-                            );
-                            this._botState = 'explore';
-                            this._stuckFrames = 0;
-                        }
-                    } else {
+                    // If wall-sliding too long (>15 frames) or fully stuck (>5), pick new target
+                    if (!moved) this._stuckFrames = (this._stuckFrames || 0) + 1;
+                    else this._stuckFrames = 0;
+
+                    if (this._stuckFrames > 5 || this._wallSlideFrames > 15) {
+                        this.targetPosition = null; // Force new target next frame
+                        this._botState = 'explore';
                         this._stuckFrames = 0;
+                        this._wallSlideFrames = 0;
                     }
                 }
                 this.position.y = this.getTerrainHeight(this.position.x, this.position.z);
