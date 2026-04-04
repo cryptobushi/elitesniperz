@@ -92,6 +92,18 @@ function decodeBinaryState(buf) {
             if (gameState.player) {
                 const wasDead = gameState.player.health <= 0;
                 const nowDead = !alive;
+                // Sync position from server (authoritative)
+                const posErr = Math.abs(gameState.player.position.x - x) + Math.abs(gameState.player.position.z - z);
+                if (posErr > 2) {
+                    // Snap if too far off
+                    gameState.player.position.x = x;
+                    gameState.player.position.z = z;
+                } else {
+                    // Smooth correct
+                    gameState.player.position.x += (x - gameState.player.position.x) * 0.3;
+                    gameState.player.position.z += (z - gameState.player.position.z) * 0.3;
+                }
+                gameState.player.position.y = terrainY_client(gameState.player.position.x, gameState.player.position.z) + 0.5;
                 gameState.player.health = alive ? 100 : 0;
                 gameState.player.kills = kills;
                 gameState.player.deaths = deaths;
@@ -140,6 +152,7 @@ function decodeBinaryState(buf) {
         if (!remote) {
             const info = _roster.get(id);
             const name = info ? info.name : ((flags & 4) ? 'Bot' : 'Player');
+            console.log(`Creating remote player: ${name} (${team}) id=${id}`);
             const player = getPooledPlayer(name, team);
             player._remoteId = id;
             remote = { player };
