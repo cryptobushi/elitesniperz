@@ -254,6 +254,10 @@
         @keyframes streakOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-20px); } }
         @keyframes candleGrow { 0% { transform: scaleY(0); } 80% { transform: scaleY(1.1); } 100% { transform: scaleY(1); } }
         @keyframes screenFlash { 0% { opacity: 0.3; } 100% { opacity: 0; } }
+        @keyframes particleBurst {
+            0% { opacity: 1; transform: translate(-50%,-50%) rotate(var(--a,0deg)) translateY(0) scale(1); }
+            100% { opacity: 0; transform: translate(-50%,-50%) rotate(var(--a,0deg)) translateY(-40px) scale(0); }
+        }
 
         /* Flying candle that moves from center to HUD chart */
         .flying-candle {

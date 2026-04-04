@@ -2170,47 +2170,62 @@ function spawnFlyingCandle(text, color, boost) {
     const candle = document.createElement('div');
     candle.className = 'flying-candle';
 
-    const bodyH = Math.min(15 + boost * 2, 60);
-    const wickH = Math.round(bodyH * 0.3);
-    const bodyW = Math.min(8 + boost, 20);
+    const bodyH = Math.min(30 + boost * 3, 120);
+    const wickH = Math.round(bodyH * 0.35);
+    const bodyW = Math.min(16 + boost * 1.5, 40);
+    const glowSize = Math.min(bodyH, 60);
+
+    // Sparkle particles
+    let particles = '';
+    const numParticles = Math.floor(6 + boost);
+    for (let i = 0; i < numParticles; i++) {
+        const angle = (i / numParticles) * 360;
+        const dist = 15 + Math.random() * 30;
+        const size = 2 + Math.random() * 4;
+        const delay = Math.random() * 0.4;
+        const dur = 0.5 + Math.random() * 0.3;
+        particles += `<div style="position:absolute;width:${size}px;height:${size}px;background:${color};border-radius:50%;box-shadow:0 0 ${size*2}px ${color};left:50%;top:50%;opacity:0;animation:particleBurst ${dur}s ${delay}s ease-out forwards;transform:translate(-50%,-50%) rotate(${angle}deg) translateY(-${dist}px);"></div>`;
+    }
 
     candle.innerHTML = `
-        <div style="width:2px;height:${wickH}px;background:${color};"></div>
-        <div style="width:${bodyW}px;height:${bodyH}px;background:${color};border-radius:1px;box-shadow:0 0 10px ${color};animation:candleGrow 0.1s ease-out forwards;transform-origin:bottom;"></div>
-        <div style="width:2px;height:${Math.round(wickH*0.4)}px;background:${color};margin-top:1px;"></div>
-        <div style="color:${color};font-size:0.8rem;font-weight:900;margin-top:3px;font-family:monospace;text-shadow:0 0 8px ${color};">${text}</div>
+        <div style="position:relative;display:flex;flex-direction:column;align-items:center;">
+            ${particles}
+            <div style="width:3px;height:${wickH}px;background:linear-gradient(to top,${color},${color}cc);box-shadow:0 0 6px ${color};"></div>
+            <div style="width:${bodyW}px;height:${bodyH}px;background:linear-gradient(to top,${color}cc,${color});border-radius:2px;box-shadow:0 0 ${glowSize}px ${color},0 0 ${glowSize*2}px ${color}44;animation:candleGrow 0.12s cubic-bezier(0,0.8,0.2,1.3) forwards;transform-origin:bottom;"></div>
+            <div style="width:3px;height:${Math.round(wickH*0.3)}px;background:${color}88;margin-top:1px;"></div>
+        </div>
+        <div style="color:${color};font-size:clamp(1rem,4vw,1.8rem);font-weight:900;margin-top:8px;font-family:monospace;text-shadow:0 0 15px ${color},0 0 30px ${color}66;letter-spacing:0.05em;white-space:nowrap;">${text}</div>
     `;
 
-    // Start at center of screen — big and bold
+    // Start at center — slam in big
     candle.style.left = '50%';
-    candle.style.top = '40%';
-    candle.style.transform = 'translate(-50%, -50%) scale(2)';
+    candle.style.top = '35%';
+    candle.style.transform = 'translate(-50%, -50%) scale(2.5)';
     candle.style.opacity = '1';
-    candle.style.transition = 'transform 0.15s ease-out';
+    candle.style.transition = 'transform 0.15s cubic-bezier(0,0.8,0.2,1.2)';
     document.body.appendChild(candle);
 
-    // Pop in to normal size
+    // Pop to normal
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             candle.style.transform = 'translate(-50%, -50%) scale(1)';
         });
     });
 
-    // Hold center for 0.8s, then fly to chart
+    // Hold 1s, then fly to chart
     setTimeout(() => {
-        candle.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        candle.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
         const chart = document.getElementById('hudChart');
         if (chart) {
             const rect = chart.getBoundingClientRect();
             candle.style.left = rect.left + rect.width / 2 + 'px';
             candle.style.top = rect.top + rect.height / 2 + 'px';
-            candle.style.transform = 'translate(-50%, -50%) scale(0.3)';
+            candle.style.transform = 'translate(-50%, -50%) scale(0.2)';
             candle.style.opacity = '0';
         }
-    }, 800);
+    }, 1000);
 
-    // Remove after flight
-    setTimeout(() => candle.remove(), 1400);
+    setTimeout(() => candle.remove(), 1700);
 }
 
 function showGoldPopup(text) {
