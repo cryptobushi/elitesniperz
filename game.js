@@ -1,5 +1,224 @@
 import * as THREE from 'three';
 
+// === NETWORKING ===
+let ws = null;
+let isOnlineMode = false;
+let myPlayerId = null;
+const remotePlayers = new Map(); // id -> { state, mesh }
+
+function connectToServer(username, team) {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${protocol}//${location.host}`);
+
+    ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'join', username, team }));
+    };
+
+    ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        handleServerMessage(msg);
+    };
+
+    ws.onclose = () => {
+        console.log('Disconnected from server');
+        // Could show reconnect UI here
+    };
+}
+
+function sendToServer(msg) {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+}
+
+function handleServerMessage(msg) {
+    switch (msg.type) {
+        case 'joined':
+            myPlayerId = msg.id;
+            console.log(`Joined as ${msg.username} on ${msg.team} (id: ${msg.id})`);
+            break;
+
+        case 'queued':
+            showQueuePopup(msg.position);
+            break;
+
+        case 'state':
+            updateFromServer(msg);
+            break;
+
+        case 'kill':
+            handleServerKill(msg);
+            break;
+
+        case 'respawn':
+            handleServerRespawn(msg);
+            break;
+
+        case 'chat':
+            addChatMessage(msg.username, msg.text, msg.team);
+            break;
+
+        case 'playerJoined':
+            addChatMessage('SERVER', `${msg.username} joined ${msg.team}`, 'system');
+            break;
+
+        case 'playerLeft':
+            addChatMessage('SERVER', `${msg.username} disconnected`, 'system');
+            break;
+    }
+}
+
+function updateFromServer(msg) {
+    if (!gameState.gameStarted) return;
+
+    for (const p of msg.players) {
+        if (p.id === myPlayerId) {
+            // Update our own state from server (authoritative)
+            if (gameState.player) {
+                gameState.player.health = p.health;
+                gameState.player.kills = p.kills;
+                gameState.player.deaths = p.deaths;
+                gameState.player.price = p.price;
+                gameState.player.gold = p.gold;
+                gameState.player._streak = p.streak;
+                gameState.kills = p.kills;
+                gameState.deaths = p.deaths;
+                gameState.gold = p.gold;
+                document.getElementById('killCount').textContent = p.kills;
+                document.getElementById('deathCount').textContent = p.deaths;
+                updateGoldUI();
+                pumpPrice(0); // sync price
+            }
+            continue;
+        }
+
+        // Remote player
+        let remote = remotePlayers.get(p.id);
+        if (!remote) {
+            // Create new mesh for this player
+            const player = new Player(p.username, p.team, false);
+            player._remoteId = p.id;
+            remote = { state: p, player };
+            remotePlayers.set(p.id, remote);
+        }
+
+        // Update position (interpolate)
+        const rp = remote.player;
+        rp.position.x += (p.x - rp.position.x) * 0.3;
+        rp.position.z += (p.z - rp.position.z) * 0.3;
+        rp.position.y = p.y;
+        rp.health = p.health;
+        rp.kills = p.kills;
+        rp.deaths = p.deaths;
+        rp.price = p.price;
+        rp.mesh.visible = p.health > 0;
+
+        if (p.rotation !== undefined) {
+            rp.mesh.rotation.y += (p.rotation - rp.mesh.rotation.y) * 0.3;
+        }
+
+        remote.state = p;
+    }
+
+    // Remove players no longer in state
+    const serverIds = new Set(msg.players.map(p => p.id));
+    for (const [id, remote] of remotePlayers) {
+        if (!serverIds.has(id)) {
+            scene.remove(remote.player.mesh);
+            remotePlayers.delete(id);
+        }
+    }
+}
+
+function handleServerKill(msg) {
+    if (msg.killerId === myPlayerId) {
+        // I got a kill
+        showGoldPopup(`+${msg.gold}c`);
+        if (msg.firstBlood) showStreakPopup('FIRST BLOOD', '#ff4444');
+        audioManager.play('headshot');
+        audioManager.play('sniperFire');
+
+        // Check streaks
+        const streakMap = { 5: ['killingSpree', 'KILLING SPREE', '#ff8800'], 10: ['rampage', 'RAMPAGE', '#ff4400'],
+            15: ['dominating', 'DOMINATING', '#ff0044'], 20: ['unstoppable', 'UNSTOPPABLE', '#cc00ff'],
+            25: ['godlike', 'GODLIKE', '#ffdd00'] };
+        if (streakMap[msg.streak]) {
+            audioManager.play(streakMap[msg.streak][0]);
+            showStreakPopup(streakMap[msg.streak][1], streakMap[msg.streak][2]);
+        }
+    }
+
+    if (msg.victimId === myPlayerId) {
+        // I died
+        resetStreakChart();
+    }
+
+    addKillFeed(msg.killerName, msg.victimName);
+}
+
+function handleServerRespawn(msg) {
+    if (msg.id === myPlayerId && gameState.player) {
+        gameState.player.position.set(msg.x, terrainY(msg.x, msg.z) + 0.5, msg.z);
+        gameState.player.health = 100;
+        gameState.player.mesh.visible = true;
+    }
+}
+
+function terrainY_client(x, z) {
+    return Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2;
+}
+
+function showQueuePopup(position) {
+    // Simple alert for now
+    console.log(`In queue, position: ${position}`);
+}
+
+// === CHAT ===
+function addChatMessage(username, text, team) {
+    const container = document.getElementById('chatMessages');
+    if (!container) return;
+    const el = document.createElement('div');
+    el.style.cssText = 'margin-bottom:2px;word-wrap:break-word;';
+    const color = team === 'red' ? '#ff4444' : team === 'blue' ? '#4488ff' : team === 'system' ? '#888' : '#fff';
+    el.innerHTML = `<span style="color:${color};font-weight:bold;">${username}:</span> <span style="color:#ccc;">${text}</span>`;
+    container.appendChild(el);
+    container.scrollTop = container.scrollHeight;
+    // Cap messages
+    while (container.children.length > 50) container.removeChild(container.firstChild);
+}
+
+function initChat() {
+    const input = document.getElementById('chatInput');
+    if (!input) return;
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && gameState.gameStarted) {
+            if (input.style.display === 'none') {
+                input.style.display = 'block';
+                input.focus();
+                e.preventDefault();
+            } else if (input.value.trim()) {
+                if (isOnlineMode) {
+                    sendToServer({ type: 'chat', text: input.value.trim() });
+                } else {
+                    addChatMessage(gameState.username, input.value.trim(), gameState.team);
+                }
+                input.value = '';
+                input.style.display = 'none';
+                input.blur();
+                e.preventDefault();
+            } else {
+                input.style.display = 'none';
+                input.blur();
+                e.preventDefault();
+            }
+        }
+        if (e.key === 'Escape' && input.style.display !== 'none') {
+            input.style.display = 'none';
+            input.blur();
+            e.preventDefault();
+        }
+    });
+}
+
 // Game State
 const gameState = {
     player: null,
@@ -2274,18 +2493,8 @@ function spawnFlyingCandle(text, color, boost) {
 function showGoldPopup(text) {
     const boost = parseFloat(text.replace(/[^0-9.]/g, '')) / 50 || 0.5;
     pumpPrice(boost);
-    // Small floating text — doesn't overlap with streak candles
-    const el = document.createElement('div');
-    el.style.cssText = `position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);color:#ffd700;font-size:1rem;font-weight:900;font-family:monospace;text-shadow:0 0 10px #ffd70066;pointer-events:none;z-index:9998;transition:all 0.8s ease-out;opacity:1;`;
-    el.textContent = text.replace(/g$/, 'c'); // gold → coins
-    document.body.appendChild(el);
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            el.style.top = '38%';
-            el.style.opacity = '0';
-        });
-    });
-    setTimeout(() => el.remove(), 900);
+    // Green candle for every kill
+    spawnFlyingCandle(text, '#00ff44', boost * 8);
 }
 
 function drawDeathChart() {
@@ -2735,7 +2944,12 @@ document.addEventListener('mousedown', (e) => {
 
         // Set move target
         gameState.moveTarget = intersectPoint.clone();
-        gameState.targetLock = null; // Clear attack target
+        gameState.targetLock = null;
+
+        // Send to server in online mode
+        if (isOnlineMode) {
+            sendToServer({ type: 'move', x: intersectPoint.x, z: intersectPoint.z });
+        }
 
         // Visual feedback - create click marker
         createMoveMarker(intersectPoint);
@@ -2840,10 +3054,27 @@ document.querySelectorAll('.teamBtn').forEach(btn => {
     });
 });
 
+// Mode selection
+let selectedMode = 'online';
+document.getElementById('modeOnline')?.addEventListener('click', () => {
+    selectedMode = 'online';
+    document.getElementById('modeOnline').style.borderColor = '#00ff44';
+    document.getElementById('modeOnline').style.color = '#00ff44';
+    document.getElementById('modeOffline').style.borderColor = '#888';
+    document.getElementById('modeOffline').style.color = '#888';
+});
+document.getElementById('modeOffline')?.addEventListener('click', () => {
+    selectedMode = 'offline';
+    document.getElementById('modeOffline').style.borderColor = '#00ff44';
+    document.getElementById('modeOffline').style.color = '#00ff44';
+    document.getElementById('modeOnline').style.borderColor = '#888';
+    document.getElementById('modeOnline').style.color = '#888';
+});
+
 document.getElementById('startBtn').addEventListener('click', () => {
     audioManager.init().then(() => {
         soundtrack.start(audioManager.ctx);
-    }); // Unlock audio + start music on first user interaction
+    });
     const username = document.getElementById('usernameInput').value.trim() || 'Sniper';
 
     if (!selectedTeamValue) {
@@ -2851,11 +3082,21 @@ document.getElementById('startBtn').addEventListener('click', () => {
         return;
     }
 
+    isOnlineMode = selectedMode === 'online';
     gameState.username = username;
     gameState.team = selectedTeamValue;
     gameState.gameStarted = true;
 
-    console.log('Starting game as', username, 'on team', gameState.team);
+    // Connect to server if online
+    if (isOnlineMode) {
+        connectToServer(username, selectedTeamValue);
+    }
+
+    // Init chat
+    initChat();
+    document.getElementById('chatBox')?.classList.remove('hidden');
+
+    console.log(`Starting ${selectedMode} game as`, username, 'on team', gameState.team);
 
     document.getElementById('usernameModal').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');

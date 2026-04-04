@@ -1,0 +1,24 @@
+{
+  "name": "sniperz",
+  "version": "1.0.0",
+  "description": "A web-based tribute to the legendary Warcraft III custom game \"Elite Snipers\". Experience intense sniper combat in a fully 3D environment with fog of war, team-based gameplay, and tactical positioning.",
+  "main": "game.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cryptobushi/elitesniperz.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cryptobushi/elitesniperz/issues"
+  },
+  "homepage": "https://github.com/cryptobushi/elitesniperz#readme",
+  "dependencies": {
+    "express": "^5.2.1",
+    "ws": "^8.20.0"
+  }
+}
