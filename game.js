@@ -3463,7 +3463,24 @@ function connectToServer() {
     _ws = new WebSocket(url);
     _ws.binaryType = 'arraybuffer';
 
+    // Timeout — if no connection in 3s, fall back to offline
+    const connectTimeout = setTimeout(() => {
+        if (_ws.readyState !== 1) {
+            _netDebug('Connection timeout — falling back to offline');
+            _ws.close();
+            isOnlineMode = false;
+            // Create local bots
+            const botNames = ['Elite','Anima','Game','ESi','Apathetic','Gem','Kflan','Jubei','Steve','Sean'];
+            for (let i = 0; i < 10; i++) {
+                const bot = new Player(botNames[i], i < 5 ? 'red' : 'blue', false);
+                gameState.bots.push(bot);
+            }
+            setTimeout(() => { const el = document.getElementById('_netdbg'); if (el) el.remove(); }, 3000);
+        }
+    }, 3000);
+
     _ws.onopen = () => {
+        clearTimeout(connectTimeout);
         _netDebug('Connected! Joining as ' + gameState.username + '...');
         _ws.send(JSON.stringify({
             t: 'join',
