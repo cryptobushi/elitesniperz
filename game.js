@@ -3069,7 +3069,7 @@ document.querySelectorAll('.teamBtn').forEach(btn => {
 });
 
 // Mode selection
-let selectedMode = 'online';
+let selectedMode = 'offline';
 document.getElementById('modeOnline')?.addEventListener('click', () => {
     selectedMode = 'online';
     document.getElementById('modeOnline').style.borderColor = '#00ff44';
