@@ -2167,13 +2167,15 @@ function drawHudChart() {
 }
 
 function pumpPrice(amount) {
-    _playerPrice += amount;
+    if (gameState.player) _playerPrice = gameState.player.price;
+    else _playerPrice += amount;
     _priceHistory.push(_playerPrice);
     updateTerminal();
 }
 
 function dumpPrice() {
-    _playerPrice = Math.max(0.10, _playerPrice * 0.5);
+    if (gameState.player) _playerPrice = gameState.player.price;
+    else _playerPrice = Math.max(0.10, _playerPrice * 0.5);
     _priceHistory.push(_playerPrice);
     updateTerminal();
 }
