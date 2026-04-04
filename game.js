@@ -3444,17 +3444,27 @@ let _lastSendTime = 0;
 const BYTES_PER_PLAYER = 28;
 const INTERP_SPEED = 12; // units/sec for interpolation
 
+function _netDebug(text) {
+    let el = document.getElementById('_netdbg');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = '_netdbg';
+        el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.8);color:#0f0;font:11px monospace;padding:4px 8px;z-index:99999;pointer-events:none;max-height:100px;overflow:hidden;';
+        document.body.appendChild(el);
+    }
+    el.textContent = text;
+}
+
 function connectToServer() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const url = protocol + '//' + window.location.host;
-    console.log('Connecting to', url);
+    _netDebug('Connecting to ' + url + '...');
 
     _ws = new WebSocket(url);
     _ws.binaryType = 'arraybuffer';
 
     _ws.onopen = () => {
-        console.log('WebSocket connected');
-        // Send join message
+        _netDebug('Connected! Joining as ' + gameState.username + '...');
         _ws.send(JSON.stringify({
             t: 'join',
             n: gameState.username,
@@ -3465,20 +3475,26 @@ function connectToServer() {
         document.getElementById('chatBox')?.classList.remove('hidden');
     };
 
+    let _msgCount = 0;
     _ws.onmessage = (evt) => {
+        _msgCount++;
         const data = evt.data;
+        if (_msgCount <= 3) _netDebug('msg#' + _msgCount + ' type=' + (typeof data) + ' ctor=' + (data && data.constructor && data.constructor.name) + ' size=' + (data.byteLength || data.size || data.length || '?'));
         if (typeof data === 'string') {
-            try { handleJsonMessage(JSON.parse(data)); } catch(e) {}
+            try { handleJsonMessage(JSON.parse(data)); } catch(e) { _netDebug('JSON parse error: ' + e.message); }
         } else if (data instanceof ArrayBuffer) {
             handleBinaryState(data);
         } else if (data instanceof Blob) {
-            data.arrayBuffer().then(ab => handleBinaryState(ab));
+            _netDebug('Got Blob, converting...');
+            data.arrayBuffer().then(ab => { _netDebug('Blob->AB ok, ' + ab.byteLength + 'b'); handleBinaryState(ab); });
         } else if (data && data.byteLength !== undefined) {
-            // Fallback for any ArrayBuffer-like object
-            handleBinaryState(data);
+            handleBinaryState(data.buffer ? data.buffer : data);
+        } else {
+            _netDebug('Unknown data type: ' + (typeof data));
         }
     };
 
+    _ws.onerror = (err) => { _netDebug('WS ERROR: ' + (err.message || 'unknown')); };
     _ws.onclose = () => {
         console.log('WebSocket disconnected');
         addChatSystem('Disconnected from server');
@@ -3761,7 +3777,11 @@ function updateRemotePlayers(dt) {
         const dz = remote.targetZ - p.position.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
 
-        if (dist > 0.1) {
+        if (dist > 20) {
+            // Snap if too far (first frame or teleport)
+            p.position.x = remote.targetX;
+            p.position.z = remote.targetZ;
+        } else if (dist > 0.1) {
             const step = Math.min(INTERP_SPEED * dt, dist);
             p.position.x += (dx / dist) * step;
             p.position.z += (dz / dist) * step;
