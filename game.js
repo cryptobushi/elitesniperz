@@ -588,7 +588,7 @@ const createMap = () => {
 
 // Fog of War — pure distance-based vision
 // Vision radius = shoot range. No canvas overlay tricks.
-const VISION_RADIUS = 50; // Must match shootRange
+const VISION_RADIUS = 50;
 const FARSIGHT_RADIUS = 70;
 
 class FogOfWar {
@@ -694,7 +694,7 @@ class Player {
         this.speed = 8;
         this.normalSpeed = 8;
         this.windwalkSpeed = 14;
-        this.shootRange = 50;
+        this.shootRange = 45;
         this.damage = 25;
         this.isWindwalking = false;
         this.farsightActive = false;
@@ -711,7 +711,7 @@ class Player {
         this.hasShield = false;
         this.goldMultiplier = 1.0;
         this.baseSpeed = 8;
-        this.baseRange = 50;
+        this.baseRange = 45;
         this.baseCooldown = 1.0;
 
         this.createMesh(team);
