@@ -2255,18 +2255,8 @@ function spawnFlyingCandle(text, color, boost) {
 function showGoldPopup(text) {
     const boost = parseFloat(text.replace(/[^0-9.]/g, '')) / 50 || 0.5;
     pumpPrice(boost);
-    // Small floating text — doesn't overlap with streak candles
-    const el = document.createElement('div');
-    el.style.cssText = `position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);color:#ffd700;font-size:1rem;font-weight:900;font-family:monospace;text-shadow:0 0 10px #ffd70066;pointer-events:none;z-index:9998;transition:all 0.8s ease-out;opacity:1;`;
-    el.textContent = text.replace(/g$/, 'c'); // gold → coins
-    document.body.appendChild(el);
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            el.style.top = '38%';
-            el.style.opacity = '0';
-        });
-    });
-    setTimeout(() => el.remove(), 900);
+    // Green candle for every kill
+    spawnFlyingCandle(text, '#00ff44', boost * 8);
 }
 
 function drawDeathChart() {
