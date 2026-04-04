@@ -632,7 +632,7 @@ class FogOfWar {
     }
 
     update(player, allUnits, farsightPositions = []) {
-        const revealRadius = 35; // Larger than shoot range (25) to account for fog edge fade
+        const revealRadius = 45; // Larger than shoot range (35) to account for fog edge fade
         const farsightRadius = 45; // Far sight radius
 
         // Mark explored areas (areas you've been to before)
@@ -756,7 +756,7 @@ class Player {
         this.speed = 8;
         this.normalSpeed = 8;
         this.windwalkSpeed = 14;
-        this.shootRange = 25; // Matches vision radius
+        this.shootRange = 35;
         this.damage = 25;
         this.isWindwalking = false;
         this.farsightActive = false;
@@ -773,7 +773,7 @@ class Player {
         this.hasShield = false;
         this.goldMultiplier = 1.0;
         this.baseSpeed = 8;
-        this.baseRange = 25;
+        this.baseRange = 35;
         this.baseCooldown = 1.0;
 
         this.createMesh(team);
