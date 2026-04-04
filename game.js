@@ -3476,13 +3476,16 @@ function connectToServer() {
     };
 
     _ws.onmessage = (evt) => {
-        if (evt.data instanceof ArrayBuffer) {
-            handleBinaryState(evt.data);
-        } else if (evt.data instanceof Blob) {
-            // Some browsers send Blob even with binaryType=arraybuffer
-            evt.data.arrayBuffer().then(ab => handleBinaryState(ab));
-        } else {
-            try { handleJsonMessage(JSON.parse(evt.data)); } catch(e) {}
+        const data = evt.data;
+        if (typeof data === 'string') {
+            try { handleJsonMessage(JSON.parse(data)); } catch(e) {}
+        } else if (data instanceof ArrayBuffer) {
+            handleBinaryState(data);
+        } else if (data instanceof Blob) {
+            data.arrayBuffer().then(ab => handleBinaryState(ab));
+        } else if (data && data.byteLength !== undefined) {
+            // Fallback for any ArrayBuffer-like object
+            handleBinaryState(data);
         }
     };
 

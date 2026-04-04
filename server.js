@@ -197,10 +197,17 @@ function updateBot(bot, dt) {
             return;
         }
         bot.botState = 'explore';
-        bot.botTarget = {
-            x: (Math.random() - 0.5) * MAP_SIZE * 0.7,
-            z: (Math.random() - 0.5) * MAP_SIZE * 0.7
-        };
+        // Favor own half of map, avoid enemy spawn
+        var bias = bot.team === 'red' ? -0.2 : 0.2;
+        var tx = (Math.random() - 0.5 + bias) * MAP_SIZE * 0.7;
+        var tz = (Math.random() - 0.5 + bias) * MAP_SIZE * 0.7;
+        // Don't target enemy spawn area
+        var esx = bot.team === 'red' ? 70 : -70, esz = esx;
+        if (Math.sqrt((tx-esx)*(tx-esx)+(tz-esz)*(tz-esz)) < 25) {
+            tx = (Math.random() - 0.5) * MAP_SIZE * 0.4;
+            tz = (Math.random() - 0.5) * MAP_SIZE * 0.4;
+        }
+        bot.botTarget = { x: tx, z: tz };
     }
 
     // Move toward target
