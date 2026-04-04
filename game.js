@@ -3278,7 +3278,9 @@ function syncCanvasPointerEvents() {
     const shopOpen = !document.getElementById('shopPanel').classList.contains('hidden');
     const sbOpen = !document.getElementById('scoreboard').classList.contains('hidden');
     const deathOpen = !document.getElementById('deathPopup').classList.contains('hidden');
-    canvas.style.pointerEvents = (shopOpen || sbOpen || deathOpen) ? 'none' : 'auto';
+    const uiOpen = shopOpen || sbOpen || deathOpen;
+    canvas.style.pointerEvents = uiOpen ? 'none' : 'auto';
+    canvas.style.touchAction = uiOpen ? 'auto' : 'none';
 }
 // Poll every frame
 setInterval(syncCanvasPointerEvents, 50);
