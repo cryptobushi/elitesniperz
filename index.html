@@ -315,8 +315,7 @@
             top: 0; left: 0;
             width: 100%; height: 100%;
             z-index: 900;
-            pointer-events: all;
-            cursor: pointer;
+            pointer-events: none;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -338,42 +337,58 @@
             position: relative;
             z-index: 1;
             font-family: 'Times New Roman', 'Georgia', serif;
-            font-size: clamp(1.8rem, 10vw, 6rem);
+            font-size: clamp(3rem, 12vw, 6rem);
             font-weight: 400;
-            letter-spacing: clamp(0.1em, 3vw, 0.3em);
+            letter-spacing: 0.3em;
             color: #8b0000;
-            text-shadow: 0 0 60px rgba(200,0,0,0.8), 0 0 120px rgba(139,0,0,0.4);
+            text-shadow: 0 0 60px rgba(200,0,0,0.8), 0 0 120px rgba(139,0,0,0.4), 0 0 200px rgba(139,0,0,0.2);
             opacity: 0;
             transform: scale(1.8);
             animation: deathTextIn 1s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s forwards;
         }
         @keyframes deathTextIn {
-            0% { opacity: 0; transform: scale(1.8); letter-spacing: 0.5em; }
-            50% { opacity: 1; transform: scale(0.95); letter-spacing: 0.15em; }
+            0% { opacity: 0; transform: scale(1.8); letter-spacing: 0.8em; }
+            50% { opacity: 1; transform: scale(0.95); letter-spacing: 0.25em; }
             70% { transform: scale(1.05); }
-            100% { opacity: 1; transform: scale(1); letter-spacing: clamp(0.1em, 3vw, 0.3em); }
-        }
-        #deathChart {
-            position: relative;
-            z-index: 1;
-            max-width: 90vw;
+            100% { opacity: 1; transform: scale(1); letter-spacing: 0.3em; }
         }
         #deathKiller {
             position: relative;
             z-index: 1;
             font-family: 'Times New Roman', 'Georgia', serif;
-            font-size: clamp(0.6rem, 2.5vw, 1.2rem);
+            font-size: clamp(0.8rem, 3vw, 1.2rem);
             color: #777;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.15em;
             opacity: 0;
             animation: deathSubIn 0.5s ease-out 1s forwards;
-            margin-top: 0.5rem;
-            max-width: 90vw;
-            text-align: center;
+            margin-top: 0.8rem;
         }
         @keyframes deathSubIn {
             0% { opacity: 0; transform: translateY(10px); }
             100% { opacity: 0.8; transform: translateY(0); }
+        }
+        #respawnBtn {
+            position: relative;
+            z-index: 1;
+            margin-top: 1.5rem;
+            background: none;
+            border: 1px solid #8b000044;
+            color: #8b0000;
+            font-family: 'Times New Roman', 'Georgia', serif;
+            font-size: clamp(0.8rem, 2.5vw, 1rem);
+            letter-spacing: 0.15em;
+            padding: 0.6rem 2rem;
+            cursor: pointer;
+            pointer-events: all;
+            opacity: 0;
+            animation: deathSubIn 0.5s ease-out 1.3s forwards;
+            -webkit-tap-highlight-color: transparent;
+            transition: all 0.2s;
+        }
+        #respawnBtn:hover, #respawnBtn:active {
+            border-color: #cc0000;
+            color: #ff2222;
+            text-shadow: 0 0 20px rgba(255,0,0,0.4);
         }
 
         /* === SHOP PANEL === */
@@ -476,53 +491,17 @@
         }
 
         /* === MOBILE TWEAKS === */
-        /* === MOBILE RESPONSIVE === */
-        @media (max-width: 768px), (max-height: 500px) {
-            /* HUD terminal */
-            #terminal { padding: 4px 8px; min-width: 120px; }
-            #terminal #ticker { font-size: 0.8rem; }
-            #terminal #price { font-size: 0.7rem; }
-            #terminal #pctChange { font-size: 0.55rem; }
-            #hudChart { width: 100px; height: 35px; }
+        @media (max-width: 768px) {
+            #controls { display: none !important; }
+        }
 
-            /* Abilities bar */
-            .ability { width: 44px; padding: 5px; }
-            .ability-key { font-size: 0.8rem; }
-            .ability-name { font-size: 0.45rem; }
-
-            /* Minimap */
-            .minimap { width: 80px; height: 80px; }
-
-            /* Kill feed */
-            #killFeed { bottom: 100px; width: min(180px, 40vw); }
-            .kill-message { font-size: 0.45rem; padding: 1px 6px; }
-
-            /* Scoreboard watchlist */
-            #scoreboard { padding: 0.5rem; }
-            #scoreboard .sb-table-wrap { padding: 0.5rem 0.8rem; }
-            #scoreboard .sb-title { font-size: 0.9rem; margin-bottom: 0.5rem; }
-            #scoreboard .sb-table th { font-size: 0.5rem; padding: 3px 4px; }
-            #scoreboard .sb-row td { font-size: 0.6rem; padding: 4px; }
-            #scoreboard .sb-chart { width: 50px; height: 18px; }
-            #scoreboard .sb-price span { display: none; } /* hide % on small screens */
-
-            /* Death screen */
-            #deathPopup { padding: 0.5rem; }
-            #deathCandle { transform: scale(0.6); }
-            #deathChart { width: 150px !important; height: 40px !important; }
-            #respawnBtn { margin-top: 0.5rem; }
-
-            /* Shop */
-            #shopPanel { padding: 0.6rem; }
-            #shopPanel h2 { font-size: 0.8rem; }
-            .shop-item { padding: 0.35rem; gap: 0.3rem; }
-            .shop-icon { font-size: 1rem; width: 1.5rem; }
-            .shop-name { font-size: 0.65rem; }
-            .shop-cost { font-size: 0.6rem; }
-            .shop-desc { font-size: 0.5rem; }
-
-            /* Streak popup */
-            #streakPopup { top: 30%; }
+        @media (max-height: 400px) {
+            /* Very short landscape — tighten everything */
+            #scoreboard { font-size: 0.6rem; min-width: 80px; padding: 6px; }
+            .stat { padding: 2px 8px; font-size: 0.6rem; }
+            .minimap { width: 100px; height: 100px; }
+            .ability { width: 50px; padding: 6px; }
+            .ability-key { font-size: 0.9rem; }
         }
     </style>
 </head>
@@ -643,7 +622,7 @@
                 opacity:0; animation:deathSubIn 0.5s ease-out 1s forwards;
             "></canvas>
             <div id="deathKiller"></div>
-            <div style="position:relative;z-index:1;color:#553333;font-size:clamp(0.5rem,2vw,0.7rem);margin-top:1rem;opacity:0;animation:deathSubIn 0.5s ease-out 1.5s forwards;letter-spacing:0.1em;">TAP TO RESPAWN</div>
+            <button id="respawnBtn">RETURN TO SPAWN</button>
         </div>
         <canvas class="minimap hidden" id="minimap"></canvas>
     </div>

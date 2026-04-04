@@ -489,19 +489,13 @@ const createMap = () => {
         return treeGroup;
     };
 
-    // Safe zone check — nothing spawns near team spawns
-    const nearSpawn = (x, z) => {
-        const d1 = Math.sqrt((x+70)*(x+70) + (z+70)*(z+70)); // Red spawn
-        const d2 = Math.sqrt((x-70)*(x-70) + (z-70)*(z-70)); // Blue spawn
-        return d1 < 20 || d2 < 20;
-    };
-
     // Plant trees randomly across the map
     for (let i = 0; i < 80; i++) {
         const x = (Math.random() - 0.5) * MAP_SIZE * 0.9;
         const z = (Math.random() - 0.5) * MAP_SIZE * 0.9;
+        // Don't plant trees in spawn areas or center
         const distFromCenter = Math.sqrt(x*x + z*z);
-        if (distFromCenter > 15 && distFromCenter < MAP_SIZE * 0.45 && !nearSpawn(x, z)) {
+        if (distFromCenter > 15 && distFromCenter < MAP_SIZE * 0.45) {
             createTree(x, z);
         }
     }
@@ -528,7 +522,6 @@ const createMap = () => {
     for (let i = 0; i < 40; i++) {
         const x = (Math.random() - 0.5) * MAP_SIZE * 0.85;
         const z = (Math.random() - 0.5) * MAP_SIZE * 0.85;
-        if (nearSpawn(x, z)) continue;
         const size = 0.8 + Math.random() * 1.5;
         createRock(x, z, size);
     }
@@ -572,7 +565,7 @@ const createMap = () => {
         const width = 3 + Math.random() * 5;
         const height = 3 + Math.random() * 5;
         const distFromCenter = Math.sqrt(x*x + z*z);
-        if (distFromCenter > 25 && !nearSpawn(x, z)) {
+        if (distFromCenter > 25) {
             createWall(x, z, width, height);
         }
     }
@@ -703,7 +696,7 @@ class Player {
         this.windwalkSpeed = 14;
         this.shootRange = 45;
         this.damage = 25;
-        this._spawnProtection = 1.5;
+        this._spawnProtection = 3.0; // 3s invulnerable on spawn
         this.price = 1.00; // Everyone is a token
         this.isWindwalking = false;
         this.farsightActive = false;
@@ -1055,10 +1048,7 @@ class Player {
             this.mesh.position.y += Math.sin(time * 2) * 0.008;
         }
 
-        // Spawn protection — cancel if player leaves spawn area
-        if (this._spawnProtection > 0 && !this.isNearSpawn()) {
-            this._spawnProtection = 0;
-        }
+        // Spawn protection countdown + visual
         if (this._spawnProtection > 0) {
             this._spawnProtection -= deltaTime;
             // Flicker transparency to show invulnerability
@@ -1212,12 +1202,10 @@ class Player {
                         const z = (Math.random() - 0.5) * (MAP_SIZE * 0.8);
                         const candidate = new THREE.Vector3(x, 0.5, z);
 
+                        // Check distance from edges
                         if (Math.abs(x) > MAP_SIZE / 2 - 15 || Math.abs(z) > MAP_SIZE / 2 - 15) continue;
 
-                        // Skip if target is inside a wall
-                        if (this.checkCollision(candidate)) continue;
-
-                        // Avoid piling on other bots
+                        // Avoid piling on other bots — skip if another bot is within 8 units of target
                         let tooClose = false;
                         for (const other of gameState.bots) {
                             if (other === this || other.health <= 0) continue;
@@ -1265,35 +1253,59 @@ class Player {
                 if (!this.checkCollision(newPos)) {
                     this.position.x = newPos.x;
                     this.position.z = newPos.z;
-                    this._wallSlideFrames = 0;
                 } else {
                     // Wall slide
-                    this._wallSlideFrames = (this._wallSlideFrames || 0) + 1;
                     let moved = false;
+                    const slideX = this.position.clone(); slideX.x += this.velocity.x;
+                    const slideZ = this.position.clone(); slideZ.z += this.velocity.z;
 
-                    // Try perpendicular directions to get around the wall
-                    const angle = Math.atan2(direction.z, direction.x);
-                    for (const offset of [Math.PI/2, -Math.PI/2, Math.PI/3, -Math.PI/3, Math.PI*2/3, -Math.PI*2/3]) {
-                        const alt = this.position.clone();
-                        alt.x += Math.cos(angle + offset) * speed;
-                        alt.z += Math.sin(angle + offset) * speed;
-                        if (!this.checkCollision(alt)) {
-                            this.position.x = alt.x;
-                            this.position.z = alt.z;
-                            moved = true;
-                            break;
+                    if (!this.checkCollision(slideX)) {
+                        this.position.x = slideX.x; moved = true;
+                    } else if (!this.checkCollision(slideZ)) {
+                        this.position.z = slideZ.z; moved = true;
+                    } else {
+                        const angle = Math.atan2(direction.z, direction.x);
+                        for (const offset of [Math.PI/4, -Math.PI/4, Math.PI/3, -Math.PI/3, Math.PI/2, -Math.PI/2]) {
+                            const alt = this.position.clone();
+                            alt.x += Math.cos(angle + offset) * speed;
+                            alt.z += Math.sin(angle + offset) * speed;
+                            if (!this.checkCollision(alt)) {
+                                this.position.x = alt.x;
+                                this.position.z = alt.z;
+                                moved = true;
+                                break;
+                            }
                         }
                     }
 
-                    // If wall-sliding too long (>15 frames) or fully stuck (>5), pick new target
-                    if (!moved) this._stuckFrames = (this._stuckFrames || 0) + 1;
-                    else this._stuckFrames = 0;
+                    if (!moved) {
+                        this._stuckFrames++;
+                        if (this._stuckFrames > 10) {
+                            // Find nearest bot and run AWAY from it + the wall
+                            let escapeDir = new THREE.Vector3((Math.random() - 0.5), 0, (Math.random() - 0.5)).normalize();
 
-                    if (this._stuckFrames > 5 || this._wallSlideFrames > 15) {
-                        this.targetPosition = null; // Force new target next frame
-                        this._botState = 'explore';
+                            for (const other of gameState.bots) {
+                                if (other === this || other.health <= 0) continue;
+                                const dist = this.position.distanceTo(other.position);
+                                if (dist < 5) {
+                                    // Run away from nearby bot
+                                    escapeDir.add(new THREE.Vector3().subVectors(this.position, other.position).normalize());
+                                }
+                            }
+                            escapeDir.normalize();
+
+                            this.targetPosition = new THREE.Vector3(
+                                this.position.x + escapeDir.x * 25,
+                                0.5,
+                                this.position.z + escapeDir.z * 25
+                            );
+                            // Clamp to map bounds
+                            this.targetPosition.x = Math.max(-MAP_SIZE/2 + 10, Math.min(MAP_SIZE/2 - 10, this.targetPosition.x));
+                            this.targetPosition.z = Math.max(-MAP_SIZE/2 + 10, Math.min(MAP_SIZE/2 - 10, this.targetPosition.z));
+                            this._stuckFrames = 0;
+                        }
+                    } else {
                         this._stuckFrames = 0;
-                        this._wallSlideFrames = 0;
                     }
                 }
                 this.position.y = this.getTerrainHeight(this.position.x, this.position.z);
@@ -1318,7 +1330,7 @@ class Player {
             }
         });
 
-        // If enemy found, aim at them and chase (but not through walls forever)
+        // If enemy found, aim at them and chase
         if (closestEnemy) {
             this.weapon.lookAt(closestEnemy.position);
 
@@ -1326,22 +1338,10 @@ class Player {
                 .subVectors(closestEnemy.position, this.position)
                 .normalize();
 
-            // Only chase if we have LOS — don't run at walls
-            const ray = new THREE.Raycaster();
-            const eyePos = this.position.clone(); eyePos.y += 1.0;
-            ray.set(eyePos, enemyDirection);
-            const hits = ray.intersectObjects(gameState._wallObjects || [], false);
-            const dist = this.position.distanceTo(closestEnemy.position);
-            const wallBlocked = hits.some(h => h.distance < dist);
-
-            if (!wallBlocked) {
-                this._botState = 'chase';
-                this._campTimer = 0;
-                this.targetPosition = this.position.clone().add(enemyDirection.multiplyScalar(10));
-            } else {
-                // Can see enemy but wall in the way — go explore instead
-                if (this._botState === 'chase') this._botState = 'explore';
-            }
+            // Switch to chase state and pursue enemy
+            this._botState = 'chase';
+            this._campTimer = 0;
+            this.targetPosition = this.position.clone().add(enemyDirection.multiplyScalar(10));
         } else if (this.targetPosition) {
             // No enemy — aim in movement direction
             this.weapon.lookAt(this.targetPosition);
@@ -1961,11 +1961,7 @@ class Player {
             gameState.moveTarget = null;
             gameState.targetLock = null;
 
-            // Hide HUD on death
-            document.getElementById('hud').classList.add('hidden');
-            document.getElementById('abilities').classList.add('hidden');
-            document.querySelector('.minimap').classList.add('hidden');
-
+            // Dark Souls death screen
             const popup = document.getElementById('deathPopup');
             const killerName = killer ? killer.username : 'the darkness';
 
@@ -2026,9 +2022,7 @@ class Player {
         this.mesh.visible = true;
 
         if (this.isPlayer) {
-            document.getElementById('hud').classList.remove('hidden');
-            document.getElementById('abilities').classList.remove('hidden');
-            document.querySelector('.minimap').classList.remove('hidden');
+            // Player alive
         } else {
             // Bot auto-buy: prioritize items they don't have
             this._botShop();
@@ -2598,7 +2592,7 @@ document.addEventListener('keydown', (e) => {
 
     if (e.key === ' ' && gameState.player && gameState.player.health <= 0) {
         e.preventDefault();
-        document.getElementById('deathPopup')?.click();
+        document.getElementById('respawnBtn')?.click();
         return;
     }
     if (e.key.toLowerCase() === 'q') {
@@ -2683,8 +2677,6 @@ document.addEventListener('mousemove', (e) => {
 
 document.addEventListener('mousedown', (e) => {
     if (!gameState.gameStarted) return;
-    // Don't register movement when clicking UI elements
-    if (e.target.closest('#shopPanel, #scoreboard, #deathPopup, #abilities, #terminal, #minimap, #debugPanel')) return;
 
     // Right click or middle mouse for camera drag
     if (e.button === 1 || e.button === 2) {
@@ -2875,35 +2867,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
     startGame();
 });
 
-// Ability buttons — use touchend to beat the canvas touch handler
-let _uiTouchConsumed = false;
 document.querySelectorAll('.ability').forEach(el => {
-    el.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        _uiTouchConsumed = true;
-    }, { passive: false });
-    el.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const ability = el.dataset.ability;
-        if (ability === 'windwalk') useWindwalk();
-        if (ability === 'farsight') useFarsight();
-        if (el.id === 'shopBtn') {
-            if (gameState.player && gameState.player.isNearSpawn()) {
-                const panel = document.getElementById('shopPanel');
-                panel.classList.toggle('hidden');
-                if (!panel.classList.contains('hidden')) updateShopUI();
-            }
-        }
-        if (el.id === 'scoreBtn') {
-            const sb = document.getElementById('scoreboard');
-            sb.classList.toggle('hidden');
-            if (!sb.classList.contains('hidden')) updateScoreboard();
-        }
-        setTimeout(() => _uiTouchConsumed = false, 50);
-    }, { passive: false });
-    // Keep click for desktop
     el.addEventListener('click', () => {
         const ability = el.dataset.ability;
         if (ability === 'windwalk') useWindwalk();
@@ -2919,22 +2883,6 @@ document.querySelectorAll('.ability').forEach(el => {
             const sb = document.getElementById('scoreboard');
             sb.classList.toggle('hidden');
             if (!sb.classList.contains('hidden')) updateScoreboard();
-        }
-    });
-});
-
-// Tap anywhere on scoreboard overlay to close it (mobile)
-document.getElementById('scoreboard').addEventListener('click', () => {
-    document.getElementById('scoreboard').classList.add('hidden');
-});
-
-// Click/tap outside shop to close it
-['click', 'touchend'].forEach(evt => {
-    document.addEventListener(evt, (e) => {
-        const shop = document.getElementById('shopPanel');
-        if (shop.classList.contains('hidden')) return;
-        if (!e.target.closest('#shopPanel') && !e.target.closest('#shopBtn') && !e.target.closest('.ability')) {
-            shop.classList.add('hidden');
         }
     });
 });
@@ -3239,23 +3187,14 @@ function preGameRender() {
 preGameRender();
 
 // Respawn button — immediate respawn
-// Block touches on shop panel from reaching canvas
-document.getElementById('shopPanel').addEventListener('touchstart', (e) => { e.stopPropagation(); }, { passive: false });
-document.getElementById('shopPanel').addEventListener('touchmove', (e) => { e.stopPropagation(); }, { passive: false });
-document.getElementById('shopPanel').addEventListener('touchend', (e) => { e.stopPropagation(); }, { passive: false });
-
-// Tap anywhere on death screen to respawn
-document.getElementById('deathPopup')?.addEventListener('click', () => {
+document.getElementById('respawnBtn')?.addEventListener('click', () => {
     document.getElementById('deathPopup').classList.add('hidden');
+    // Just snap camera to spawn — auto-respawn handles the actual respawn
     if (gameState.player) {
         const spawnX = gameState.player.team === 'red' ? -70 : 70;
         const spawnZ = gameState.player.team === 'red' ? -70 : 70;
         gameState.cameraTarget.x = spawnX;
         gameState.cameraTarget.z = spawnZ;
-        // Show HUD back
-        document.getElementById('hud').classList.remove('hidden');
-        document.getElementById('abilities').classList.remove('hidden');
-        document.querySelector('.minimap').classList.remove('hidden');
     }
 });
 
@@ -3274,19 +3213,6 @@ Player.prototype.respawn = function() {
 // === MOBILE TOUCH — drag anywhere to scroll camera, tap to move/attack ===
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('ontouchstart' in window);
 
-// Disable canvas touch when UI overlays are open
-function syncCanvasPointerEvents() {
-    const canvas = document.getElementById('gameCanvas');
-    const shopOpen = !document.getElementById('shopPanel').classList.contains('hidden');
-    const sbOpen = !document.getElementById('scoreboard').classList.contains('hidden');
-    const deathOpen = !document.getElementById('deathPopup').classList.contains('hidden');
-    const uiOpen = shopOpen || sbOpen || deathOpen;
-    canvas.style.pointerEvents = uiOpen ? 'none' : 'auto';
-    canvas.style.touchAction = uiOpen ? 'auto' : 'none';
-}
-// Poll every frame
-setInterval(syncCanvasPointerEvents, 50);
-
 if (isMobile) {
     const canvas = document.getElementById('gameCanvas');
     let touchStartPos = null;
@@ -3297,14 +3223,11 @@ if (isMobile) {
     // Camera velocity for flick momentum
     let camVelX = 0, camVelZ = 0;
 
-    const _uiOpen = () =>
-        !document.getElementById('shopPanel').classList.contains('hidden') ||
-        !document.getElementById('scoreboard').classList.contains('hidden') ||
-        !document.getElementById('deathPopup').classList.contains('hidden');
+    const _shopOpen = () => !document.getElementById('shopPanel').classList.contains('hidden');
 
     canvas.addEventListener('touchstart', (e) => {
-        if (_uiOpen() || _uiTouchConsumed) return;
         e.preventDefault();
+        if (_shopOpen()) return;
         camVelX = 0;
         camVelZ = 0;
 
@@ -3324,8 +3247,8 @@ if (isMobile) {
     }, { passive: false });
 
     canvas.addEventListener('touchmove', (e) => {
-        if (_uiOpen()) return;
         e.preventDefault();
+        if (_shopOpen()) return;
 
         if (e.touches.length >= 1) {
             const t = e.touches[0];
@@ -3369,8 +3292,8 @@ if (isMobile) {
     }, { passive: false });
 
     canvas.addEventListener('touchend', (e) => {
-        if (_uiOpen()) { touches.clear(); return; }
         e.preventDefault();
+        if (_shopOpen()) { touches.clear(); return; }
 
         for (const t of e.changedTouches) {
             const data = touches.get(t.identifier);
@@ -3411,7 +3334,15 @@ if (isMobile) {
 
 if (!isMobile) {
 
-    // Ability buttons work via click — touch handled by blocking canvas
+    // Ability buttons work via tap on the HTML elements (pointer-events: all)
+    document.querySelectorAll('.ability').forEach(btn => {
+        btn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            const ability = btn.dataset.ability;
+            if (ability === 'windwalk') { gameState.keys['q'] = true; setTimeout(() => gameState.keys['q'] = false, 100); }
+            if (ability === 'farsight') { gameState.keys['e'] = true; setTimeout(() => gameState.keys['e'] = false, 100); }
+        }, { passive: false });
+    });
 
     // Fullscreen on game start
     document.getElementById('startBtn')?.addEventListener('click', () => {
