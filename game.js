@@ -3228,11 +3228,14 @@ if (isMobile) {
     // Camera velocity for flick momentum
     let camVelX = 0, camVelZ = 0;
 
-    const _shopOpen = () => !document.getElementById('shopPanel').classList.contains('hidden');
+    const _uiOpen = () =>
+        !document.getElementById('shopPanel').classList.contains('hidden') ||
+        !document.getElementById('scoreboard').classList.contains('hidden') ||
+        !document.getElementById('deathPopup').classList.contains('hidden');
 
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        if (_shopOpen()) return;
+        if (_uiOpen()) return;
         camVelX = 0;
         camVelZ = 0;
 
@@ -3253,7 +3256,7 @@ if (isMobile) {
 
     canvas.addEventListener('touchmove', (e) => {
         e.preventDefault();
-        if (_shopOpen()) return;
+        if (_uiOpen()) return;
 
         if (e.touches.length >= 1) {
             const t = e.touches[0];
@@ -3298,7 +3301,7 @@ if (isMobile) {
 
     canvas.addEventListener('touchend', (e) => {
         e.preventDefault();
-        if (_shopOpen()) { touches.clear(); return; }
+        if (_uiOpen()) { touches.clear(); return; }
 
         for (const t of e.changedTouches) {
             const data = touches.get(t.identifier);
