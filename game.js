@@ -3478,8 +3478,11 @@ function connectToServer() {
     _ws.onmessage = (evt) => {
         if (evt.data instanceof ArrayBuffer) {
             handleBinaryState(evt.data);
+        } else if (evt.data instanceof Blob) {
+            // Some browsers send Blob even with binaryType=arraybuffer
+            evt.data.arrayBuffer().then(ab => handleBinaryState(ab));
         } else {
-            handleJsonMessage(JSON.parse(evt.data));
+            try { handleJsonMessage(JSON.parse(evt.data)); } catch(e) {}
         }
     };
 
