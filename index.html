@@ -544,10 +544,6 @@
                 <button class="teamBtn red" data-team="red">RED</button>
                 <button class="teamBtn blue" data-team="blue">BLUE</button>
             </div>
-            <div id="modeSelect" style="display:flex;gap:0.5rem;margin-bottom:1rem;justify-content:center;">
-                <button class="teamBtn" id="modeOnline" style="border-color:#888;color:#888;flex:1;">ONLINE (beta)</button>
-                <button class="teamBtn" id="modeOffline" style="border-color:#00ff44;color:#00ff44;flex:1;">OFFLINE</button>
-            </div>
             <button id="startBtn">START GAME</button>
         </div>
 
@@ -605,25 +601,6 @@
             <h2>⚔ ARMORY ⚔</h2>
             <div class="shop-gold" id="shopGold">Gold: 0</div>
             <div id="shopItems"></div>
-        </div>
-
-        <!-- Chat -->
-        <div id="chatBox" class="hidden" style="
-            position:absolute; bottom:140px; right:8px;
-            width:min(250px,40vw); max-height:200px;
-            pointer-events:all; font-family:'Courier New',monospace;
-        ">
-            <div id="chatMessages" style="
-                overflow-y:auto; max-height:160px; padding:4px;
-                background:rgba(0,0,0,0.5); border:1px solid #ffffff22;
-                border-radius:4px 4px 0 0; font-size:0.6rem;
-            "></div>
-            <input id="chatInput" type="text" maxlength="200" placeholder="Press Enter to chat..." style="
-                width:100%; background:rgba(0,0,0,0.7); border:1px solid #ffffff33;
-                border-top:none; color:#fff; padding:4px 8px; font-size:0.65rem;
-                font-family:'Courier New',monospace; border-radius:0 0 4px 4px;
-                outline:none; display:none;
-            ">
         </div>
 
         <div id="killFeed"></div>

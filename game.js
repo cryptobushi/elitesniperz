@@ -1,286 +1,5 @@
 import * as THREE from 'three';
 
-// === NETWORKING (WebSocket + Binary) ===
-let ws = null;
-let isOnlineMode = false;
-let myPlayerId = null;
-const remotePlayers = new Map(); // id -> { player }
-const _roster = new Map(); // id -> { name, team, isBot }
-
-function connectToServer(username, team) {
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${protocol}//${location.host}`);
-    ws.binaryType = 'arraybuffer';
-
-    ws.onopen = () => {
-        console.log('Connected to server');
-        ws.send(JSON.stringify({ t: 'join', n: username, m: team }));
-    };
-
-    ws.onmessage = (event) => {
-        if (event.data instanceof ArrayBuffer) {
-            decodeBinaryState(event.data);
-        } else {
-            try {
-                const msg = JSON.parse(event.data);
-                handleMessage(msg);
-            } catch {}
-        }
-    };
-
-    ws.onclose = () => {
-        console.log('Disconnected');
-        if (gameState.gameStarted && gameState.bots.length === 0 && remotePlayers.size === 0) {
-            isOnlineMode = false;
-            const botNames = ['Elite','Anima','Game','ESi','Apathetic','Gem','Kflan','Jubei','Steve','Sean'];
-            for (let i = 0; i < 10; i++) {
-                const bot = new Player(botNames[i], i < 5 ? 'red' : 'blue', false);
-                gameState.bots.push(bot);
-            }
-        }
-    };
-}
-
-function handleMessage(msg) {
-    switch (msg.t) {
-        case 'j': // joined
-            myPlayerId = msg.id;
-            msg.roster.forEach(r => _roster.set(r.id, { name: r.n, team: r.m, isBot: r.b }));
-            console.log(`Joined as id ${msg.id}, roster: ${msg.roster.length} players`);
-            break;
-        case 'k': // kill
-            handleServerKill({ killerId: msg.ki, killerName: msg.kn, victimId: msg.vi, victimName: msg.vn, gold: msg.g, price: msg.p, streak: msg.s, firstBlood: msg.fb });
-            break;
-        case 'r': // respawn
-            handleServerRespawn({ id: msg.id, x: msg.x, z: msg.z });
-            break;
-        case 'ch': // chat
-            addChatMessage(msg.n, msg.x, msg.m);
-            break;
-        case 'pj': // player joined
-            addChatMessage('SERVER', `${msg.n} joined ${msg.m}`, 'system');
-            break;
-        case 'pl': // player left
-            addChatMessage('SERVER', `${msg.n} disconnected`, 'system');
-            break;
-    }
-}
-
-function decodeBinaryState(buf) {
-    if (!gameState.gameStarted) return;
-    const view = new DataView(buf);
-    const count = view.getUint16(0, true);
-    const serverIds = new Set();
-    let off = 2;
-
-    for (let i = 0; i < count; i++) {
-        const id = view.getUint16(off, true); off += 2;
-        const x = view.getFloat32(off, true); off += 4;
-        const z = view.getFloat32(off, true); off += 4;
-        const rot = view.getFloat32(off, true); off += 4;
-        const alive = view.getUint8(off); off += 1;
-        const kills = view.getInt16(off, true); off += 2;
-        const deaths = view.getInt16(off, true); off += 2;
-        const price = view.getFloat32(off, true); off += 4;
-        const flags = view.getUint8(off); off += 1;
-        const streak = view.getInt16(off, true); off += 2;
-        const gold = view.getInt16(off, true); off += 2;
-
-        serverIds.add(id);
-
-        if (id === myPlayerId) {
-            if (gameState.player) {
-                const wasDead = gameState.player.health <= 0;
-                const nowDead = !alive;
-                // Sync position from server (authoritative)
-                const posErr = Math.abs(gameState.player.position.x - x) + Math.abs(gameState.player.position.z - z);
-                if (posErr > 2) {
-                    // Snap if too far off
-                    gameState.player.position.x = x;
-                    gameState.player.position.z = z;
-                } else {
-                    // Smooth correct
-                    gameState.player.position.x += (x - gameState.player.position.x) * 0.3;
-                    gameState.player.position.z += (z - gameState.player.position.z) * 0.3;
-                }
-                gameState.player.position.y = terrainY_client(gameState.player.position.x, gameState.player.position.z) + 0.5;
-                gameState.player.health = alive ? 100 : 0;
-                gameState.player.kills = kills;
-                gameState.player.deaths = deaths;
-                gameState.player.price = price;
-                gameState.player.gold = gold;
-                gameState.player._streak = streak;
-                gameState.kills = kills;
-                gameState.deaths = deaths;
-                gameState.gold = gold;
-                document.getElementById('killCount').textContent = kills;
-                document.getElementById('deathCount').textContent = deaths;
-                updateGoldUI();
-                pumpPrice(0);
-
-                // Death transition — show death screen
-                if (nowDead && !wasDead) {
-                    gameState.player.mesh.visible = false;
-                    document.getElementById('hud').classList.add('hidden');
-                    document.getElementById('abilities').classList.add('hidden');
-                    document.querySelector('.minimap').classList.add('hidden');
-                    const popup = document.getElementById('deathPopup');
-                    popup.classList.add('hidden');
-                    void popup.offsetHeight;
-                    popup.classList.remove('hidden');
-                    drawDeathChart();
-                    resetStreakChart();
-                    setTimeout(() => popup.classList.add('hidden'), 5000);
-                }
-                // Respawn transition — show HUD again
-                if (!nowDead && wasDead) {
-                    gameState.player.mesh.visible = true;
-                    gameState.player.velocity.set(0, 0, 0);
-                    gameState.moveTarget = null;
-                    document.getElementById('hud').classList.remove('hidden');
-                    document.getElementById('abilities').classList.remove('hidden');
-                    document.querySelector('.minimap').classList.remove('hidden');
-                }
-            }
-            continue;
-        }
-
-        const isBlue = (flags & 8) !== 0;
-        const team = isBlue ? 'blue' : 'red';
-
-        let remote = remotePlayers.get(id);
-        if (!remote) {
-            const info = _roster.get(id);
-            const name = info ? info.name : ((flags & 4) ? 'Bot' : 'Player');
-            console.log(`Creating remote player: ${name} (${team}) id=${id}`);
-            const player = getPooledPlayer(name, team);
-            player._remoteId = id;
-            remote = { player };
-            remotePlayers.set(id, remote);
-        }
-
-        const rp = remote.player;
-        rp.position.x += (x - rp.position.x) * 0.25;
-        rp.position.z += (z - rp.position.z) * 0.25;
-        rp.position.y = terrainY_client(rp.position.x, rp.position.z) + 0.5;
-        rp.mesh.rotation.y += (rot - rp.mesh.rotation.y) * 0.25;
-        rp.mesh.visible = alive === 1;
-        rp.health = alive ? 100 : 0;
-        rp.kills = kills;
-        rp.deaths = deaths;
-        rp.price = price;
-    }
-
-    // Remove stale
-    for (const [id, remote] of remotePlayers) {
-        if (!serverIds.has(id)) {
-            returnToPool(remote.player);
-            remotePlayers.delete(id);
-        }
-    }
-}
-
-// Online mode: binary state decoded in decodeBinaryState() on ws.onmessage
-
-function handleServerKill(msg) {
-    // Play sniper fire sound for all kills
-    audioManager.play('sniperFire');
-
-    // Find killer and victim meshes for visual effect
-    const killerMesh = msg.killerId === myPlayerId ? gameState.player : remotePlayers.get(msg.killerId)?.player;
-    const victimMesh = msg.victimId === myPlayerId ? gameState.player : remotePlayers.get(msg.victimId)?.player;
-
-    if (killerMesh && victimMesh) {
-        killerMesh.createShootingEffect(victimMesh.position);
-    }
-
-    if (msg.killerId === myPlayerId) {
-        showGoldPopup(`+${msg.gold}c`);
-        if (msg.firstBlood) showStreakPopup('FIRST BLOOD', '#ff4444');
-        audioManager.play('headshot');
-
-        const streakMap = { 5: ['killingSpree', 'KILLING SPREE', '#ff8800'], 10: ['rampage', 'RAMPAGE', '#ff4400'],
-            15: ['dominating', 'DOMINATING', '#ff0044'], 20: ['unstoppable', 'UNSTOPPABLE', '#cc00ff'],
-            25: ['godlike', 'GODLIKE', '#ffdd00'] };
-        if (streakMap[msg.streak]) {
-            audioManager.play(streakMap[msg.streak][0]);
-            showStreakPopup(streakMap[msg.streak][1], streakMap[msg.streak][2]);
-        }
-    }
-
-    if (msg.victimId === myPlayerId) {
-        // I died
-        resetStreakChart();
-    }
-
-    addKillFeed(msg.killerName, msg.victimName);
-}
-
-function handleServerRespawn(msg) {
-    if (msg.id === myPlayerId && gameState.player) {
-        gameState.player.position.set(msg.x, terrainY_client(msg.x, msg.z) + 0.5, msg.z);
-        gameState.player.health = 100;
-        gameState.player.mesh.visible = true;
-    }
-}
-
-function terrainY_client(x, z) {
-    return Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2;
-}
-
-function showQueuePopup(position) {
-    // Simple alert for now
-    console.log(`In queue, position: ${position}`);
-}
-
-// === CHAT ===
-function addChatMessage(username, text, team) {
-    const container = document.getElementById('chatMessages');
-    if (!container) return;
-    const el = document.createElement('div');
-    el.style.cssText = 'margin-bottom:2px;word-wrap:break-word;';
-    const color = team === 'red' ? '#ff4444' : team === 'blue' ? '#4488ff' : team === 'system' ? '#888' : '#fff';
-    el.innerHTML = `<span style="color:${color};font-weight:bold;">${username}:</span> <span style="color:#ccc;">${text}</span>`;
-    container.appendChild(el);
-    container.scrollTop = container.scrollHeight;
-    // Cap messages
-    while (container.children.length > 50) container.removeChild(container.firstChild);
-}
-
-function initChat() {
-    const input = document.getElementById('chatInput');
-    if (!input) return;
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && gameState.gameStarted) {
-            if (input.style.display === 'none') {
-                input.style.display = 'block';
-                input.focus();
-                e.preventDefault();
-            } else if (input.value.trim()) {
-                if (isOnlineMode) {
-                    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'ch', x: input.value.trim() }));
-                } else {
-                    addChatMessage(gameState.username, input.value.trim(), gameState.team);
-                }
-                input.value = '';
-                input.style.display = 'none';
-                input.blur();
-                e.preventDefault();
-            } else {
-                input.style.display = 'none';
-                input.blur();
-                e.preventDefault();
-            }
-        }
-        if (e.key === 'Escape' && input.style.display !== 'none') {
-            input.style.display = 'none';
-            input.blur();
-            e.preventDefault();
-        }
-    });
-}
-
 // Game State
 const gameState = {
     player: null,
@@ -770,17 +489,22 @@ const createMap = () => {
         return treeGroup;
     };
 
-    // Plant trees from static map data
-    const _mapTrees = [
-        [-30,20],[25,-15],[-45,-30],[50,25],[-20,45],[35,-40],[-55,5],[15,50],
-        [-10,-35],[60,-10],[-35,60],[40,45],[-50,-45],[20,-60],[-15,-50],[55,-35],
-        [-40,25],[30,15],[-25,-15],[45,-5],[-60,40],[10,35],[-5,-55],[50,55],
-        [-30,-60],[65,30],[-45,50],[20,-30],[-55,-15],[35,65],[-20,30],[55,-50],
-        [-65,15],[40,-15],[-10,60],[25,-45],[-35,-25],[60,50],[-50,35],[15,-55],
-        [-25,-45],[45,20],[-40,-10],[30,55],[-15,15],[50,-25],[-55,-50],[20,40],
-        [-30,50],[65,-20],[-45,-5],[35,-55],[-60,55],[10,-40],[-5,25],[55,10]
-    ];
-    _mapTrees.forEach(([x,z]) => createTree(x, z));
+    // Safe zone check — nothing spawns near team spawns
+    const nearSpawn = (x, z) => {
+        const d1 = Math.sqrt((x+70)*(x+70) + (z+70)*(z+70)); // Red spawn
+        const d2 = Math.sqrt((x-70)*(x-70) + (z-70)*(z-70)); // Blue spawn
+        return d1 < 20 || d2 < 20;
+    };
+
+    // Plant trees randomly across the map
+    for (let i = 0; i < 80; i++) {
+        const x = (Math.random() - 0.5) * MAP_SIZE * 0.9;
+        const z = (Math.random() - 0.5) * MAP_SIZE * 0.9;
+        const distFromCenter = Math.sqrt(x*x + z*z);
+        if (distFromCenter > 15 && distFromCenter < MAP_SIZE * 0.45 && !nearSpawn(x, z)) {
+            createTree(x, z);
+        }
+    }
 
     // Rocks/Boulders for cover
     const createRock = (x, z, size) => {
@@ -800,15 +524,14 @@ const createMap = () => {
         return rock;
     };
 
-    // Rocks from static map data
-    const _mapRocks = [
-        [-25,10,1.2],[30,-20,1.5],[-40,-35,0.9],[50,15,1.8],[-15,40,1.1],[35,-50,1.4],
-        [-55,20,1.0],[20,55,1.6],[-10,-25,0.8],[60,-5,1.3],[-35,55,1.5],[45,35,1.0],
-        [-50,-40,1.7],[15,-55,0.9],[-20,-50,1.2],[55,-30,1.1],[-45,15,1.4],[25,25,0.8],
-        [-30,-10,1.6],[40,-40,1.3],[-60,45,1.0],[10,30,1.5],[-5,-45,1.2],[50,50,1.8],
-        [-25,-55,0.9],[65,20,1.1],[-40,40,1.4],[20,-35,1.0],[-55,-20,1.3],[35,60,1.5]
-    ];
-    _mapRocks.forEach(([x,z,s]) => createRock(x, z, s));
+    // Add rocks
+    for (let i = 0; i < 40; i++) {
+        const x = (Math.random() - 0.5) * MAP_SIZE * 0.85;
+        const z = (Math.random() - 0.5) * MAP_SIZE * 0.85;
+        if (nearSpawn(x, z)) continue;
+        const size = 0.8 + Math.random() * 1.5;
+        createRock(x, z, size);
+    }
 
     // Walls/Boundaries
     const wallMaterial = new THREE.MeshStandardMaterial({
@@ -842,13 +565,17 @@ const createMap = () => {
     createWall(15, -8, 12, 3);
     createWall(-15, -8, 12, 3);
 
-    // Static scattered walls from map data
-    const _mapWalls = [
-        [-45,35,6,4],[30,-50,5,7],[-60,-20,4,5],[55,40,7,3],[-25,55,5,6],
-        [40,-25,3,8],[-50,-55,6,4],[60,15,4,5],[-35,-40,5,3],[25,60,7,4],
-        [-55,10,4,6],[45,-60,5,5],[-20,-65,6,3],[35,30,3,7],[-40,65,5,4]
-    ];
-    _mapWalls.forEach(([x,z,w,h]) => createWall(x, z, w, h));
+    // Additional scattered walls for cover
+    for (let i = 0; i < 15; i++) {
+        const x = (Math.random() - 0.5) * MAP_SIZE * 0.7;
+        const z = (Math.random() - 0.5) * MAP_SIZE * 0.7;
+        const width = 3 + Math.random() * 5;
+        const height = 3 + Math.random() * 5;
+        const distFromCenter = Math.sqrt(x*x + z*z);
+        if (distFromCenter > 25 && !nearSpawn(x, z)) {
+            createWall(x, z, width, height);
+        }
+    }
 
     // Team spawn markers
     const redSpawnGeometry = new THREE.CircleGeometry(5, 32);
@@ -961,117 +688,6 @@ class FogOfWar {
 const fogOfWar = new FogOfWar();
 fogOfWar.init();
 
-// === SHARED GEOMETRY + MATERIAL CACHE ===
-// Created once, reused by all Player meshes to avoid GC thrashing
-const _geoCache = {
-    leg: new THREE.CylinderGeometry(0.06, 0.06, 0.7, 4),
-    shoe: new THREE.ConeGeometry(0.1, 0.35, 4),
-    robe: new THREE.CylinderGeometry(0.2, 0.45, 1.1, 6),
-    belt: new THREE.CylinderGeometry(0.32, 0.32, 0.08, 6),
-    brim: new THREE.CylinderGeometry(0.45, 0.45, 0.06, 8),
-    cone: new THREE.ConeGeometry(0.28, 0.9, 6),
-    tip: new THREE.SphereGeometry(0.06, 4, 4),
-    band: new THREE.CylinderGeometry(0.29, 0.29, 0.06, 6),
-    eye: new THREE.SphereGeometry(0.04, 4, 4),
-    arm: new THREE.CylinderGeometry(0.06, 0.1, 0.6, 4),
-    barrel: new THREE.CylinderGeometry(0.06, 0.06, 2.8, 6),
-    muzzle: new THREE.CylinderGeometry(0.09, 0.06, 0.2, 6),
-    receiver: new THREE.BoxGeometry(0.18, 0.22, 0.8),
-    scope: new THREE.CylinderGeometry(0.1, 0.1, 0.8, 6),
-    lens: new THREE.CircleGeometry(0.09, 8),
-    mount: new THREE.TorusGeometry(0.11, 0.02, 6, 8),
-    stock: new THREE.BoxGeometry(0.18, 0.28, 0.7),
-    stockEnd: new THREE.SphereGeometry(0.12, 6, 6),
-    grip: new THREE.BoxGeometry(0.14, 0.3, 0.2),
-    mag: new THREE.BoxGeometry(0.1, 0.35, 0.14),
-    bolt: new THREE.BoxGeometry(0.08, 0.08, 0.18),
-    halo: new THREE.RingGeometry(0.6, 0.8, 16),
-};
-
-const _matCache = {};
-function getTeamMats(team) {
-    if (_matCache[team]) return _matCache[team];
-    const robeColor = team === 'red' ? 0x881111 : 0x112288;
-    const robeDark = team === 'red' ? 0x550a0a : 0x0a1155;
-    const robeLight = team === 'red' ? 0xaa3333 : 0x3344aa;
-    _matCache[team] = {
-        cloth: new THREE.MeshStandardMaterial({ color: robeColor, roughness: 0.9 }),
-        clothDark: new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.9 }),
-        leg: new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 }),
-        shoe: new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.8 }),
-        belt: new THREE.MeshStandardMaterial({ color: 0x886622, roughness: 0.7, metalness: 0.3 }),
-        hat: new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.8 }),
-        tip: new THREE.MeshStandardMaterial({ color: robeLight, roughness: 0.7, emissive: robeLight, emissiveIntensity: 0.3 }),
-        band: new THREE.MeshStandardMaterial({ color: 0x886622, roughness: 0.6, metalness: 0.4 }),
-        eye: new THREE.MeshBasicMaterial({ color: team === 'red' ? 0xff4444 : 0x4488ff }),
-        cape: new THREE.MeshStandardMaterial({ color: robeDark, side: THREE.DoubleSide, roughness: 0.9 }),
-        gunMetal: new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3, metalness: 0.9 }),
-        scopeMat: new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.3, metalness: 0.9 }),
-        lensMat: new THREE.MeshStandardMaterial({ color: 0x2244aa, roughness: 0.1, metalness: 1, emissive: 0x0000aa, emissiveIntensity: 0.3 }),
-        wood: new THREE.MeshStandardMaterial({ color: 0x4a2a10, roughness: 0.8, metalness: 0.1 }),
-        pole: new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 0.8 }),
-        halo: new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.5 }),
-    };
-    return _matCache[team];
-}
-
-// === MESH POOL — pre-created player meshes ===
-const _meshPool = { red: [], blue: [] };
-let _meshPoolInitialized = false;
-
-function initMeshPool() {
-    if (_meshPoolInitialized) return;
-    _meshPoolInitialized = true;
-    // Pre-create 5 meshes per team for instant assignment
-    for (const team of ['red', 'blue']) {
-        for (let i = 0; i < 5; i++) {
-            const p = new Player('_pool', team, false);
-            p.mesh.visible = false;
-            scene.remove(p.mesh);
-            _meshPool[team].push(p);
-        }
-    }
-}
-
-function getPooledPlayer(username, team) {
-    const pool = _meshPool[team];
-    let p;
-    if (pool.length > 0) {
-        p = pool.pop();
-        // Update nameplate
-        p.username = username;
-        _updateNameplate(p, team);
-    } else {
-        p = new Player(username, team, false);
-    }
-    p.mesh.visible = true;
-    if (!p.mesh.parent) scene.add(p.mesh);
-    return p;
-}
-
-function returnToPool(player) {
-    player.mesh.visible = false;
-    scene.remove(player.mesh);
-    const pool = _meshPool[player.team];
-    if (pool.length < 8) pool.push(player);
-}
-
-function _updateNameplate(player, team) {
-    // Find the sprite in the mesh group and update its texture
-    player.mesh.traverse(child => {
-        if (child.isSprite && child.material.map) {
-            const canvas = child.material.map.image;
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, 256, 64);
-            ctx.fillStyle = team === 'red' ? '#ff0000' : '#0088ff';
-            ctx.font = 'bold 32px Courier New';
-            ctx.textAlign = 'center';
-            ctx.fillText(player.username, 128, 40);
-            child.material.map.needsUpdate = true;
-        }
-    });
-}
-
 // Player Class
 class Player {
     constructor(username, team, isPlayer = false) {
@@ -1128,83 +744,253 @@ class Player {
 
     createMesh(team) {
         const group = new THREE.Group();
-        const G = _geoCache;
-        const M = getTeamMats(team);
+        const robeColor = team === 'red' ? 0x881111 : 0x112288;
+        const robeDark = team === 'red' ? 0x550a0a : 0x0a1155;
+        const robeLight = team === 'red' ? 0xaa3333 : 0x3344aa;
+        const cloth = new THREE.MeshStandardMaterial({ color: robeColor, roughness: 0.9 });
+        const clothDark = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.9 });
 
-        // Legs
-        const leftLeg = new THREE.Mesh(G.leg, M.leg);
-        leftLeg.position.set(-0.12, -0.15, 0); group.add(leftLeg);
-        const rightLeg = new THREE.Mesh(G.leg, M.leg);
-        rightLeg.position.set(0.12, -0.15, 0); group.add(rightLeg);
-        this.leftLeg = leftLeg; this.rightLeg = rightLeg;
+        // === LEGS — thin sticks under the robe ===
+        const legGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.7, 4);
+        const legMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
 
-        // Shoes
-        const leftShoe = new THREE.Mesh(G.shoe, M.shoe);
-        leftShoe.position.set(-0.12, -0.55, 0.08); leftShoe.rotation.x = -Math.PI/2; group.add(leftShoe);
-        const rightShoe = new THREE.Mesh(G.shoe, M.shoe);
-        rightShoe.position.set(0.12, -0.55, 0.08); rightShoe.rotation.x = -Math.PI/2; group.add(rightShoe);
-        this.leftShoe = leftShoe; this.rightShoe = rightShoe;
+        const leftLeg = new THREE.Mesh(legGeo, legMat);
+        leftLeg.position.set(-0.12, -0.15, 0);
+        group.add(leftLeg);
 
-        // Robe + belt
-        const robe = new THREE.Mesh(G.robe, M.cloth); robe.position.y = 0.45; robe.castShadow = true; group.add(robe);
-        const belt = new THREE.Mesh(G.belt, M.belt); belt.position.y = 0.2; group.add(belt);
+        const rightLeg = new THREE.Mesh(legGeo, legMat);
+        rightLeg.position.set(0.12, -0.15, 0);
+        group.add(rightLeg);
 
-        // Hat
-        const hatGroup = new THREE.Group(); hatGroup.position.y = 1.05;
-        const brim = new THREE.Mesh(G.brim, M.hat); brim.position.y = -0.05; hatGroup.add(brim);
-        const cone = new THREE.Mesh(G.cone, M.hat); cone.position.y = 0.4; cone.rotation.z = 0.15; hatGroup.add(cone);
-        const tip = new THREE.Mesh(G.tip, M.tip); tip.position.set(0.12, 0.85, 0); hatGroup.add(tip);
-        const band = new THREE.Mesh(G.band, M.band); band.position.y = 0.02; hatGroup.add(band);
-        const leftEye = new THREE.Mesh(G.eye, M.eye); leftEye.position.set(-0.1, -0.12, 0.2); hatGroup.add(leftEye);
-        const rightEye = new THREE.Mesh(G.eye, M.eye); rightEye.position.set(0.1, -0.12, 0.2); hatGroup.add(rightEye);
+        this.leftLeg = leftLeg;
+        this.rightLeg = rightLeg;
+
+        // === POINTY SHOES ===
+        const shoeGeo = new THREE.ConeGeometry(0.1, 0.35, 4);
+        const shoeMat = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.8 });
+
+        const leftShoe = new THREE.Mesh(shoeGeo, shoeMat);
+        leftShoe.position.set(-0.12, -0.55, 0.08);
+        leftShoe.rotation.x = -Math.PI / 2;
+        group.add(leftShoe);
+        this.leftShoe = leftShoe;
+
+        const rightShoe = new THREE.Mesh(shoeGeo, shoeMat);
+        rightShoe.position.set(0.12, -0.55, 0.08);
+        rightShoe.rotation.x = -Math.PI / 2;
+        group.add(rightShoe);
+        this.rightShoe = rightShoe;
+
+        // === ROBE BODY — tapered cylinder, wider at bottom ===
+        const robeGeo = new THREE.CylinderGeometry(0.2, 0.45, 1.1, 6);
+        const robe = new THREE.Mesh(robeGeo, cloth);
+        robe.position.y = 0.45;
+        robe.castShadow = true;
+        group.add(robe);
+
+        // Belt/sash
+        const beltGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.08, 6);
+        const beltMat = new THREE.MeshStandardMaterial({ color: 0x886622, roughness: 0.7, metalness: 0.3 });
+        const belt = new THREE.Mesh(beltGeo, beltMat);
+        belt.position.y = 0.2;
+        group.add(belt);
+
+        // === WIZARD HAT — the head IS the hat ===
+        const hatGroup = new THREE.Group();
+        hatGroup.position.y = 1.05;
+
+        // Hat brim — wide flat disc
+        const brimGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.06, 8);
+        const hatMat = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.8 });
+        const brim = new THREE.Mesh(brimGeo, hatMat);
+        brim.position.y = -0.05;
+        hatGroup.add(brim);
+
+        // Hat cone — tall and pointy, slightly bent
+        const coneGeo = new THREE.ConeGeometry(0.28, 0.9, 6);
+        const cone = new THREE.Mesh(coneGeo, hatMat);
+        cone.position.y = 0.4;
+        cone.rotation.z = 0.15; // Slight tilt
+        cone.castShadow = true;
+        hatGroup.add(cone);
+
+        // Hat tip — small sphere at the bent tip
+        const tipGeo = new THREE.SphereGeometry(0.06, 4, 4);
+        const tipMat = new THREE.MeshStandardMaterial({ color: robeLight, roughness: 0.7, emissive: robeLight, emissiveIntensity: 0.3 });
+        const tip = new THREE.Mesh(tipGeo, tipMat);
+        tip.position.set(0.12, 0.85, 0);
+        hatGroup.add(tip);
+
+        // Hat band — stripe of accent color
+        const bandGeo = new THREE.CylinderGeometry(0.29, 0.29, 0.06, 6);
+        const bandMat = new THREE.MeshStandardMaterial({ color: 0x886622, roughness: 0.6, metalness: 0.4 });
+        const band = new THREE.Mesh(bandGeo, bandMat);
+        band.position.y = 0.02;
+        hatGroup.add(band);
+
+        // Visor glow — two small glowing eyes under the brim
+        const eyeGeo = new THREE.SphereGeometry(0.04, 4, 4);
+        const eyeMat = new THREE.MeshBasicMaterial({
+            color: team === 'red' ? 0xff4444 : 0x4488ff,
+        });
+        const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+        leftEye.position.set(-0.1, -0.12, 0.2);
+        hatGroup.add(leftEye);
+        const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+        rightEye.position.set(0.1, -0.12, 0.2);
+        hatGroup.add(rightEye);
+
         group.add(hatGroup);
 
-        // Arms
-        const leftArm = new THREE.Mesh(G.arm, M.cloth); leftArm.position.set(-0.32, 0.5, 0); leftArm.rotation.z = 0.4; group.add(leftArm);
-        const rightArm = new THREE.Mesh(G.arm, M.cloth); rightArm.position.set(0.32, 0.5, 0); rightArm.rotation.z = -0.4; group.add(rightArm);
-        this.leftArm = leftArm; this.rightArm = rightArm;
+        // === ARMS — thin sleeves ===
+        const armGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.6, 4);
 
-        // Rifle
+        const leftArm = new THREE.Mesh(armGeo, cloth);
+        leftArm.position.set(-0.32, 0.5, 0);
+        leftArm.rotation.z = 0.4;
+        leftArm.castShadow = true;
+        group.add(leftArm);
+        this.leftArm = leftArm;
+
+        const rightArm = new THREE.Mesh(armGeo, cloth);
+        rightArm.position.set(0.32, 0.5, 0);
+        rightArm.rotation.z = -0.4;
+        rightArm.castShadow = true;
+        group.add(rightArm);
+        this.rightArm = rightArm;
+
+        // === OVERSIZED SNIPER RIFLE ===
         const rifleGroup = new THREE.Group();
-        const b = new THREE.Mesh(G.barrel, M.gunMetal); b.rotation.x = Math.PI/2; b.position.z = 1.2; rifleGroup.add(b);
-        const mz = new THREE.Mesh(G.muzzle, M.gunMetal); mz.rotation.x = Math.PI/2; mz.position.z = 2.7; rifleGroup.add(mz);
-        const rv = new THREE.Mesh(G.receiver, M.gunMetal); rv.position.set(0, 0.02, 0.1); rifleGroup.add(rv);
-        const sc = new THREE.Mesh(G.scope, M.scopeMat); sc.rotation.x = Math.PI/2; sc.position.set(0, 0.2, 0.5); rifleGroup.add(sc);
-        const ln = new THREE.Mesh(G.lens, M.lensMat); ln.position.set(0, 0.2, 0.91); rifleGroup.add(ln);
-        for (let i = 0; i < 2; i++) { const mt = new THREE.Mesh(G.mount, M.gunMetal); mt.rotation.y = Math.PI/2; mt.position.set(0, 0.2, 0.25+i*0.5); rifleGroup.add(mt); }
-        const st = new THREE.Mesh(G.stock, M.wood); st.position.set(0, 0, -0.4); rifleGroup.add(st);
-        const se = new THREE.Mesh(G.stockEnd, M.wood); se.position.z = -0.75; se.scale.set(1.5, 2, 0.8); rifleGroup.add(se);
-        const gr = new THREE.Mesh(G.grip, M.wood); gr.position.set(0, -0.18, 0.2); rifleGroup.add(gr);
-        const mg = new THREE.Mesh(G.mag, M.gunMetal); mg.position.set(0, -0.12, 0.05); rifleGroup.add(mg);
-        const bl = new THREE.Mesh(G.bolt, M.gunMetal); bl.position.set(0.06, 0.05, 0); rifleGroup.add(bl);
-        rifleGroup.position.set(0.3, 0.5, 0.3); rifleGroup.rotation.y = 0.1;
-        group.add(rifleGroup);
-        this.rifleGroup = rifleGroup; this.weapon = rifleGroup;
+        const gunMetal = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3, metalness: 0.9 });
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2a10, roughness: 0.8, metalness: 0.1 });
 
-        // Cape (shape geometry can't be cached easily — keep per-player)
+        // Barrel — extra long and thick
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.8, 6), gunMetal);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.z = 1.2;
+        barrel.castShadow = true;
+        rifleGroup.add(barrel);
+
+        // Muzzle brake
+        const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.06, 0.2, 6), gunMetal);
+        muzzle.rotation.x = Math.PI / 2;
+        muzzle.position.z = 2.7;
+        rifleGroup.add(muzzle);
+
+        // Receiver body — chunky box
+        const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.8), gunMetal);
+        receiver.position.set(0, 0.02, 0.1);
+        receiver.castShadow = true;
+        rifleGroup.add(receiver);
+
+        // Scope — oversized
+        const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.8, 6), new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.3, metalness: 0.9 }));
+        scope.rotation.x = Math.PI / 2;
+        scope.position.set(0, 0.2, 0.5);
+        scope.castShadow = true;
+        rifleGroup.add(scope);
+
+        // Scope lens
+        const lens = new THREE.Mesh(new THREE.CircleGeometry(0.09, 8), new THREE.MeshStandardMaterial({
+            color: 0x2244aa, roughness: 0.1, metalness: 1, emissive: 0x0000aa, emissiveIntensity: 0.3
+        }));
+        lens.position.set(0, 0.2, 0.91);
+        rifleGroup.add(lens);
+
+        // Scope mount rings
+        for (let i = 0; i < 2; i++) {
+            const mount = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.02, 6, 8), gunMetal);
+            mount.rotation.y = Math.PI / 2;
+            mount.position.set(0, 0.2, 0.25 + i * 0.5);
+            rifleGroup.add(mount);
+        }
+
+        // Stock — big chunky wood
+        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 0.7), woodMat);
+        stock.position.set(0, 0, -0.4);
+        stock.castShadow = true;
+        rifleGroup.add(stock);
+
+        // Stock butt
+        const stockEnd = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), woodMat);
+        stockEnd.position.z = -0.75;
+        stockEnd.scale.set(1.5, 2, 0.8);
+        rifleGroup.add(stockEnd);
+
+        // Grip
+        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.2), woodMat);
+        grip.position.set(0, -0.18, 0.2);
+        rifleGroup.add(grip);
+
+        // Magazine — oversized box mag
+        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.35, 0.14), gunMetal);
+        mag.position.set(0, -0.12, 0.05);
+        rifleGroup.add(mag);
+
+        // Bolt handle
+        const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.18), gunMetal);
+        bolt.position.set(0.06, 0.05, 0);
+        rifleGroup.add(bolt);
+
+        rifleGroup.position.set(0.3, 0.5, 0.3);
+        rifleGroup.rotation.y = 0.1;
+        group.add(rifleGroup);
+
+        this.rifleGroup = rifleGroup;
+        this.weapon = rifleGroup;
+
+        // === CAPE — long flowing cape on all characters ===
         const capeShape = new THREE.Shape();
-        capeShape.moveTo(-0.3, 0); capeShape.lineTo(0.3, 0); capeShape.lineTo(0.35, -1.4);
-        capeShape.lineTo(0.1, -1.6); capeShape.lineTo(-0.1, -1.6); capeShape.lineTo(-0.35, -1.4); capeShape.closePath();
-        const cape = new THREE.Mesh(new THREE.ShapeGeometry(capeShape), M.cape);
-        cape.position.set(0, 0.95, -0.22); cape.rotation.x = 0.1; group.add(cape);
+        capeShape.moveTo(-0.3, 0);
+        capeShape.lineTo(0.3, 0);
+        capeShape.lineTo(0.35, -1.4);
+        capeShape.lineTo(0.1, -1.6);
+        capeShape.lineTo(-0.1, -1.6);
+        capeShape.lineTo(-0.35, -1.4);
+        capeShape.closePath();
+        const capeGeo = new THREE.ShapeGeometry(capeShape);
+        const capeMat = new THREE.MeshStandardMaterial({
+            color: robeDark,
+            side: THREE.DoubleSide,
+            roughness: 0.9,
+        });
+        const cape = new THREE.Mesh(capeGeo, capeMat);
+        cape.position.set(0, 0.95, -0.22);
+        cape.rotation.x = 0.1;
+        cape.castShadow = true;
+        group.add(cape);
         this.cape = cape;
 
-        // Nameplate
-        const cvs = document.createElement('canvas'); cvs.width = 256; cvs.height = 64;
-        const ctx = cvs.getContext('2d');
+        // === NAMEPLATE ===
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
         ctx.fillStyle = team === 'red' ? '#ff0000' : '#0088ff';
-        ctx.font = 'bold 32px Courier New'; ctx.textAlign = 'center';
+        ctx.font = 'bold 32px Courier New';
+        ctx.textAlign = 'center';
         ctx.fillText(this.username, 128, 40);
-        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cvs) }));
-        sprite.scale.set(2, 0.5, 1); sprite.position.y = 2.1; sprite.raycast = () => {};
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.scale.set(2, 0.5, 1);
+        sprite.position.y = 2.1;
+        sprite.raycast = () => {};
         group.add(sprite);
 
         this.healthBar = null;
 
-        // Player halo
+        // === PLAYER GROUND HALO ===
         if (this.isPlayer) {
-            const halo = new THREE.Mesh(G.halo, M.halo);
-            halo.rotation.x = -Math.PI / 2; halo.position.y = -0.2; halo.raycast = () => {};
+            const haloGeometry = new THREE.RingGeometry(0.6, 0.8, 16);
+            const haloMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.5,
+            });
+            const halo = new THREE.Mesh(haloGeometry, haloMaterial);
+            halo.rotation.x = -Math.PI / 2;
+            halo.position.y = -0.2;
+            halo.raycast = () => {};
             group.add(halo);
         }
 
@@ -2488,8 +2274,18 @@ function spawnFlyingCandle(text, color, boost) {
 function showGoldPopup(text) {
     const boost = parseFloat(text.replace(/[^0-9.]/g, '')) / 50 || 0.5;
     pumpPrice(boost);
-    // Green candle for every kill
-    spawnFlyingCandle(text, '#00ff44', boost * 8);
+    // Small floating text — doesn't overlap with streak candles
+    const el = document.createElement('div');
+    el.style.cssText = `position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);color:#ffd700;font-size:1rem;font-weight:900;font-family:monospace;text-shadow:0 0 10px #ffd70066;pointer-events:none;z-index:9998;transition:all 0.8s ease-out;opacity:1;`;
+    el.textContent = text.replace(/g$/, 'c'); // gold → coins
+    document.body.appendChild(el);
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            el.style.top = '38%';
+            el.style.opacity = '0';
+        });
+    });
+    setTimeout(() => el.remove(), 900);
 }
 
 function drawDeathChart() {
@@ -2647,11 +2443,8 @@ function updateScoreboard() {
     const sb = document.getElementById('scoreboard');
     if (!sb || sb.classList.contains('hidden')) return;
 
-    // Collect all players (offline bots + online remote players)
+    // Collect all players
     const all = [...gameState.bots];
-    if (isOnlineMode) {
-        remotePlayers.forEach(r => all.push(r.player));
-    }
     if (gameState.player) all.push(gameState.player);
 
     // Sort by price descending
@@ -2796,11 +2589,9 @@ function updateAbilityUI() {
 
 // Input Handlers
 document.addEventListener('keydown', (e) => {
-    // Don't intercept keys when typing in an input field
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
     gameState.keys[e.key.toLowerCase()] = true;
 
+    // Debug key presses
     if (['w', 'a', 's', 'd'].includes(e.key.toLowerCase())) {
         console.log('Key pressed:', e.key.toLowerCase());
     }
@@ -2867,7 +2658,6 @@ function updateDebugFPS() {
 updateDebugFPS();
 
 document.addEventListener('keyup', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     gameState.keys[e.key.toLowerCase()] = false;
     if (!e.shiftKey) gameState.attackWalk = false;
     if (e.key === 'Tab') {
@@ -2945,12 +2735,7 @@ document.addEventListener('mousedown', (e) => {
 
         // Set move target
         gameState.moveTarget = intersectPoint.clone();
-        gameState.targetLock = null;
-
-        // Send to server in online mode
-        if (isOnlineMode) {
-            if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'mv', x: intersectPoint.x, z: intersectPoint.z }));
-        }
+        gameState.targetLock = null; // Clear attack target
 
         // Visual feedback - create click marker
         createMoveMarker(intersectPoint);
@@ -3055,27 +2840,10 @@ document.querySelectorAll('.teamBtn').forEach(btn => {
     });
 });
 
-// Mode selection
-let selectedMode = 'offline';
-document.getElementById('modeOnline')?.addEventListener('click', () => {
-    selectedMode = 'online';
-    document.getElementById('modeOnline').style.borderColor = '#00ff44';
-    document.getElementById('modeOnline').style.color = '#00ff44';
-    document.getElementById('modeOffline').style.borderColor = '#888';
-    document.getElementById('modeOffline').style.color = '#888';
-});
-document.getElementById('modeOffline')?.addEventListener('click', () => {
-    selectedMode = 'offline';
-    document.getElementById('modeOffline').style.borderColor = '#00ff44';
-    document.getElementById('modeOffline').style.color = '#00ff44';
-    document.getElementById('modeOnline').style.borderColor = '#888';
-    document.getElementById('modeOnline').style.color = '#888';
-});
-
 document.getElementById('startBtn').addEventListener('click', () => {
     audioManager.init().then(() => {
         soundtrack.start(audioManager.ctx);
-    });
+    }); // Unlock audio + start music on first user interaction
     const username = document.getElementById('usernameInput').value.trim() || 'Sniper';
 
     if (!selectedTeamValue) {
@@ -3083,21 +2851,11 @@ document.getElementById('startBtn').addEventListener('click', () => {
         return;
     }
 
-    isOnlineMode = selectedMode === 'online';
     gameState.username = username;
     gameState.team = selectedTeamValue;
     gameState.gameStarted = true;
 
-    // Connect to server if online
-    if (isOnlineMode) {
-        connectToServer(username, selectedTeamValue);
-    }
-
-    // Init chat
-    initChat();
-    if (isOnlineMode) document.getElementById('chatBox')?.classList.remove('hidden');
-
-    console.log(`Starting ${selectedMode} game as`, username, 'on team', gameState.team);
+    console.log('Starting game as', username, 'on team', gameState.team);
 
     document.getElementById('usernameModal').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
@@ -3203,19 +2961,14 @@ function startGame() {
     // Initialize camera at player position
     gameState.cameraTarget.copy(gameState.player.position);
 
-    // Create bots only in offline mode — online mode gets them from server
-    if (!isOnlineMode) {
-        const botNames = ['Elite', 'Anima', 'Game', 'ESi', 'Apathetic', 'Gem', 'Kflan', 'Jubei', 'Steve', 'Sean'];
-        for (let i = 0; i < 10; i++) {
-            const team = i < 5 ? 'red' : 'blue';
-            const bot = new Player(botNames[i], team, false);
-            gameState.bots.push(bot);
-        }
-        console.log('Bots created:', gameState.bots.length);
-    } else {
-        initMeshPool(); // Pre-create meshes for remote players
-        console.log('Online mode — bots managed by server');
+    // Create bots (5 per team)
+    const botNames = ['Elite', 'Anima', 'Game', 'ESi', 'Apathetic', 'Gem', 'Kflan', 'Jubei', 'Steve', 'Sean'];
+    for (let i = 0; i < 10; i++) {
+        const team = i < 5 ? 'red' : 'blue';
+        const bot = new Player(botNames[i], team, false);
+        gameState.bots.push(bot);
     }
+    console.log('Bots created:', gameState.bots.length);
 
     updateScoreboard();
     console.log('Game started! Player can now move with WASD');
@@ -3412,11 +3165,8 @@ function animate() {
         // Gold display updated via earnGold()
     }
 
-    // Update bots (offline only — online bots are server-managed)
-    if (!isOnlineMode) {
-        gameState.bots.forEach(bot => bot.update(deltaTime));
-    }
-    // Online: binary state handled in ws.onmessage callback
+    // Update bots
+    gameState.bots.forEach(bot => bot.update(deltaTime));
 
     // Update player
     if (gameState.player) {
@@ -3435,35 +3185,37 @@ function animate() {
     updateScoreboard();
     updateMinimap();
 
-    // Fog of war — offline only (online fog handled by server not sending hidden enemies)
-    if (!isOnlineMode) {
-        const allUnits = [...gameState.bots];
-        if (gameState.player) allUnits.push(gameState.player);
+    // Update fog of war with all units (player + all bots)
+    const allUnits = [...gameState.bots];
+    if (gameState.player) {
+        allUnits.push(gameState.player);
+    }
 
-        const farsightPositions = [];
-        if (gameState.player && gameState.player.farsightActive) {
-            farsightPositions.push(gameState.player.farsightPosition);
-        }
+    const farsightPositions = [];
+    if (gameState.player && gameState.player.farsightActive) {
+        farsightPositions.push(gameState.player.farsightPosition);
+    }
 
-        fogOfWar.update(gameState.player, allUnits, farsightPositions);
+    fogOfWar.update(gameState.player, allUnits, farsightPositions);
 
-        gameState.bots.forEach(bot => {
-            if (bot.team !== gameState.team) {
-                const inVision = fogOfWar.isVisible(bot.position.x, bot.position.z);
-                bot.mesh.visible = inVision && bot.health > 0;
-                if (bot.mesh.visible) {
-                    bot.mesh.traverse(child => {
-                        if (child.material && !child.isSprite) {
-                            child.material.transparent = false;
-                            child.material.opacity = 1;
-                        }
-                    });
+    // Hide enemy units — instant hide when leaving vision, no linger
+    gameState.bots.forEach(bot => {
+        if (bot.team !== gameState.team) {
+            const inVision = fogOfWar.isVisible(bot.position.x, bot.position.z);
+            bot.mesh.visible = inVision && bot.health > 0;
+            // Reset opacity when visible
+            if (bot.mesh.visible) {
+                bot.mesh.traverse(child => {
+                    if (child.material && !child.isSprite) {
+                        child.material.transparent = false;
+                        child.material.opacity = 1;
+                    }
+                });
             }
         } else {
             bot.mesh.visible = bot.health > 0;
         }
-        });
-    } // end offline fog
+    });
 
     renderer.render(scene, camera);
 }
@@ -3523,7 +3275,17 @@ Player.prototype.respawn = function() {
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('ontouchstart' in window);
 
 // Disable canvas touch when UI overlays are open
-// Canvas pointer events managed by _uiOpen() checks in touch handlers
+function syncCanvasPointerEvents() {
+    const canvas = document.getElementById('gameCanvas');
+    const shopOpen = !document.getElementById('shopPanel').classList.contains('hidden');
+    const sbOpen = !document.getElementById('scoreboard').classList.contains('hidden');
+    const deathOpen = !document.getElementById('deathPopup').classList.contains('hidden');
+    const uiOpen = shopOpen || sbOpen || deathOpen;
+    canvas.style.pointerEvents = uiOpen ? 'none' : 'auto';
+    canvas.style.touchAction = uiOpen ? 'auto' : 'none';
+}
+// Poll every frame
+setInterval(syncCanvasPointerEvents, 50);
 
 if (isMobile) {
     const canvas = document.getElementById('gameCanvas');
