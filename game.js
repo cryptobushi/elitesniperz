@@ -3816,7 +3816,7 @@ function updateRemotePlayers(dt) {
     // Send player rotation to server for FOV-based auto-aim
     if (_ws && _ws.readyState === 1 && gameState.player && gameState.player.weapon) {
         const now2 = performance.now();
-        if (now2 - _lastSendTime > 100) { // 10hz rotation updates
+        if (now2 - _lastSendTime > 33) { // 30hz rotation updates
             const wdir = new THREE.Vector3(0, 0, 1);
             wdir.applyQuaternion(gameState.player.weapon.getWorldQuaternion(new THREE.Quaternion()));
             const rot = Math.atan2(wdir.x, wdir.z);

@@ -36,7 +36,7 @@ function createPlayer(id, name, team, isBot) {
         price: 1.0, gold: 0, streak: 0,
         spawnProt: SPAWN_PROTECTION, windwalk: false, windwalkTimer: 0,
         farsight: false, farsightX: 0, farsightZ: 0, farsightTimer: 0,
-        shootCd: 0, shootRange: SHOOT_RANGE, shootCooldownTime: SHOOT_COOLDOWN,
+        shootCd: 0, shootRange: SHOOT_RANGE, shootCooldownTime: SHOOT_COOLDOWN, aimRot: 0,
         speed: 8, normalSpeed: 8, windwalkSpeed: 14,
         hasShield: false, goldMultiplier: 1.0,
         inventory: {},
@@ -252,25 +252,31 @@ function tryShoot(attacker) {
     if (attacker.health <= 0) return;
     if (attacker.shootCd > 0) return;
 
-    // Find closest enemy in range with LOS — no FOV cone on server
-    // (auto-aim game: server auto-rotates to face target)
+    // Use aimRot (from client mouse/weapon aim) if available, otherwise movement rot
+    const aimDir = attacker.aimRot !== undefined ? attacker.aimRot : attacker.rot;
+
     let closest = null, closestDist = Infinity;
     players.forEach(function(p) {
         if (p === attacker || p.team === attacker.team || p.health <= 0) return;
         if (p.windwalk) return;
         const d = dist(attacker, p);
         if (d < closestDist && d <= attacker.shootRange) {
-            if (hasLineOfSight(attacker.x, attacker.z, p.x, p.z)) {
-                closest = p;
-                closestDist = d;
+            // FOV cone: 30 degrees from aim direction
+            const dx = p.x - attacker.x, dz = p.z - attacker.z;
+            const angle = Math.atan2(dx, dz);
+            let diff = angle - aimDir;
+            while (diff > Math.PI) diff -= 2 * Math.PI;
+            while (diff < -Math.PI) diff += 2 * Math.PI;
+            if (Math.abs(diff) < (30 * Math.PI / 180)) {
+                if (hasLineOfSight(attacker.x, attacker.z, p.x, p.z)) {
+                    closest = p;
+                    closestDist = d;
+                }
             }
         }
     });
 
     if (!closest) return;
-
-    // Auto-face target
-    attacker.rot = Math.atan2(closest.x - attacker.x, closest.z - attacker.z);
     attacker.shootCd = attacker.shootCooldownTime;
 
     // Spawn protection blocks damage
@@ -473,9 +479,9 @@ wss.on('connection', function(ws) {
                 }
             }
             else if (msg.t === 'rot' && ws.playerId) {
-                // Weapon rotation update for FOV-based shooting
+                // Weapon aim direction for FOV-based shooting
                 const p = players.get(ws.playerId);
-                if (p) p.rot = msg.r || 0;
+                if (p) { p.aimRot = msg.r || 0; p.rot = msg.r || 0; }
             }
             else if (msg.t === 'ab' && ws.playerId) {
                 const p = players.get(ws.playerId);
