@@ -2867,7 +2867,35 @@ document.getElementById('startBtn').addEventListener('click', () => {
     startGame();
 });
 
+// Ability buttons — use touchend to beat the canvas touch handler
+let _uiTouchConsumed = false;
 document.querySelectorAll('.ability').forEach(el => {
+    el.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        _uiTouchConsumed = true;
+    }, { passive: false });
+    el.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const ability = el.dataset.ability;
+        if (ability === 'windwalk') useWindwalk();
+        if (ability === 'farsight') useFarsight();
+        if (el.id === 'shopBtn') {
+            if (gameState.player && gameState.player.isNearSpawn()) {
+                const panel = document.getElementById('shopPanel');
+                panel.classList.toggle('hidden');
+                if (!panel.classList.contains('hidden')) updateShopUI();
+            }
+        }
+        if (el.id === 'scoreBtn') {
+            const sb = document.getElementById('scoreboard');
+            sb.classList.toggle('hidden');
+            if (!sb.classList.contains('hidden')) updateScoreboard();
+        }
+        setTimeout(() => _uiTouchConsumed = false, 50);
+    }, { passive: false });
+    // Keep click for desktop
     el.addEventListener('click', () => {
         const ability = el.dataset.ability;
         if (ability === 'windwalk') useWindwalk();
@@ -2892,13 +2920,15 @@ document.getElementById('scoreboard').addEventListener('click', () => {
     document.getElementById('scoreboard').classList.add('hidden');
 });
 
-// Click outside shop to close it
-document.addEventListener('click', (e) => {
-    const shop = document.getElementById('shopPanel');
-    if (shop.classList.contains('hidden')) return;
-    if (!e.target.closest('#shopPanel') && !e.target.closest('#shopBtn')) {
-        shop.classList.add('hidden');
-    }
+// Click/tap outside shop to close it
+['click', 'touchend'].forEach(evt => {
+    document.addEventListener(evt, (e) => {
+        const shop = document.getElementById('shopPanel');
+        if (shop.classList.contains('hidden')) return;
+        if (!e.target.closest('#shopPanel') && !e.target.closest('#shopBtn') && !e.target.closest('.ability')) {
+            shop.classList.add('hidden');
+        }
+    });
 });
 
 function startGame() {
@@ -3261,7 +3291,7 @@ if (isMobile) {
 
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        if (_uiOpen() || _touchInBottomUI(e) || _touchInHUD(e)) return;
+        if (_uiOpen() || _uiTouchConsumed || _touchInBottomUI(e) || _touchInHUD(e)) return;
         camVelX = 0;
         camVelZ = 0;
 
