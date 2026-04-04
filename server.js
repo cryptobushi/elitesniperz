@@ -252,28 +252,25 @@ function tryShoot(attacker) {
     if (attacker.health <= 0) return;
     if (attacker.shootCd > 0) return;
 
+    // Find closest enemy in range with LOS — no FOV cone on server
+    // (auto-aim game: server auto-rotates to face target)
     let closest = null, closestDist = Infinity;
     players.forEach(function(p) {
         if (p === attacker || p.team === attacker.team || p.health <= 0) return;
-        if (p.windwalk) return; // Can't shoot invisible
+        if (p.windwalk) return;
         const d = dist(attacker, p);
         if (d < closestDist && d <= attacker.shootRange) {
-            // FOV check: 30 degrees
-            const dx = p.x - attacker.x, dz = p.z - attacker.z;
-            const angle = Math.atan2(dx, dz);
-            let diff = angle - attacker.rot;
-            while (diff > Math.PI) diff -= 2 * Math.PI;
-            while (diff < -Math.PI) diff += 2 * Math.PI;
-            if (Math.abs(diff) < (30 * Math.PI / 180)) {
-                if (hasLineOfSight(attacker.x, attacker.z, p.x, p.z)) {
-                    closest = p;
-                    closestDist = d;
-                }
+            if (hasLineOfSight(attacker.x, attacker.z, p.x, p.z)) {
+                closest = p;
+                closestDist = d;
             }
         }
     });
 
     if (!closest) return;
+
+    // Auto-face target
+    attacker.rot = Math.atan2(closest.x - attacker.x, closest.z - attacker.z);
     attacker.shootCd = attacker.shootCooldownTime;
 
     // Spawn protection blocks damage
