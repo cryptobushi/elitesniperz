@@ -3307,8 +3307,8 @@ if (isMobile) {
         !document.getElementById('deathPopup').classList.contains('hidden');
 
     canvas.addEventListener('touchstart', (e) => {
-        e.preventDefault();
         if (_uiOpen() || _uiTouchConsumed) return;
+        e.preventDefault();
         camVelX = 0;
         camVelZ = 0;
 
@@ -3328,8 +3328,8 @@ if (isMobile) {
     }, { passive: false });
 
     canvas.addEventListener('touchmove', (e) => {
-        e.preventDefault();
         if (_uiOpen()) return;
+        e.preventDefault();
 
         if (e.touches.length >= 1) {
             const t = e.touches[0];
@@ -3373,8 +3373,8 @@ if (isMobile) {
     }, { passive: false });
 
     canvas.addEventListener('touchend', (e) => {
-        e.preventDefault();
         if (_uiOpen()) { touches.clear(); return; }
+        e.preventDefault();
 
         for (const t of e.changedTouches) {
             const data = touches.get(t.identifier);
