@@ -2432,39 +2432,77 @@ function addKillFeed(killer, victim) {
 }
 
 function updateScoreboard() {
-    const redScores = document.getElementById('redScores');
-    const blueScores = document.getElementById('blueScores');
+    const sb = document.getElementById('scoreboard');
+    if (!sb || sb.classList.contains('hidden')) return;
 
-    const redPlayers = [];
-    const bluePlayers = [];
+    // Collect all players
+    const all = [...gameState.bots];
+    if (gameState.player) all.push(gameState.player);
 
-    if (gameState.player) {
-        if (gameState.player.team === 'red') {
-            redPlayers.push(gameState.player);
-        } else {
-            bluePlayers.push(gameState.player);
+    // Sort by price descending
+    all.sort((a, b) => b.price - a.price);
+
+    // Track price history per player for sparklines
+    all.forEach(p => {
+        if (!p._priceHist) p._priceHist = [1.0];
+        if (p._priceHist[p._priceHist.length - 1] !== p.price) {
+            p._priceHist.push(p.price);
         }
-    }
-
-    gameState.players.forEach(p => {
-        if (p.team === 'red') redPlayers.push(p);
-        else bluePlayers.push(p);
+        if (p._priceHist.length > 30) p._priceHist.shift();
     });
 
-    gameState.bots.forEach(b => {
-        if (b.team === 'red') redPlayers.push(b);
-        else bluePlayers.push(b);
+    let html = `
+        <div class="sb-title">WATCHLIST</div>
+        <table class="sb-table">
+            <tr><th>#</th><th>TICKER</th><th>K/D</th><th>CHART</th><th>PRICE</th></tr>
+    `;
+
+    all.forEach((p, i) => {
+        const isMe = p === gameState.player;
+        const teamClass = p.team === 'red' ? 'sb-team-red' : 'sb-team-blue';
+        const ticker = '$' + p.username.toUpperCase().slice(0, 5);
+        const pctChange = ((p.price - 1.0) / 1.0 * 100);
+        const pctColor = pctChange >= 0 ? '#00ff44' : '#ff4444';
+        const pctText = (pctChange >= 0 ? '+' : '') + pctChange.toFixed(0) + '%';
+
+        html += `<tr class="sb-row ${teamClass} ${isMe ? 'me' : ''}">
+            <td style="color:#555;">${i + 1}</td>
+            <td class="sb-ticker">${ticker}</td>
+            <td class="sb-kd">${p.kills}/${p.deaths}</td>
+            <td><canvas class="sb-chart" data-player-idx="${i}" width="80" height="24"></canvas></td>
+            <td class="sb-price" style="color:${pctColor};">$${p.price.toFixed(2)} <span style="font-size:0.6rem;">${pctText}</span></td>
+        </tr>`;
     });
 
-    redScores.innerHTML = redPlayers
-        .sort((a, b) => b.kills - a.kills)
-        .map(p => `<div class="player-score">${p.username}: ${p.kills}-${p.deaths} <span style="color:#00ff44;">$${p.price.toFixed(2)}</span></div>`)
-        .join('');
+    html += '</table>';
+    html += '<div style="color:#444;font-size:0.6rem;margin-top:1rem;">TAB to close</div>';
+    sb.innerHTML = html;
 
-    blueScores.innerHTML = bluePlayers
-        .sort((a, b) => b.kills - a.kills)
-        .map(p => `<div class="player-score">${p.username}: ${p.kills}-${p.deaths} <span style="color:#00ff44;">$${p.price.toFixed(2)}</span></div>`)
-        .join('');
+    // Draw sparkline charts
+    sb.querySelectorAll('.sb-chart').forEach(canvas => {
+        const idx = parseInt(canvas.dataset.playerIdx);
+        const p = all[idx];
+        if (!p || !p._priceHist || p._priceHist.length < 2) return;
+
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width, h = canvas.height;
+        const prices = p._priceHist;
+        const min = Math.min(...prices) * 0.9;
+        const max = Math.max(...prices) * 1.1;
+        const range = max - min || 1;
+        const up = prices[prices.length - 1] >= prices[0];
+
+        ctx.beginPath();
+        ctx.strokeStyle = up ? '#00ff44' : '#ff4444';
+        ctx.lineWidth = 1.5;
+        prices.forEach((pr, i) => {
+            const x = (i / (prices.length - 1)) * w;
+            const y = h - ((pr - min) / range) * h;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+    });
 }
 
 // Abilities
@@ -2812,7 +2850,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
     document.getElementById('hud').classList.remove('hidden');
     // Scoreboard starts hidden — Tab or tap kill count to toggle
     document.getElementById('abilities').classList.remove('hidden');
-    document.getElementById('controls').classList.remove('hidden');
+    // Controls panel removed
     document.querySelector('.minimap').classList.remove('hidden');
 
     // Set ticker to player name
