@@ -489,13 +489,19 @@ const createMap = () => {
         return treeGroup;
     };
 
+    // Safe zone check — nothing spawns near team spawns
+    const nearSpawn = (x, z) => {
+        const d1 = Math.sqrt((x+70)*(x+70) + (z+70)*(z+70)); // Red spawn
+        const d2 = Math.sqrt((x-70)*(x-70) + (z-70)*(z-70)); // Blue spawn
+        return d1 < 20 || d2 < 20;
+    };
+
     // Plant trees randomly across the map
     for (let i = 0; i < 80; i++) {
         const x = (Math.random() - 0.5) * MAP_SIZE * 0.9;
         const z = (Math.random() - 0.5) * MAP_SIZE * 0.9;
-        // Don't plant trees in spawn areas or center
         const distFromCenter = Math.sqrt(x*x + z*z);
-        if (distFromCenter > 15 && distFromCenter < MAP_SIZE * 0.45) {
+        if (distFromCenter > 15 && distFromCenter < MAP_SIZE * 0.45 && !nearSpawn(x, z)) {
             createTree(x, z);
         }
     }
@@ -522,6 +528,7 @@ const createMap = () => {
     for (let i = 0; i < 40; i++) {
         const x = (Math.random() - 0.5) * MAP_SIZE * 0.85;
         const z = (Math.random() - 0.5) * MAP_SIZE * 0.85;
+        if (nearSpawn(x, z)) continue;
         const size = 0.8 + Math.random() * 1.5;
         createRock(x, z, size);
     }
@@ -565,7 +572,7 @@ const createMap = () => {
         const width = 3 + Math.random() * 5;
         const height = 3 + Math.random() * 5;
         const distFromCenter = Math.sqrt(x*x + z*z);
-        if (distFromCenter > 25) {
+        if (distFromCenter > 25 && !nearSpawn(x, z)) {
             createWall(x, z, width, height);
         }
     }
