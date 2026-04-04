@@ -696,6 +696,7 @@ class Player {
         this.windwalkSpeed = 14;
         this.shootRange = 45;
         this.damage = 25;
+        this._spawnProtection = 3.0; // 3s invulnerable on spawn
         this.isWindwalking = false;
         this.farsightActive = false;
         this.farsightPosition = null;
@@ -1046,6 +1047,27 @@ class Player {
             this.mesh.position.y += Math.sin(time * 2) * 0.008;
         }
 
+        // Spawn protection countdown + visual
+        if (this._spawnProtection > 0) {
+            this._spawnProtection -= deltaTime;
+            // Flicker transparency to show invulnerability
+            const flicker = Math.sin(Date.now() * 0.015) > 0;
+            this.mesh.traverse(child => {
+                if (child.material && !child.isSprite) {
+                    child.material.transparent = true;
+                    child.material.opacity = flicker ? 0.4 : 0.8;
+                }
+            });
+        } else if (this._spawnProtection !== undefined && this._spawnProtection <= 0) {
+            this.mesh.traverse(child => {
+                if (child.material && !child.isSprite) {
+                    child.material.transparent = false;
+                    child.material.opacity = 1;
+                }
+            });
+            this._spawnProtection = -1; // Don't keep resetting
+        }
+
         // Update shoot cooldown
         if (this.shootCooldown > 0) {
             this.shootCooldown -= deltaTime;
@@ -1103,9 +1125,14 @@ class Player {
                         continue; // Skip this enemy, can't see them in fog
                     }
 
-                    // Check line of sight (walls blocking)
+                    // Check line of sight (walls blocking) — raycast from chest height
                     const raycaster = new THREE.Raycaster();
-                    raycaster.set(this.position, toEnemy);
+                    const eyePos = this.position.clone();
+                    eyePos.y += 1.0;
+                    const enemyChest = enemy.position.clone();
+                    enemyChest.y += 1.0;
+                    const losDir = new THREE.Vector3().subVectors(enemyChest, eyePos).normalize();
+                    raycaster.set(eyePos, losDir);
                     const intersects = raycaster.intersectObjects(gameState._wallObjects || [], false);
 
                     let blocked = false;
@@ -1453,10 +1480,14 @@ class Player {
         const distance = this.position.distanceTo(target.position);
         if (distance > this.shootRange) return;
 
-        // Check line of sight
+        // Check line of sight — from chest height
         const raycaster = new THREE.Raycaster();
-        const direction = new THREE.Vector3().subVectors(target.position, this.position).normalize();
-        raycaster.set(this.position, direction);
+        const eyePos = this.position.clone();
+        eyePos.y += 1.0;
+        const targetChest = target.position.clone();
+        targetChest.y += 1.0;
+        const direction = new THREE.Vector3().subVectors(targetChest, eyePos).normalize();
+        raycaster.set(eyePos, direction);
 
         const intersects = raycaster.intersectObjects(gameState._wallObjects || [], false);
         for (let intersect of intersects) {
@@ -1793,6 +1824,8 @@ class Player {
     }
 
     takeDamage(damage, attacker) {
+        // Spawn protection
+        if (this._spawnProtection > 0) return;
         // Shield blocks one shot (check before god mode so it still consumes)
         if (this.hasShield) {
             this.hasShield = false;
@@ -1957,6 +1990,7 @@ class Player {
 
     respawn() {
         this.health = this.maxHealth;
+        this._spawnProtection = 3.0; // 3 seconds invulnerable
         this.velocity.set(0, 0, 0);
         this.targetPosition = null;
         this.attackWalkTarget = null;
