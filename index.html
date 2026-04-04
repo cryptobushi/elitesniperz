@@ -670,41 +670,6 @@
         <canvas class="minimap hidden" id="minimap"></canvas>
     </div>
 
-    <script>
-    // Minimal Buffer polyfill for Colyseus client SDK
-    (function(){
-        if(typeof window.Buffer!=='undefined')return;
-        const B=function(arg,enc){
-            if(typeof arg==='number')return new Uint8Array(arg);
-            if(typeof arg==='string'){
-                const e=new TextEncoder();return e.encode(arg);
-            }
-            if(arg instanceof ArrayBuffer)return new Uint8Array(arg);
-            if(ArrayBuffer.isView(arg))return new Uint8Array(arg.buffer,arg.byteOffset,arg.byteLength);
-            return new Uint8Array(arg||0);
-        };
-        B.isBuffer=function(o){return o instanceof Uint8Array;};
-        B.alloc=function(n,f){const b=new Uint8Array(n);if(f)b.fill(f);return b;};
-        B.allocUnsafe=function(n){return new Uint8Array(n);};
-        B.from=function(a,e){
-            if(typeof a==='string'){return new TextEncoder().encode(a);}
-            if(a instanceof ArrayBuffer)return new Uint8Array(a);
-            if(ArrayBuffer.isView(a))return new Uint8Array(a.buffer,a.byteOffset,a.byteLength);
-            if(Array.isArray(a))return new Uint8Array(a);
-            return new Uint8Array(a||0);
-        };
-        B.concat=function(list,len){
-            if(!len)len=list.reduce((s,b)=>s+b.length,0);
-            const r=new Uint8Array(len);let off=0;
-            for(const b of list){r.set(b,off);off+=b.length;}
-            return r;
-        };
-        B.byteLength=function(s,e){return new TextEncoder().encode(s).length;};
-        window.Buffer=B;
-        if(typeof global==='undefined')window.global=window;
-    })();
-    </script>
-    <script src="/node_modules/colyseus.js/dist/colyseus.js"></script>
     <script type="importmap">
     {
         "imports": {

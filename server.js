@@ -1,279 +1,190 @@
-const { Server } = require('colyseus');
-const { WebSocketTransport } = require('@colyseus/ws-transport');
-const { Schema, MapSchema, type } = require('@colyseus/schema');
-const { Room } = require('colyseus');
 const express = require('express');
+const { WebSocketServer } = require('ws');
 const http = require('http');
 const path = require('path');
 
-// === SCHEMA ===
-class PlayerState extends Schema {}
-type('string')(PlayerState.prototype, 'username');
-type('string')(PlayerState.prototype, 'team');
-type('boolean')(PlayerState.prototype, 'isBot');
-type('float32')(PlayerState.prototype, 'x');
-type('float32')(PlayerState.prototype, 'z');
-type('float32')(PlayerState.prototype, 'y');
-type('float32')(PlayerState.prototype, 'rotation');
-type('int16')(PlayerState.prototype, 'health');
-type('int16')(PlayerState.prototype, 'kills');
-type('int16')(PlayerState.prototype, 'deaths');
-type('float32')(PlayerState.prototype, 'price');
-type('int32')(PlayerState.prototype, 'gold');
-type('int16')(PlayerState.prototype, 'streak');
-type('float32')(PlayerState.prototype, 'spawnProtection');
-type('boolean')(PlayerState.prototype, 'isWindwalking');
-
-class GameState extends Schema {}
-type({ map: PlayerState })(GameState.prototype, 'players');
-type('boolean')(GameState.prototype, 'firstBlood');
-
-// === CONSTANTS ===
-const MAP_SIZE = 200;
-const TICK_RATE = 20;
-const MAX_PLAYERS = 10;
-const SHOOT_RANGE = 45;
-const SHOOT_COOLDOWN = 1.0;
-const VISION_RADIUS = 50;
-const SPAWN_PROTECTION = 1.5;
-const BOT_NAMES = ['Archon', 'Vex', 'Nyx', 'Zara', 'Kael', 'Drax', 'Luna', 'Hex', 'Rune', 'Ash'];
-
-function terrainY(x, z) { return Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2; }
-function dist(a, b) { return Math.sqrt((a.x - b.x) ** 2 + (a.z - b.z) ** 2); }
-function spawnPos(team) {
-    const sx = team === 'red' ? -70 : 70;
-    const sz = team === 'red' ? -70 : 70;
-    const x = sx + (Math.random() * 10 - 5);
-    const z = sz + (Math.random() * 10 - 5);
-    return { x, z, y: terrainY(x, z) + 0.5 };
-}
-function isNearSpawn(p) {
-    const sx = p.team === 'red' ? -70 : 70;
-    const sz = p.team === 'red' ? -70 : 70;
-    return Math.sqrt((p.x - sx) ** 2 + (p.z - sz) ** 2) < 15;
-}
-
-// === GAME ROOM ===
-class EliteSnipersRoom extends Room {
-    onCreate() {
-        const state = new GameState();
-        state.players = new MapSchema();
-        state.firstBlood = false;
-        this.setState(state);
-
-        this.maxClients = MAX_PLAYERS;
-        this._botId = 0;
-        this._moveTargets = new Map();
-        this._shootCooldowns = new Map();
-        this._botStates = new Map();
-
-        // Fill with bots
-        for (let i = 0; i < MAX_PLAYERS; i++) {
-            this._addBot(i < 5 ? 'red' : 'blue', BOT_NAMES[i]);
-        }
-
-        this.setSimulationInterval((dt) => this.gameLoop(dt), 1000 / TICK_RATE);
-
-        this.onMessage('move', (client, msg) => {
-            this._moveTargets.set(client.sessionId, { x: msg.x, z: msg.z });
-        });
-
-        this.onMessage('ability', (client, msg) => {
-            const p = this.state.players.get(client.sessionId);
-            if (p && msg.ability === 'windwalk') {
-                p.isWindwalking = true;
-                this.clock.setTimeout(() => { if (p) p.isWindwalking = false; }, 3000);
-            }
-        });
-
-        this.onMessage('chat', (client, msg) => {
-            const p = this.state.players.get(client.sessionId);
-            if (p && msg.text) {
-                this.broadcast('chat', { username: p.username, team: p.team, text: String(msg.text).slice(0, 200) });
-            }
-        });
-
-        console.log('Room created with', MAX_PLAYERS, 'bots');
-    }
-
-    onJoin(client, options) {
-        const username = (options.username || 'Sniper').slice(0, 12);
-        const team = options.team === 'blue' ? 'blue' : 'red';
-
-        this._removeBot(team);
-
-        const pos = spawnPos(team);
-        const p = new PlayerState();
-        p.username = username; p.team = team; p.isBot = false;
-        p.x = pos.x; p.z = pos.z; p.y = pos.y;
-        p.health = 100; p.price = 1.0; p.spawnProtection = SPAWN_PROTECTION;
-
-        this.state.players.set(client.sessionId, p);
-        this._shootCooldowns.set(client.sessionId, 0);
-
-        this.broadcast('playerJoined', { username, team });
-        console.log(`${username} joined ${team}`);
-    }
-
-    onLeave(client) {
-        const p = this.state.players.get(client.sessionId);
-        if (p) {
-            const team = p.team;
-            this.broadcast('playerLeft', { username: p.username });
-            this.state.players.delete(client.sessionId);
-            this._moveTargets.delete(client.sessionId);
-            this._shootCooldowns.delete(client.sessionId);
-            this._addBot(team);
-            console.log(`${p.username} left, bot added to ${team}`);
-        }
-    }
-
-    _addBot(team, name) {
-        const id = `bot_${this._botId++}`;
-        const pos = spawnPos(team);
-        const p = new PlayerState();
-        p.username = name || BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
-        p.team = team; p.isBot = true;
-        p.x = pos.x; p.z = pos.z; p.y = pos.y;
-        p.health = 100; p.price = 1.0; p.spawnProtection = SPAWN_PROTECTION;
-
-        this.state.players.set(id, p);
-        this._shootCooldowns.set(id, 0);
-        this._botStates.set(id, { state: 'explore', target: null, campTimer: 0 });
-    }
-
-    _removeBot(team) {
-        for (const [id, p] of this.state.players) {
-            if (p.isBot && p.team === team) {
-                this.state.players.delete(id);
-                this._botStates.delete(id);
-                this._shootCooldowns.delete(id);
-                return;
-            }
-        }
-    }
-
-    gameLoop(dt) {
-        const delta = dt / 1000;
-        this.state.players.forEach((p, id) => {
-            if (p.health <= 0) return;
-            if (p.spawnProtection > 0) {
-                p.spawnProtection -= delta;
-                if (!isNearSpawn(p)) p.spawnProtection = 0;
-            }
-            const cd = this._shootCooldowns.get(id) || 0;
-            if (cd > 0) this._shootCooldowns.set(id, cd - delta);
-
-            if (p.isBot) this._updateBot(id, p, delta);
-            else this._updatePlayer(id, p, delta);
-
-            if ((this._shootCooldowns.get(id) || 0) <= 0) this._tryShoot(id, p);
-        });
-    }
-
-    _updatePlayer(id, p, dt) {
-        const t = this._moveTargets.get(id);
-        if (!t) return;
-        const dx = t.x - p.x, dz = t.z - p.z;
-        const d = Math.sqrt(dx*dx + dz*dz);
-        if (d < 1) { this._moveTargets.delete(id); return; }
-        const spd = (p.isWindwalking ? 14 : 8) * dt;
-        p.x = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, p.x + (dx/d)*spd));
-        p.z = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, p.z + (dz/d)*spd));
-        p.y = terrainY(p.x, p.z) + 0.5;
-        p.rotation = Math.atan2(dx, dz);
-    }
-
-    _updateBot(id, bot, dt) {
-        const bs = this._botStates.get(id);
-        if (!bs) return;
-
-        let closestEnemy = null, closestDist = Infinity;
-        this.state.players.forEach((e, eid) => {
-            if (eid === id || e.team === bot.team || e.health <= 0) return;
-            const d = dist(bot, e);
-            if (d < closestDist) { closestDist = d; closestEnemy = e; }
-        });
-
-        if (bs.state === 'camp') {
-            bs.campTimer += dt;
-            if (bs.campTimer > 5 || (closestEnemy && closestDist < VISION_RADIUS)) bs.state = 'explore';
-            return;
-        }
-
-        if (closestEnemy && closestDist < VISION_RADIUS) {
-            bs.target = { x: closestEnemy.x, z: closestEnemy.z };
-        }
-
-        if (!bs.target || dist(bot, {x:bs.target.x, z:bs.target.z}) < 3) {
-            if (Math.random() < 0.15) { bs.state = 'camp'; bs.campTimer = 0; bs.target = null; return; }
-            bs.state = 'explore';
-            bs.target = { x: (Math.random()-0.5)*MAP_SIZE*0.7, z: (Math.random()-0.5)*MAP_SIZE*0.7 };
-        }
-
-        if (bs.target) {
-            const dx = bs.target.x - bot.x, dz = bs.target.z - bot.z;
-            const d = Math.sqrt(dx*dx + dz*dz);
-            if (d > 0.5) {
-                const spd = 8 * dt;
-                bot.x = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, bot.x + (dx/d)*spd));
-                bot.z = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, bot.z + (dz/d)*spd));
-                bot.y = terrainY(bot.x, bot.z) + 0.5;
-                bot.rotation = Math.atan2(dx, dz);
-            }
-        }
-    }
-
-    _tryShoot(attackerId, attacker) {
-        let closest = null, closestId = null, closestDist = Infinity;
-        this.state.players.forEach((p, pid) => {
-            if (pid === attackerId || p.team === attacker.team || p.health <= 0) return;
-            const d = dist(attacker, p);
-            if (d < closestDist && d <= SHOOT_RANGE) { closest = p; closestId = pid; closestDist = d; }
-        });
-        if (!closest) return;
-
-        this._shootCooldowns.set(attackerId, SHOOT_COOLDOWN);
-        if (closest.spawnProtection > 0) return;
-
-        closest.health = 0;
-        closest.deaths++;
-        closest.price = Math.max(0.10, closest.price * 0.5);
-        attacker.kills++;
-        attacker.streak++;
-        attacker.price += 0.5 + closest.price * 0.3;
-        attacker.gold += 50 + attacker.streak * 10 + Math.round(closest.price * 10);
-
-        const fb = !this.state.firstBlood;
-        if (fb) this.state.firstBlood = true;
-
-        this.broadcast('kill', {
-            killerId: attackerId, killerName: attacker.username,
-            victimId: closestId, victimName: closest.username,
-            gold: attacker.gold, price: attacker.price, streak: attacker.streak, firstBlood: fb,
-        });
-
-        this.clock.setTimeout(() => {
-            if (!this.state.players.has(closestId)) return;
-            const pos = spawnPos(closest.team);
-            closest.health = 100; closest.x = pos.x; closest.z = pos.z; closest.y = pos.y;
-            closest.spawnProtection = SPAWN_PROTECTION; closest.streak = 0;
-            this.broadcast('respawn', { id: closestId, x: pos.x, z: pos.z });
-        }, 5000);
-    }
-}
-
-// === SERVER ===
 const app = express();
 app.use(express.static(path.join(__dirname)));
-// Serve node_modules for client SDK
-app.use('/node_modules', express.static(path.join(__dirname, 'node_modules')));
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
 
-const httpServer = http.createServer(app);
-const gameServer = new Server({ transport: new WebSocketTransport({ server: httpServer }) });
-gameServer.define('game', EliteSnipersRoom);
+// === CONSTANTS ===
+const MAP_SIZE = 200, TICK_RATE = 20, MAX_PLAYERS = 10;
+const SHOOT_RANGE = 45, SHOOT_COOLDOWN = 1.0, SPAWN_PROTECTION = 1.5;
+const BOT_NAMES = ['Archon','Vex','Nyx','Zara','Kael','Drax','Luna','Hex','Rune','Ash'];
 
-const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`Elite Snipers Colyseus server on port ${PORT}`);
+function terrainY(x,z){return Math.sin(x*0.1)*Math.cos(z*0.1)*2}
+function dist(a,b){return Math.sqrt((a.x-b.x)**2+(a.z-b.z)**2)}
+function spawnPos(team){const s=team==='red'?-70:70;return{x:s+Math.random()*10-5,z:s+Math.random()*10-5}}
+function isNearSpawn(p){const s=p.team==='red'?-70:70;return Math.sqrt((p.x-s)**2+(p.z-s)**2)<15}
+
+// === STATE ===
+const players = new Map(); // id -> state
+let nextId = 1;
+let firstBlood = false;
+
+function createPlayer(id,name,team,isBot){
+    const pos = spawnPos(team);
+    return {id,username:name,team,isBot,x:pos.x,z:pos.z,y:terrainY(pos.x,pos.z)+0.5,
+        rot:0,health:100,kills:0,deaths:0,price:1.0,gold:0,streak:0,
+        spawnProt:SPAWN_PROTECTION,windwalk:false,shootCd:0,
+        moveTarget:null,botState:'explore',botTarget:null,campTimer:0};
+}
+
+// Init bots
+for(let i=0;i<MAX_PLAYERS;i++){
+    const team=i<5?'red':'blue';
+    const bot=createPlayer(nextId++,BOT_NAMES[i],team,true);
+    players.set(bot.id,bot);
+}
+
+// === BINARY STATE ENCODING ===
+// Each player: 28 bytes (id:2, x:f32, z:f32, rot:f32, health:1, kills:2, deaths:2, price:f32, flags:1)
+function encodeState(){
+    const count = players.size;
+    const buf = new ArrayBuffer(2 + count * 28);
+    const view = new DataView(buf);
+    view.setUint16(0, count, true);
+    let off = 2;
+    players.forEach(p => {
+        view.setUint16(off, p.id, true); off+=2;
+        view.setFloat32(off, p.x, true); off+=4;
+        view.setFloat32(off, p.z, true); off+=4;
+        view.setFloat32(off, p.rot, true); off+=4;
+        view.setUint8(off, p.health > 0 ? 1 : 0); off+=1;
+        view.setInt16(off, p.kills, true); off+=2;
+        view.setInt16(off, p.deaths, true); off+=2;
+        view.setFloat32(off, p.price, true); off+=4;
+        // flags: bit0=windwalk, bit1=spawnProt, bit2=isBot
+        let flags = 0;
+        if(p.windwalk) flags |= 1;
+        if(p.spawnProt > 0) flags |= 2;
+        if(p.isBot) flags |= 4;
+        view.setUint8(off, flags); off+=1;
+        // streak + gold packed
+        view.setInt16(off, p.streak, true); off+=2;
+        view.setInt16(off, Math.min(p.gold, 32767), true); off+=2;
+    });
+    return buf;
+}
+
+// === BOT AI ===
+function updateBot(bot, dt){
+    if(bot.health<=0)return;
+    let closestEnemy=null,closestDist=Infinity;
+    players.forEach(e=>{if(e!==bot&&e.team!==bot.team&&e.health>0){const d=dist(bot,e);if(d<closestDist){closestDist=d;closestEnemy=e}}});
+
+    if(bot.botState==='camp'){bot.campTimer+=dt;if(bot.campTimer>5||closestEnemy&&closestDist<50)bot.botState='explore';return}
+    if(closestEnemy&&closestDist<50)bot.botTarget={x:closestEnemy.x,z:closestEnemy.z};
+    if(!bot.botTarget||dist(bot,{x:bot.botTarget.x,z:bot.botTarget.z})<3){
+        if(Math.random()<0.15){bot.botState='camp';bot.campTimer=0;bot.botTarget=null;return}
+        bot.botState='explore';bot.botTarget={x:(Math.random()-0.5)*MAP_SIZE*0.7,z:(Math.random()-0.5)*MAP_SIZE*0.7};
+    }
+    if(bot.botTarget){
+        const dx=bot.botTarget.x-bot.x,dz=bot.botTarget.z-bot.z,d=Math.sqrt(dx*dx+dz*dz);
+        if(d>0.5){const spd=8*dt;bot.x+=dx/d*spd;bot.z+=dz/d*spd;
+            bot.x=Math.max(-MAP_SIZE/2+2,Math.min(MAP_SIZE/2-2,bot.x));
+            bot.z=Math.max(-MAP_SIZE/2+2,Math.min(MAP_SIZE/2-2,bot.z));
+            bot.y=terrainY(bot.x,bot.z)+0.5;bot.rot=Math.atan2(dx,dz);}
+    }
+}
+
+// === SHOOTING ===
+function tryShoot(attacker){
+    let closest=null,closestDist=Infinity;
+    players.forEach(p=>{if(p!==attacker&&p.team!==attacker.team&&p.health>0){const d=dist(attacker,p);if(d<closestDist&&d<=SHOOT_RANGE){closest=p;closestDist=d}}});
+    if(!closest)return;
+    attacker.shootCd=SHOOT_COOLDOWN;
+    if(closest.spawnProt>0)return;
+
+    closest.health=0;closest.deaths++;closest.price=Math.max(0.1,closest.price*0.5);
+    attacker.kills++;attacker.streak++;attacker.price+=0.5+closest.price*0.3;
+    const gold=50+attacker.streak*10+Math.round(closest.price*10);attacker.gold+=gold;
+    const fb=!firstBlood;if(fb)firstBlood=true;
+
+    broadcast(JSON.stringify({t:'k',ki:attacker.id,kn:attacker.username,vi:closest.id,vn:closest.username,g:gold,p:attacker.price,s:attacker.streak,fb:fb?1:0}));
+
+    setTimeout(()=>{
+        if(!players.has(closest.id))return;
+        const pos=spawnPos(closest.team);closest.health=100;closest.x=pos.x;closest.z=pos.z;
+        closest.y=terrainY(pos.x,pos.z)+0.5;closest.spawnProt=SPAWN_PROTECTION;closest.streak=0;
+        broadcast(JSON.stringify({t:'r',id:closest.id,x:pos.x,z:pos.z}));
+    },5000);
+}
+
+function broadcast(data){wss.clients.forEach(ws=>{if(ws.readyState===1)ws.send(data)})}
+
+// === GAME LOOP ===
+setInterval(()=>{
+    const dt=1/TICK_RATE;
+    players.forEach(p=>{
+        if(p.health<=0)return;
+        if(p.spawnProt>0){p.spawnProt-=dt;if(!isNearSpawn(p))p.spawnProt=0}
+        if(p.shootCd>0)p.shootCd-=dt;
+        if(p.isBot)updateBot(p,dt);
+        else if(p.moveTarget){
+            const dx=p.moveTarget.x-p.x,dz=p.moveTarget.z-p.z,d=Math.sqrt(dx*dx+dz*dz);
+            if(d<1){p.moveTarget=null}else{
+                const spd=(p.windwalk?14:8)*dt;p.x+=dx/d*spd;p.z+=dz/d*spd;
+                p.x=Math.max(-MAP_SIZE/2+2,Math.min(MAP_SIZE/2-2,p.x));
+                p.z=Math.max(-MAP_SIZE/2+2,Math.min(MAP_SIZE/2-2,p.z));
+                p.y=terrainY(p.x,p.z)+0.5;p.rot=Math.atan2(dx,dz);
+            }
+        }
+        if(p.shootCd<=0)tryShoot(p);
+    });
+    // Send binary state to all clients
+    const buf=encodeState();
+    wss.clients.forEach(ws=>{if(ws.readyState===1)ws.send(buf)});
+},1000/TICK_RATE);
+
+// === CONNECTIONS ===
+wss.on('connection',ws=>{
+    ws.playerId=null;
+    ws.on('message',data=>{
+        try{
+            const msg=JSON.parse(data);
+            if(msg.t==='join'){
+                const name=(msg.n||'Sniper').slice(0,12);
+                const team=msg.m==='blue'?'blue':'red';
+                // Remove a bot from this team
+                for(const[id,p]of players){if(p.isBot&&p.team===team){players.delete(id);break}}
+                const player=createPlayer(nextId++,name,team,false);
+                players.set(player.id,player);
+                ws.playerId=player.id;
+                // Send join confirmation + roster
+                const roster=[];players.forEach(p=>roster.push({id:p.id,n:p.username,m:p.team,b:p.isBot?1:0}));
+                ws.send(JSON.stringify({t:'j',id:player.id,roster}));
+                broadcast(JSON.stringify({t:'pj',n:name,m:team}));
+                console.log(`${name} joined ${team}. Total: ${players.size}`);
+            }
+            else if(msg.t==='mv'&&ws.playerId){
+                const p=players.get(ws.playerId);
+                if(p)p.moveTarget={x:msg.x,z:msg.z};
+            }
+            else if(msg.t==='ch'&&ws.playerId){
+                const p=players.get(ws.playerId);
+                if(p&&msg.x)broadcast(JSON.stringify({t:'ch',n:p.username,m:p.team,x:String(msg.x).slice(0,200)}));
+            }
+            else if(msg.t==='ab'&&ws.playerId){
+                const p=players.get(ws.playerId);
+                if(p&&msg.a==='ww'){p.windwalk=true;setTimeout(()=>{p.windwalk=false},3000)}
+            }
+        }catch{}
+    });
+    ws.on('close',()=>{
+        if(ws.playerId){
+            const p=players.get(ws.playerId);
+            if(p){
+                const team=p.team;players.delete(ws.playerId);
+                const bot=createPlayer(nextId++,BOT_NAMES[Math.floor(Math.random()*BOT_NAMES.length)],team,true);
+                players.set(bot.id,bot);
+                broadcast(JSON.stringify({t:'pl',n:p.username}));
+                console.log(`${p.username} left, bot added`);
+            }
+        }
+    });
 });
+
+const PORT=process.env.PORT||3000;
+server.listen(PORT,'0.0.0.0',()=>console.log(`Elite Snipers server on port ${PORT} (${players.size} bots)`));
