@@ -315,7 +315,8 @@
             top: 0; left: 0;
             width: 100%; height: 100%;
             z-index: 900;
-            pointer-events: none;
+            pointer-events: all;
+            cursor: pointer;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -373,32 +374,6 @@
         @keyframes deathSubIn {
             0% { opacity: 0; transform: translateY(10px); }
             100% { opacity: 0.8; transform: translateY(0); }
-        }
-        #respawnBtn {
-            position: relative;
-            z-index: 1;
-            margin-top: clamp(0.5rem, 2vh, 1.5rem);
-            background: #4a0000;
-            border: 2px solid #8b0000;
-            color: #ff2222;
-            font-family: 'Times New Roman', 'Georgia', serif;
-            font-size: clamp(0.7rem, 2.5vw, 1rem);
-            letter-spacing: 0.1em;
-            padding: clamp(0.4rem, 1.5vh, 0.6rem) clamp(1rem, 4vw, 2rem);
-            cursor: pointer;
-            pointer-events: all;
-            opacity: 0;
-            animation: deathSubIn 0.5s ease-out 1.3s forwards;
-            -webkit-tap-highlight-color: transparent;
-            transition: all 0.2s;
-            border-radius: 4px;
-            text-shadow: 0 0 10px rgba(255,0,0,0.3);
-        }
-        #respawnBtn:hover, #respawnBtn:active {
-            background: #6a0000;
-            border-color: #ff2222;
-            color: #ff4444;
-            text-shadow: 0 0 20px rgba(255,0,0,0.5);
         }
 
         /* === SHOP PANEL === */
@@ -668,7 +643,7 @@
                 opacity:0; animation:deathSubIn 0.5s ease-out 1s forwards;
             "></canvas>
             <div id="deathKiller"></div>
-            <button id="respawnBtn">RETURN TO SPAWN</button>
+            <div style="position:relative;z-index:1;color:#553333;font-size:clamp(0.5rem,2vw,0.7rem);margin-top:1rem;opacity:0;animation:deathSubIn 0.5s ease-out 1.5s forwards;letter-spacing:0.1em;">TAP TO RESPAWN</div>
         </div>
         <canvas class="minimap hidden" id="minimap"></canvas>
     </div>

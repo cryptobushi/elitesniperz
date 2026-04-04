@@ -2598,7 +2598,7 @@ document.addEventListener('keydown', (e) => {
 
     if (e.key === ' ' && gameState.player && gameState.player.health <= 0) {
         e.preventDefault();
-        document.getElementById('respawnBtn')?.click();
+        document.getElementById('deathPopup')?.click();
         return;
     }
     if (e.key.toLowerCase() === 'q') {
@@ -3237,14 +3237,18 @@ function preGameRender() {
 preGameRender();
 
 // Respawn button — immediate respawn
-document.getElementById('respawnBtn')?.addEventListener('click', () => {
+// Tap anywhere on death screen to respawn
+document.getElementById('deathPopup')?.addEventListener('click', () => {
     document.getElementById('deathPopup').classList.add('hidden');
-    // Just snap camera to spawn — auto-respawn handles the actual respawn
     if (gameState.player) {
         const spawnX = gameState.player.team === 'red' ? -70 : 70;
         const spawnZ = gameState.player.team === 'red' ? -70 : 70;
         gameState.cameraTarget.x = spawnX;
         gameState.cameraTarget.z = spawnZ;
+        // Show HUD back
+        document.getElementById('hud').classList.remove('hidden');
+        document.getElementById('abilities').classList.remove('hidden');
+        document.querySelector('.minimap').classList.remove('hidden');
     }
 });
 
