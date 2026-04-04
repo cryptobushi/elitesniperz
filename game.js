@@ -2439,8 +2439,11 @@ function updateScoreboard() {
     const sb = document.getElementById('scoreboard');
     if (!sb || sb.classList.contains('hidden')) return;
 
-    // Collect all players
+    // Collect all players (offline bots + online remote players)
     const all = [...gameState.bots];
+    if (typeof _remotePlayers !== 'undefined') {
+        _remotePlayers.forEach(r => all.push(r.player));
+    }
     if (gameState.player) all.push(gameState.player);
 
     // Sort by price descending
@@ -2904,6 +2907,21 @@ document.querySelectorAll('.ability').forEach(el => {
             if (!sb.classList.contains('hidden')) updateScoreboard();
         }
     });
+});
+
+// Click/tap scoreboard to close
+document.getElementById('scoreboard')?.addEventListener('click', () => {
+    document.getElementById('scoreboard').classList.add('hidden');
+});
+
+// Click/tap outside shop to close
+document.addEventListener('click', (e) => {
+    const shop = document.getElementById('shopPanel');
+    if (shop && !shop.classList.contains('hidden')) {
+        if (!e.target.closest('#shopPanel') && !e.target.closest('.ability')) {
+            shop.classList.add('hidden');
+        }
+    }
 });
 
 function startGame() {
