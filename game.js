@@ -586,158 +586,47 @@ const createMap = () => {
     scene.add(blueSpawn);
 };
 
-// Fog of War System
+// Fog of War — pure distance-based vision
+// Vision radius = shoot range. No canvas overlay tricks.
+const VISION_RADIUS = 50; // Must match shootRange
+const FARSIGHT_RADIUS = 70;
+
 class FogOfWar {
     constructor() {
-        this.fogTexture = null;
-        this.fogMesh = null;
-        this.canvas = document.createElement('canvas');
-        this.canvas.width = 256;
-        this.canvas.height = 256;
-        this.ctx = this.canvas.getContext('2d');
-        this.visibilityMap = new Array(256 * 256).fill(0);
-
-        // Explored areas (partially revealed, darker fog)
-        this.exploredCanvas = document.createElement('canvas');
-        this.exploredCanvas.width = 256;
-        this.exploredCanvas.height = 256;
-        this.exploredCtx = this.exploredCanvas.getContext('2d');
-        this.exploredCtx.fillStyle = 'rgba(0, 0, 0, 1)';
-        this.exploredCtx.fillRect(0, 0, 256, 256);
-
-        this.init();
+        this.visionSources = [];
+        this.fogMesh = null; // Keep reference so scene cleanup doesn't break
     }
 
-    init() {
-        this.fogTexture = new THREE.CanvasTexture(this.canvas);
-        this.fogTexture.magFilter = THREE.LinearFilter;
-        this.fogTexture.minFilter = THREE.LinearFilter;
-
-        const fogMaterial = new THREE.MeshBasicMaterial({
-            map: this.fogTexture,
-            transparent: true,
-            opacity: 0.6,
-            color: 0x000000,
-            depthWrite: false,
-            depthTest: false, // Don't test depth so it renders on top
-            blending: THREE.NormalBlending
-        });
-
-        const fogGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE);
-        this.fogMesh = new THREE.Mesh(fogGeometry, fogMaterial);
-        this.fogMesh.rotation.x = -Math.PI / 2;
-        this.fogMesh.position.y = 10; // Raised high above terrain to cover everything
-        this.fogMesh.renderOrder = 10000; // Render last
-        scene.add(this.fogMesh);
-    }
+    init() {} // No mesh to create
 
     update(player, allUnits, farsightPositions = []) {
-        const revealRadius = 25; // Much larger vision radius (in world units)
-        const farsightRadius = 45; // Far sight radius
+        this.visionSources = [];
 
-        // Mark explored areas (areas you've been to before)
+        // Player vision
         if (player && player.health > 0) {
-            this.markExplored(player.position.x, player.position.z, revealRadius);
+            this.visionSources.push({ x: player.position.x, z: player.position.z, r: VISION_RADIUS });
         }
+
+        // Teammate vision
         allUnits.forEach(unit => {
             if (unit.team === gameState.team && unit.health > 0 && unit !== player) {
-                this.markExplored(unit.position.x, unit.position.z, revealRadius);
+                this.visionSources.push({ x: unit.position.x, z: unit.position.z, r: VISION_RADIUS });
             }
         });
 
-        // Start with explored fog (dark gray, not pure black)
-        this.ctx.drawImage(this.exploredCanvas, 0, 0);
-
-        // Clear fog around player (current vision)
-        if (player && player.health > 0) {
-            this.revealArea(player.position.x, player.position.z, revealRadius);
-        }
-
-        // Clear fog around ALL teammates (including bots)
-        allUnits.forEach(unit => {
-            if (unit.team === gameState.team && unit.health > 0 && unit !== player) {
-                this.revealArea(unit.position.x, unit.position.z, revealRadius);
-            }
-        });
-
-        // Clear fog around farsight areas
+        // Farsight vision
         farsightPositions.forEach(pos => {
-            this.revealArea(pos.x, pos.z, farsightRadius);
+            this.visionSources.push({ x: pos.x, z: pos.z, r: FARSIGHT_RADIUS });
         });
-
-        this.fogTexture.needsUpdate = true;
-    }
-
-    markExplored(worldX, worldZ, radius) {
-        // Mark this area as explored (permanently partially revealed)
-        const x = ((worldX + MAP_SIZE / 2) / MAP_SIZE) * 256;
-        const y = ((worldZ + MAP_SIZE / 2) / MAP_SIZE) * 256;
-        const radiusPixels = (radius / MAP_SIZE) * 256;
-
-        this.exploredCtx.globalCompositeOperation = 'destination-out';
-
-        // Create semi-transparent explored area
-        const gradient = this.exploredCtx.createRadialGradient(x, y, 0, x, y, radiusPixels);
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.5)'); // 50% revealed
-        gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.4)');
-        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-        this.exploredCtx.fillStyle = gradient;
-        this.exploredCtx.beginPath();
-        this.exploredCtx.arc(x, y, radiusPixels, 0, Math.PI * 2);
-        this.exploredCtx.fill();
-
-        this.exploredCtx.globalCompositeOperation = 'source-over';
-    }
-
-    revealArea(worldX, worldZ, radius) {
-        const x = ((worldX + MAP_SIZE / 2) / MAP_SIZE) * 256;
-        const y = ((worldZ + MAP_SIZE / 2) / MAP_SIZE) * 256;
-        const radiusPixels = (radius / MAP_SIZE) * 256;
-
-        this.ctx.globalCompositeOperation = 'destination-out';
-
-        // Draw an irregular blob using a polygon with noisy radius
-        const segments = 24;
-        const time = Date.now() * 0.0003; // Slow drift for organic feel
-
-        this.ctx.beginPath();
-        for (let i = 0; i <= segments; i++) {
-            const angle = (i / segments) * Math.PI * 2;
-            // Layered sine waves for organic edge — deterministic, no flicker
-            const noise = 1.0
-                + 0.12 * Math.sin(angle * 3 + worldX * 0.1 + time)
-                + 0.08 * Math.sin(angle * 5 - worldZ * 0.15 + time * 1.3)
-                + 0.05 * Math.sin(angle * 8 + time * 0.7);
-            const r = radiusPixels * noise;
-            const px = x + Math.cos(angle) * r;
-            const py = y + Math.sin(angle) * r;
-            if (i === 0) this.ctx.moveTo(px, py);
-            else this.ctx.lineTo(px, py);
-        }
-        this.ctx.closePath();
-
-        // Fill with radial gradient for soft edges
-        const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, radiusPixels * 1.15);
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        gradient.addColorStop(0.65, 'rgba(255, 255, 255, 0.95)');
-        gradient.addColorStop(0.85, 'rgba(255, 255, 255, 0.4)');
-        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-        this.ctx.fillStyle = gradient;
-        this.ctx.fill();
-
-        this.ctx.globalCompositeOperation = 'source-over';
     }
 
     isVisible(worldX, worldZ) {
-        const x = Math.floor(((worldX + MAP_SIZE / 2) / MAP_SIZE) * 256);
-        const y = Math.floor(((worldZ + MAP_SIZE / 2) / MAP_SIZE) * 256);
-
-        if (x < 0 || x >= 256 || y < 0 || y >= 256) return false;
-
-        const imageData = this.ctx.getImageData(x, y, 1, 1);
-        return imageData.data[3] < 200; // Check alpha channel
+        for (const src of this.visionSources) {
+            const dx = worldX - src.x;
+            const dz = worldZ - src.z;
+            if (dx * dx + dz * dz <= src.r * src.r) return true;
+        }
+        return false;
     }
 }
 
@@ -2644,7 +2533,7 @@ function startGame() {
 
     // Remove preview ground (not fog mesh)
     const toRemove = scene.children.filter(child =>
-        child.geometry && child.geometry.type === 'PlaneGeometry' && child !== fogOfWar.fogMesh
+        child.geometry && child.geometry.type === 'PlaneGeometry'
     );
     toRemove.forEach(child => scene.remove(child));
 
