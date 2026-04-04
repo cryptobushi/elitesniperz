@@ -3095,7 +3095,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
 
     // Init chat
     initChat();
-    document.getElementById('chatBox')?.classList.remove('hidden');
+    if (isOnlineMode) document.getElementById('chatBox')?.classList.remove('hidden');
 
     console.log(`Starting ${selectedMode} game as`, username, 'on team', gameState.team);
 
@@ -3523,17 +3523,7 @@ Player.prototype.respawn = function() {
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('ontouchstart' in window);
 
 // Disable canvas touch when UI overlays are open
-function syncCanvasPointerEvents() {
-    const canvas = document.getElementById('gameCanvas');
-    const shopOpen = !document.getElementById('shopPanel').classList.contains('hidden');
-    const sbOpen = !document.getElementById('scoreboard').classList.contains('hidden');
-    const deathOpen = !document.getElementById('deathPopup').classList.contains('hidden');
-    const uiOpen = shopOpen || sbOpen || deathOpen;
-    canvas.style.pointerEvents = uiOpen ? 'none' : 'auto';
-    canvas.style.touchAction = uiOpen ? 'auto' : 'none';
-}
-// Poll every frame
-setInterval(syncCanvasPointerEvents, 50);
+// Canvas pointer events managed by _uiOpen() checks in touch handlers
 
 if (isMobile) {
     const canvas = document.getElementById('gameCanvas');
