@@ -313,11 +313,15 @@ function gameTick() {
     // Build compact state snapshot — short keys, rounded positions
     const allUnits = [...gameState.players.values(), ...gameState.bots];
 
-    // Send per-client with fog filtering
+    // Send per-client with fog filtering + delta compression
+    const isFull = gameState.tickCount % 10 === 0; // Full sync every 1 second
+
     wss.clients.forEach(ws => {
         if (ws.readyState !== 1 || !ws.playerId) return;
         const me = gameState.players.get(ws.playerId);
         if (!me) return;
+
+        if (!ws._lastSent) ws._lastSent = new Map();
 
         const players = [];
         for (const p of allUnits) {
@@ -326,7 +330,8 @@ function gameTick() {
                 const d = Math.sqrt((p.x - me.x) ** 2 + (p.z - me.z) ** 2);
                 if (d > VISION_RADIUS) continue;
             }
-            players.push([
+
+            const entry = [
                 p.id,
                 Math.round(p.x * 10) / 10,
                 Math.round(p.z * 10) / 10,
@@ -337,15 +342,32 @@ function gameTick() {
                 Math.round(p.price * 100) / 100,
                 p.spawnProtection > 0 ? 1 : 0,
                 p.isWindwalking ? 1 : 0,
-            ]);
+            ];
+
+            // Delta: skip if unchanged (unless full sync tick)
+            if (!isFull) {
+                const prev = ws._lastSent.get(p.id);
+                if (prev && prev[1] === entry[1] && prev[2] === entry[2] &&
+                    prev[3] === entry[3] && prev[4] === entry[4] &&
+                    prev[5] === entry[5] && prev[6] === entry[6]) {
+                    continue; // Nothing changed, skip
+                }
+            }
+
+            ws._lastSent.set(p.id, entry);
+            players.push(entry);
         }
 
-        ws.send(JSON.stringify({
-            t: 's', // type: state
-            p: players,
-            g: me.gold,
-            k: me._streak,
-        }));
+        // Only send if there's data (or full sync)
+        if (players.length > 0 || isFull) {
+            ws.send(JSON.stringify({
+                t: 's',
+                p: players,
+                g: me.gold,
+                k: me._streak,
+                f: isFull ? 1 : undefined,
+            }));
+        }
     });
 }
 

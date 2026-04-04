@@ -78,11 +78,14 @@ function handleServerMessage(msg) {
     }
 }
 
+const INTERP_DELAY = 100; // ms — render 100ms behind server for smooth interpolation
+let _serverTimeOffset = 0;
+let _lastServerTick = 0;
+
 function updateFromServerCompact(msg) {
     if (!gameState.gameStarted) return;
-    // msg.p = array of [id, x, z, rot, alive, kills, deaths, price, spawnProt, windwalk]
-    // msg.g = my gold, msg.k = my streak
 
+    const now = performance.now();
     const serverIds = new Set();
 
     for (const p of msg.p) {
@@ -108,34 +111,82 @@ function updateFromServerCompact(msg) {
             continue;
         }
 
-        // Remote player
+        // Remote player — use pool
         let remote = remotePlayers.get(id);
         if (!remote) {
             const info = _serverRoster.get(id) || { name: 'Player', team: 'red' };
-            const player = new Player(info.name, info.team, false);
+            const player = getPooledPlayer(info.name, info.team);
             player._remoteId = id;
-            remote = { player };
+            remote = { player, snapshots: [] };
             remotePlayers.set(id, remote);
         }
 
-        const rp = remote.player;
-        rp.position.x += (x - rp.position.x) * 0.3;
-        rp.position.z += (z - rp.position.z) * 0.3;
-        rp.position.y = terrainY_client(x, z) + 0.5;
-        rp.health = alive ? 100 : 0;
-        rp.kills = kills;
-        rp.deaths = deaths;
-        rp.price = price;
-        rp.mesh.visible = alive === 1;
-        rp.mesh.rotation.y += (rot - rp.mesh.rotation.y) * 0.3;
+        // Push snapshot for interpolation
+        remote.snapshots.push({ t: now, x, z, rot, alive });
+        if (remote.snapshots.length > 5) remote.snapshots.shift();
+
+        // Update non-interpolated fields immediately
+        remote.player.health = alive ? 100 : 0;
+        remote.player.kills = kills;
+        remote.player.deaths = deaths;
+        remote.player.price = price;
     }
 
-    // Remove players no longer in state
-    for (const [id, remote] of remotePlayers) {
-        if (!serverIds.has(id)) {
-            scene.remove(remote.player.mesh);
-            remotePlayers.delete(id);
+    // Remove players no longer in state (only on full sync)
+    if (msg.f) {
+        for (const [id, remote] of remotePlayers) {
+            if (!serverIds.has(id)) {
+                returnToPool(remote.player);
+                remotePlayers.delete(id);
+            }
         }
+    }
+}
+
+// Called every frame in animate() for smooth remote player movement
+function interpolateRemotePlayers() {
+    const renderTime = performance.now() - INTERP_DELAY;
+
+    for (const [id, remote] of remotePlayers) {
+        const snaps = remote.snapshots;
+        if (snaps.length < 2) {
+            // Not enough data — just use latest
+            if (snaps.length === 1) {
+                const s = snaps[0];
+                remote.player.position.x = s.x;
+                remote.player.position.z = s.z;
+                remote.player.position.y = terrainY_client(s.x, s.z) + 0.5;
+                remote.player.mesh.rotation.y = s.rot;
+                remote.player.mesh.visible = s.alive === 1;
+            }
+            continue;
+        }
+
+        // Find two snapshots bracketing renderTime
+        let s0 = snaps[0], s1 = snaps[1];
+        for (let i = 0; i < snaps.length - 1; i++) {
+            if (snaps[i].t <= renderTime && snaps[i + 1].t >= renderTime) {
+                s0 = snaps[i];
+                s1 = snaps[i + 1];
+                break;
+            }
+        }
+
+        // If renderTime is past all snapshots, use latest
+        if (renderTime > snaps[snaps.length - 1].t) {
+            s0 = snaps[snaps.length - 2] || snaps[0];
+            s1 = snaps[snaps.length - 1];
+        }
+
+        const range = s1.t - s0.t;
+        const t = range > 0 ? Math.min(1, Math.max(0, (renderTime - s0.t) / range)) : 1;
+
+        const rp = remote.player;
+        rp.position.x = s0.x + (s1.x - s0.x) * t;
+        rp.position.z = s0.z + (s1.z - s0.z) * t;
+        rp.position.y = terrainY_client(rp.position.x, rp.position.z) + 0.5;
+        rp.mesh.rotation.y = s0.rot + (s1.rot - s0.rot) * t;
+        rp.mesh.visible = s1.alive === 1;
     }
 }
 
@@ -918,6 +969,117 @@ class FogOfWar {
 const fogOfWar = new FogOfWar();
 fogOfWar.init();
 
+// === SHARED GEOMETRY + MATERIAL CACHE ===
+// Created once, reused by all Player meshes to avoid GC thrashing
+const _geoCache = {
+    leg: new THREE.CylinderGeometry(0.06, 0.06, 0.7, 4),
+    shoe: new THREE.ConeGeometry(0.1, 0.35, 4),
+    robe: new THREE.CylinderGeometry(0.2, 0.45, 1.1, 6),
+    belt: new THREE.CylinderGeometry(0.32, 0.32, 0.08, 6),
+    brim: new THREE.CylinderGeometry(0.45, 0.45, 0.06, 8),
+    cone: new THREE.ConeGeometry(0.28, 0.9, 6),
+    tip: new THREE.SphereGeometry(0.06, 4, 4),
+    band: new THREE.CylinderGeometry(0.29, 0.29, 0.06, 6),
+    eye: new THREE.SphereGeometry(0.04, 4, 4),
+    arm: new THREE.CylinderGeometry(0.06, 0.1, 0.6, 4),
+    barrel: new THREE.CylinderGeometry(0.06, 0.06, 2.8, 6),
+    muzzle: new THREE.CylinderGeometry(0.09, 0.06, 0.2, 6),
+    receiver: new THREE.BoxGeometry(0.18, 0.22, 0.8),
+    scope: new THREE.CylinderGeometry(0.1, 0.1, 0.8, 6),
+    lens: new THREE.CircleGeometry(0.09, 8),
+    mount: new THREE.TorusGeometry(0.11, 0.02, 6, 8),
+    stock: new THREE.BoxGeometry(0.18, 0.28, 0.7),
+    stockEnd: new THREE.SphereGeometry(0.12, 6, 6),
+    grip: new THREE.BoxGeometry(0.14, 0.3, 0.2),
+    mag: new THREE.BoxGeometry(0.1, 0.35, 0.14),
+    bolt: new THREE.BoxGeometry(0.08, 0.08, 0.18),
+    halo: new THREE.RingGeometry(0.6, 0.8, 16),
+};
+
+const _matCache = {};
+function getTeamMats(team) {
+    if (_matCache[team]) return _matCache[team];
+    const robeColor = team === 'red' ? 0x881111 : 0x112288;
+    const robeDark = team === 'red' ? 0x550a0a : 0x0a1155;
+    const robeLight = team === 'red' ? 0xaa3333 : 0x3344aa;
+    _matCache[team] = {
+        cloth: new THREE.MeshStandardMaterial({ color: robeColor, roughness: 0.9 }),
+        clothDark: new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.9 }),
+        leg: new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 }),
+        shoe: new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.8 }),
+        belt: new THREE.MeshStandardMaterial({ color: 0x886622, roughness: 0.7, metalness: 0.3 }),
+        hat: new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.8 }),
+        tip: new THREE.MeshStandardMaterial({ color: robeLight, roughness: 0.7, emissive: robeLight, emissiveIntensity: 0.3 }),
+        band: new THREE.MeshStandardMaterial({ color: 0x886622, roughness: 0.6, metalness: 0.4 }),
+        eye: new THREE.MeshBasicMaterial({ color: team === 'red' ? 0xff4444 : 0x4488ff }),
+        cape: new THREE.MeshStandardMaterial({ color: robeDark, side: THREE.DoubleSide, roughness: 0.9 }),
+        gunMetal: new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3, metalness: 0.9 }),
+        scopeMat: new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.3, metalness: 0.9 }),
+        lensMat: new THREE.MeshStandardMaterial({ color: 0x2244aa, roughness: 0.1, metalness: 1, emissive: 0x0000aa, emissiveIntensity: 0.3 }),
+        wood: new THREE.MeshStandardMaterial({ color: 0x4a2a10, roughness: 0.8, metalness: 0.1 }),
+        pole: new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 0.8 }),
+        halo: new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.5 }),
+    };
+    return _matCache[team];
+}
+
+// === MESH POOL — pre-created player meshes ===
+const _meshPool = { red: [], blue: [] };
+let _meshPoolInitialized = false;
+
+function initMeshPool() {
+    if (_meshPoolInitialized) return;
+    _meshPoolInitialized = true;
+    // Pre-create 5 meshes per team for instant assignment
+    for (const team of ['red', 'blue']) {
+        for (let i = 0; i < 5; i++) {
+            const p = new Player('_pool', team, false);
+            p.mesh.visible = false;
+            scene.remove(p.mesh);
+            _meshPool[team].push(p);
+        }
+    }
+}
+
+function getPooledPlayer(username, team) {
+    const pool = _meshPool[team];
+    let p;
+    if (pool.length > 0) {
+        p = pool.pop();
+        // Update nameplate
+        p.username = username;
+        _updateNameplate(p, team);
+    } else {
+        p = new Player(username, team, false);
+    }
+    p.mesh.visible = true;
+    if (!p.mesh.parent) scene.add(p.mesh);
+    return p;
+}
+
+function returnToPool(player) {
+    player.mesh.visible = false;
+    scene.remove(player.mesh);
+    const pool = _meshPool[player.team];
+    if (pool.length < 8) pool.push(player);
+}
+
+function _updateNameplate(player, team) {
+    // Find the sprite in the mesh group and update its texture
+    player.mesh.traverse(child => {
+        if (child.isSprite && child.material.map) {
+            const canvas = child.material.map.image;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, 256, 64);
+            ctx.fillStyle = team === 'red' ? '#ff0000' : '#0088ff';
+            ctx.font = 'bold 32px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText(player.username, 128, 40);
+            child.material.map.needsUpdate = true;
+        }
+    });
+}
+
 // Player Class
 class Player {
     constructor(username, team, isPlayer = false) {
@@ -974,253 +1136,83 @@ class Player {
 
     createMesh(team) {
         const group = new THREE.Group();
-        const robeColor = team === 'red' ? 0x881111 : 0x112288;
-        const robeDark = team === 'red' ? 0x550a0a : 0x0a1155;
-        const robeLight = team === 'red' ? 0xaa3333 : 0x3344aa;
-        const cloth = new THREE.MeshStandardMaterial({ color: robeColor, roughness: 0.9 });
-        const clothDark = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.9 });
+        const G = _geoCache;
+        const M = getTeamMats(team);
 
-        // === LEGS — thin sticks under the robe ===
-        const legGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.7, 4);
-        const legMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+        // Legs
+        const leftLeg = new THREE.Mesh(G.leg, M.leg);
+        leftLeg.position.set(-0.12, -0.15, 0); group.add(leftLeg);
+        const rightLeg = new THREE.Mesh(G.leg, M.leg);
+        rightLeg.position.set(0.12, -0.15, 0); group.add(rightLeg);
+        this.leftLeg = leftLeg; this.rightLeg = rightLeg;
 
-        const leftLeg = new THREE.Mesh(legGeo, legMat);
-        leftLeg.position.set(-0.12, -0.15, 0);
-        group.add(leftLeg);
+        // Shoes
+        const leftShoe = new THREE.Mesh(G.shoe, M.shoe);
+        leftShoe.position.set(-0.12, -0.55, 0.08); leftShoe.rotation.x = -Math.PI/2; group.add(leftShoe);
+        const rightShoe = new THREE.Mesh(G.shoe, M.shoe);
+        rightShoe.position.set(0.12, -0.55, 0.08); rightShoe.rotation.x = -Math.PI/2; group.add(rightShoe);
+        this.leftShoe = leftShoe; this.rightShoe = rightShoe;
 
-        const rightLeg = new THREE.Mesh(legGeo, legMat);
-        rightLeg.position.set(0.12, -0.15, 0);
-        group.add(rightLeg);
+        // Robe + belt
+        const robe = new THREE.Mesh(G.robe, M.cloth); robe.position.y = 0.45; robe.castShadow = true; group.add(robe);
+        const belt = new THREE.Mesh(G.belt, M.belt); belt.position.y = 0.2; group.add(belt);
 
-        this.leftLeg = leftLeg;
-        this.rightLeg = rightLeg;
-
-        // === POINTY SHOES ===
-        const shoeGeo = new THREE.ConeGeometry(0.1, 0.35, 4);
-        const shoeMat = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.8 });
-
-        const leftShoe = new THREE.Mesh(shoeGeo, shoeMat);
-        leftShoe.position.set(-0.12, -0.55, 0.08);
-        leftShoe.rotation.x = -Math.PI / 2;
-        group.add(leftShoe);
-        this.leftShoe = leftShoe;
-
-        const rightShoe = new THREE.Mesh(shoeGeo, shoeMat);
-        rightShoe.position.set(0.12, -0.55, 0.08);
-        rightShoe.rotation.x = -Math.PI / 2;
-        group.add(rightShoe);
-        this.rightShoe = rightShoe;
-
-        // === ROBE BODY — tapered cylinder, wider at bottom ===
-        const robeGeo = new THREE.CylinderGeometry(0.2, 0.45, 1.1, 6);
-        const robe = new THREE.Mesh(robeGeo, cloth);
-        robe.position.y = 0.45;
-        robe.castShadow = true;
-        group.add(robe);
-
-        // Belt/sash
-        const beltGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.08, 6);
-        const beltMat = new THREE.MeshStandardMaterial({ color: 0x886622, roughness: 0.7, metalness: 0.3 });
-        const belt = new THREE.Mesh(beltGeo, beltMat);
-        belt.position.y = 0.2;
-        group.add(belt);
-
-        // === WIZARD HAT — the head IS the hat ===
-        const hatGroup = new THREE.Group();
-        hatGroup.position.y = 1.05;
-
-        // Hat brim — wide flat disc
-        const brimGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.06, 8);
-        const hatMat = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.8 });
-        const brim = new THREE.Mesh(brimGeo, hatMat);
-        brim.position.y = -0.05;
-        hatGroup.add(brim);
-
-        // Hat cone — tall and pointy, slightly bent
-        const coneGeo = new THREE.ConeGeometry(0.28, 0.9, 6);
-        const cone = new THREE.Mesh(coneGeo, hatMat);
-        cone.position.y = 0.4;
-        cone.rotation.z = 0.15; // Slight tilt
-        cone.castShadow = true;
-        hatGroup.add(cone);
-
-        // Hat tip — small sphere at the bent tip
-        const tipGeo = new THREE.SphereGeometry(0.06, 4, 4);
-        const tipMat = new THREE.MeshStandardMaterial({ color: robeLight, roughness: 0.7, emissive: robeLight, emissiveIntensity: 0.3 });
-        const tip = new THREE.Mesh(tipGeo, tipMat);
-        tip.position.set(0.12, 0.85, 0);
-        hatGroup.add(tip);
-
-        // Hat band — stripe of accent color
-        const bandGeo = new THREE.CylinderGeometry(0.29, 0.29, 0.06, 6);
-        const bandMat = new THREE.MeshStandardMaterial({ color: 0x886622, roughness: 0.6, metalness: 0.4 });
-        const band = new THREE.Mesh(bandGeo, bandMat);
-        band.position.y = 0.02;
-        hatGroup.add(band);
-
-        // Visor glow — two small glowing eyes under the brim
-        const eyeGeo = new THREE.SphereGeometry(0.04, 4, 4);
-        const eyeMat = new THREE.MeshBasicMaterial({
-            color: team === 'red' ? 0xff4444 : 0x4488ff,
-        });
-        const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-        leftEye.position.set(-0.1, -0.12, 0.2);
-        hatGroup.add(leftEye);
-        const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-        rightEye.position.set(0.1, -0.12, 0.2);
-        hatGroup.add(rightEye);
-
+        // Hat
+        const hatGroup = new THREE.Group(); hatGroup.position.y = 1.05;
+        const brim = new THREE.Mesh(G.brim, M.hat); brim.position.y = -0.05; hatGroup.add(brim);
+        const cone = new THREE.Mesh(G.cone, M.hat); cone.position.y = 0.4; cone.rotation.z = 0.15; hatGroup.add(cone);
+        const tip = new THREE.Mesh(G.tip, M.tip); tip.position.set(0.12, 0.85, 0); hatGroup.add(tip);
+        const band = new THREE.Mesh(G.band, M.band); band.position.y = 0.02; hatGroup.add(band);
+        const leftEye = new THREE.Mesh(G.eye, M.eye); leftEye.position.set(-0.1, -0.12, 0.2); hatGroup.add(leftEye);
+        const rightEye = new THREE.Mesh(G.eye, M.eye); rightEye.position.set(0.1, -0.12, 0.2); hatGroup.add(rightEye);
         group.add(hatGroup);
 
-        // === ARMS — thin sleeves ===
-        const armGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.6, 4);
+        // Arms
+        const leftArm = new THREE.Mesh(G.arm, M.cloth); leftArm.position.set(-0.32, 0.5, 0); leftArm.rotation.z = 0.4; group.add(leftArm);
+        const rightArm = new THREE.Mesh(G.arm, M.cloth); rightArm.position.set(0.32, 0.5, 0); rightArm.rotation.z = -0.4; group.add(rightArm);
+        this.leftArm = leftArm; this.rightArm = rightArm;
 
-        const leftArm = new THREE.Mesh(armGeo, cloth);
-        leftArm.position.set(-0.32, 0.5, 0);
-        leftArm.rotation.z = 0.4;
-        leftArm.castShadow = true;
-        group.add(leftArm);
-        this.leftArm = leftArm;
-
-        const rightArm = new THREE.Mesh(armGeo, cloth);
-        rightArm.position.set(0.32, 0.5, 0);
-        rightArm.rotation.z = -0.4;
-        rightArm.castShadow = true;
-        group.add(rightArm);
-        this.rightArm = rightArm;
-
-        // === OVERSIZED SNIPER RIFLE ===
+        // Rifle
         const rifleGroup = new THREE.Group();
-        const gunMetal = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3, metalness: 0.9 });
-        const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2a10, roughness: 0.8, metalness: 0.1 });
-
-        // Barrel — extra long and thick
-        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.8, 6), gunMetal);
-        barrel.rotation.x = Math.PI / 2;
-        barrel.position.z = 1.2;
-        barrel.castShadow = true;
-        rifleGroup.add(barrel);
-
-        // Muzzle brake
-        const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.06, 0.2, 6), gunMetal);
-        muzzle.rotation.x = Math.PI / 2;
-        muzzle.position.z = 2.7;
-        rifleGroup.add(muzzle);
-
-        // Receiver body — chunky box
-        const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.8), gunMetal);
-        receiver.position.set(0, 0.02, 0.1);
-        receiver.castShadow = true;
-        rifleGroup.add(receiver);
-
-        // Scope — oversized
-        const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.8, 6), new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.3, metalness: 0.9 }));
-        scope.rotation.x = Math.PI / 2;
-        scope.position.set(0, 0.2, 0.5);
-        scope.castShadow = true;
-        rifleGroup.add(scope);
-
-        // Scope lens
-        const lens = new THREE.Mesh(new THREE.CircleGeometry(0.09, 8), new THREE.MeshStandardMaterial({
-            color: 0x2244aa, roughness: 0.1, metalness: 1, emissive: 0x0000aa, emissiveIntensity: 0.3
-        }));
-        lens.position.set(0, 0.2, 0.91);
-        rifleGroup.add(lens);
-
-        // Scope mount rings
-        for (let i = 0; i < 2; i++) {
-            const mount = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.02, 6, 8), gunMetal);
-            mount.rotation.y = Math.PI / 2;
-            mount.position.set(0, 0.2, 0.25 + i * 0.5);
-            rifleGroup.add(mount);
-        }
-
-        // Stock — big chunky wood
-        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 0.7), woodMat);
-        stock.position.set(0, 0, -0.4);
-        stock.castShadow = true;
-        rifleGroup.add(stock);
-
-        // Stock butt
-        const stockEnd = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), woodMat);
-        stockEnd.position.z = -0.75;
-        stockEnd.scale.set(1.5, 2, 0.8);
-        rifleGroup.add(stockEnd);
-
-        // Grip
-        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.2), woodMat);
-        grip.position.set(0, -0.18, 0.2);
-        rifleGroup.add(grip);
-
-        // Magazine — oversized box mag
-        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.35, 0.14), gunMetal);
-        mag.position.set(0, -0.12, 0.05);
-        rifleGroup.add(mag);
-
-        // Bolt handle
-        const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.18), gunMetal);
-        bolt.position.set(0.06, 0.05, 0);
-        rifleGroup.add(bolt);
-
-        rifleGroup.position.set(0.3, 0.5, 0.3);
-        rifleGroup.rotation.y = 0.1;
+        const b = new THREE.Mesh(G.barrel, M.gunMetal); b.rotation.x = Math.PI/2; b.position.z = 1.2; rifleGroup.add(b);
+        const mz = new THREE.Mesh(G.muzzle, M.gunMetal); mz.rotation.x = Math.PI/2; mz.position.z = 2.7; rifleGroup.add(mz);
+        const rv = new THREE.Mesh(G.receiver, M.gunMetal); rv.position.set(0, 0.02, 0.1); rifleGroup.add(rv);
+        const sc = new THREE.Mesh(G.scope, M.scopeMat); sc.rotation.x = Math.PI/2; sc.position.set(0, 0.2, 0.5); rifleGroup.add(sc);
+        const ln = new THREE.Mesh(G.lens, M.lensMat); ln.position.set(0, 0.2, 0.91); rifleGroup.add(ln);
+        for (let i = 0; i < 2; i++) { const mt = new THREE.Mesh(G.mount, M.gunMetal); mt.rotation.y = Math.PI/2; mt.position.set(0, 0.2, 0.25+i*0.5); rifleGroup.add(mt); }
+        const st = new THREE.Mesh(G.stock, M.wood); st.position.set(0, 0, -0.4); rifleGroup.add(st);
+        const se = new THREE.Mesh(G.stockEnd, M.wood); se.position.z = -0.75; se.scale.set(1.5, 2, 0.8); rifleGroup.add(se);
+        const gr = new THREE.Mesh(G.grip, M.wood); gr.position.set(0, -0.18, 0.2); rifleGroup.add(gr);
+        const mg = new THREE.Mesh(G.mag, M.gunMetal); mg.position.set(0, -0.12, 0.05); rifleGroup.add(mg);
+        const bl = new THREE.Mesh(G.bolt, M.gunMetal); bl.position.set(0.06, 0.05, 0); rifleGroup.add(bl);
+        rifleGroup.position.set(0.3, 0.5, 0.3); rifleGroup.rotation.y = 0.1;
         group.add(rifleGroup);
+        this.rifleGroup = rifleGroup; this.weapon = rifleGroup;
 
-        this.rifleGroup = rifleGroup;
-        this.weapon = rifleGroup;
-
-        // === CAPE — long flowing cape on all characters ===
+        // Cape (shape geometry can't be cached easily — keep per-player)
         const capeShape = new THREE.Shape();
-        capeShape.moveTo(-0.3, 0);
-        capeShape.lineTo(0.3, 0);
-        capeShape.lineTo(0.35, -1.4);
-        capeShape.lineTo(0.1, -1.6);
-        capeShape.lineTo(-0.1, -1.6);
-        capeShape.lineTo(-0.35, -1.4);
-        capeShape.closePath();
-        const capeGeo = new THREE.ShapeGeometry(capeShape);
-        const capeMat = new THREE.MeshStandardMaterial({
-            color: robeDark,
-            side: THREE.DoubleSide,
-            roughness: 0.9,
-        });
-        const cape = new THREE.Mesh(capeGeo, capeMat);
-        cape.position.set(0, 0.95, -0.22);
-        cape.rotation.x = 0.1;
-        cape.castShadow = true;
-        group.add(cape);
+        capeShape.moveTo(-0.3, 0); capeShape.lineTo(0.3, 0); capeShape.lineTo(0.35, -1.4);
+        capeShape.lineTo(0.1, -1.6); capeShape.lineTo(-0.1, -1.6); capeShape.lineTo(-0.35, -1.4); capeShape.closePath();
+        const cape = new THREE.Mesh(new THREE.ShapeGeometry(capeShape), M.cape);
+        cape.position.set(0, 0.95, -0.22); cape.rotation.x = 0.1; group.add(cape);
         this.cape = cape;
 
-        // === NAMEPLATE ===
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 64;
-        const ctx = canvas.getContext('2d');
+        // Nameplate
+        const cvs = document.createElement('canvas'); cvs.width = 256; cvs.height = 64;
+        const ctx = cvs.getContext('2d');
         ctx.fillStyle = team === 'red' ? '#ff0000' : '#0088ff';
-        ctx.font = 'bold 32px Courier New';
-        ctx.textAlign = 'center';
+        ctx.font = 'bold 32px Courier New'; ctx.textAlign = 'center';
         ctx.fillText(this.username, 128, 40);
-
-        const texture = new THREE.CanvasTexture(canvas);
-        const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-        const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(2, 0.5, 1);
-        sprite.position.y = 2.1;
-        sprite.raycast = () => {};
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cvs) }));
+        sprite.scale.set(2, 0.5, 1); sprite.position.y = 2.1; sprite.raycast = () => {};
         group.add(sprite);
 
         this.healthBar = null;
 
-        // === PLAYER GROUND HALO ===
+        // Player halo
         if (this.isPlayer) {
-            const haloGeometry = new THREE.RingGeometry(0.6, 0.8, 16);
-            const haloMaterial = new THREE.MeshBasicMaterial({
-                color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.5,
-            });
-            const halo = new THREE.Mesh(haloGeometry, haloMaterial);
-            halo.rotation.x = -Math.PI / 2;
-            halo.position.y = -0.2;
-            halo.raycast = () => {};
+            const halo = new THREE.Mesh(G.halo, M.halo);
+            halo.rotation.x = -Math.PI / 2; halo.position.y = -0.2; halo.raycast = () => {};
             group.add(halo);
         }
 
@@ -3226,6 +3218,7 @@ function startGame() {
         }
         console.log('Bots created:', gameState.bots.length);
     } else {
+        initMeshPool(); // Pre-create meshes for remote players
         console.log('Online mode — bots managed by server');
     }
 
@@ -3427,6 +3420,8 @@ function animate() {
     // Update bots (offline only — online bots are server-managed)
     if (!isOnlineMode) {
         gameState.bots.forEach(bot => bot.update(deltaTime));
+    } else {
+        interpolateRemotePlayers();
     }
 
     // Update player
