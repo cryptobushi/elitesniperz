@@ -452,6 +452,65 @@
 
         .hidden { display: none !important; }
 
+        /* === MODE SELECT === */
+        #modeSelect {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            justify-content: center;
+        }
+        .modeBtn {
+            background: #111;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            flex: 1;
+            border-radius: 4px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .modeBtn:active { background: #00ff0033; }
+        .modeBtn.selected { background: #00ff00; color: #000; }
+
+        /* === CHAT BOX === */
+        #chatBox {
+            position: absolute;
+            bottom: 100px;
+            right: 8px;
+            width: min(250px, 40vw);
+            pointer-events: all;
+            z-index: 600;
+        }
+        #chatMessages {
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #00ff0033;
+            border-radius: 4px;
+            padding: 4px 6px;
+            max-height: 120px;
+            overflow-y: auto;
+            font-size: 0.6rem;
+            color: #ccc;
+            margin-bottom: 4px;
+        }
+        #chatMessages .chat-msg { margin-bottom: 2px; }
+        #chatMessages .chat-msg .chat-name-red { color: #ff4444; }
+        #chatMessages .chat-msg .chat-name-blue { color: #4488ff; }
+        #chatMessages .chat-sys { color: #888; font-style: italic; }
+        #chatInput {
+            width: 100%;
+            background: rgba(0,0,0,0.7);
+            border: 1px solid #00ff0044;
+            color: #00ff00;
+            padding: 4px 8px;
+            font-size: 0.65rem;
+            font-family: 'Courier New', monospace;
+            border-radius: 3px;
+            -webkit-appearance: none;
+        }
+        #chatInput::placeholder { color: #00ff0044; }
+
         /* === KILL FEED — above minimap, bottom left === */
         #killFeed {
             position: absolute;
@@ -519,6 +578,10 @@
             <h1>ELITE SNIPERS</h1>
             <p>A tribute to the legendary Warcraft III custom game</p>
             <input type="text" id="usernameInput" placeholder="Enter your name..." maxlength="12">
+            <div id="modeSelect">
+                <button class="modeBtn selected" data-mode="offline">OFFLINE</button>
+                <button class="modeBtn" data-mode="online">ONLINE</button>
+            </div>
             <div id="teamSelect">
                 <button class="teamBtn red" data-team="red">RED</button>
                 <button class="teamBtn blue" data-team="blue">BLUE</button>
@@ -625,6 +688,11 @@
             <button id="respawnBtn">RETURN TO SPAWN</button>
         </div>
         <canvas class="minimap hidden" id="minimap"></canvas>
+
+        <div id="chatBox" class="hidden">
+            <div id="chatMessages"></div>
+            <input type="text" id="chatInput" placeholder="Press Enter to chat..." maxlength="200">
+        </div>
     </div>
 
     <script type="importmap">

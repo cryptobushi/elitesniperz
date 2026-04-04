@@ -2816,6 +2816,23 @@ function createMoveMarker(position) {
 
 // Game Setup
 let selectedTeamValue = null;
+let isOnlineMode = false;
+
+// Mode selection
+document.querySelectorAll('.modeBtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.modeBtn').forEach(b => {
+            b.classList.remove('selected');
+            b.style.background = '#111';
+            b.style.color = '#00ff00';
+        });
+        btn.classList.add('selected');
+        btn.style.background = '#00ff00';
+        btn.style.color = '#000';
+        isOnlineMode = btn.dataset.mode === 'online';
+        console.log('Mode:', isOnlineMode ? 'ONLINE' : 'OFFLINE');
+    });
+});
 
 document.querySelectorAll('.teamBtn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2909,14 +2926,19 @@ function startGame() {
     // Initialize camera at player position
     gameState.cameraTarget.copy(gameState.player.position);
 
-    // Create bots (5 per team)
-    const botNames = ['Elite', 'Anima', 'Game', 'ESi', 'Apathetic', 'Gem', 'Kflan', 'Jubei', 'Steve', 'Sean'];
-    for (let i = 0; i < 10; i++) {
-        const team = i < 5 ? 'red' : 'blue';
-        const bot = new Player(botNames[i], team, false);
-        gameState.bots.push(bot);
+    // Create bots (5 per team) — only in offline mode
+    if (!isOnlineMode) {
+        const botNames = ['Elite', 'Anima', 'Game', 'ESi', 'Apathetic', 'Gem', 'Kflan', 'Jubei', 'Steve', 'Sean'];
+        for (let i = 0; i < 10; i++) {
+            const team = i < 5 ? 'red' : 'blue';
+            const bot = new Player(botNames[i], team, false);
+            gameState.bots.push(bot);
+        }
+        console.log('Bots created:', gameState.bots.length);
+    } else {
+        console.log('Online mode — bots managed by server');
+        connectToServer();
     }
-    console.log('Bots created:', gameState.bots.length);
 
     updateScoreboard();
     console.log('Game started! Player can now move with WASD');
@@ -3113,8 +3135,13 @@ function animate() {
         // Gold display updated via earnGold()
     }
 
-    // Update bots
-    gameState.bots.forEach(bot => bot.update(deltaTime));
+    // Update bots (offline only — online mode updates from server)
+    if (!isOnlineMode) {
+        gameState.bots.forEach(bot => bot.update(deltaTime));
+    } else {
+        // Online mode: interpolate remote players
+        if (typeof updateRemotePlayers === 'function') updateRemotePlayers(deltaTime);
+    }
 
     // Update player
     if (gameState.player) {
@@ -3361,3 +3388,543 @@ if (!isMobile) {
 }
 
 console.log('Elite Snipers - Loading complete!' + (isMobile ? ' (Mobile)' : ''));
+
+// ============================================================================
+// === AABB COLLISION (uses map-data.json, matches server collision) ===
+// ============================================================================
+
+let _aabbWalls = null; // Will be loaded from map-data.json
+let _mapDataLoaded = null;
+
+// Fetch map data for AABB collision (used in online mode + as alternative collision)
+fetch('map-data.json').then(r => r.json()).then(data => {
+    _mapDataLoaded = data;
+    _aabbWalls = [];
+    data.walls.forEach(w => {
+        _aabbWalls.push([w.x - w.w/2, w.z - w.d/2, w.x + w.w/2, w.z + w.d/2]);
+    });
+    data.trees.forEach(t => {
+        _aabbWalls.push([t.x - 0.5, t.z - 0.5, t.x + 0.5, t.z + 0.5]);
+    });
+    data.rocks.forEach(r => {
+        _aabbWalls.push([r.x - r.s, r.z - r.s, r.x + r.s, r.z + r.s]);
+    });
+    console.log('AABB collision loaded:', _aabbWalls.length, 'objects');
+}).catch(e => console.warn('Failed to load map-data.json for AABB:', e));
+
+function checkCollisionAABB(x, z, radius) {
+    if (!_aabbWalls) return false;
+    if (radius === undefined) radius = 1.0;
+    // Map bounds
+    if (Math.abs(x) > MAP_SIZE / 2 - 2 || Math.abs(z) > MAP_SIZE / 2 - 2) return true;
+    for (let i = 0; i < _aabbWalls.length; i++) {
+        const w = _aabbWalls[i];
+        if (x + radius > w[0] && x - radius < w[2] && z + radius > w[1] && z - radius < w[3]) return true;
+    }
+    return false;
+}
+
+function hasLineOfSightAABB(ax, az, bx, bz) {
+    if (!_aabbWalls) return true;
+    const dx = bx - ax, dz = bz - az;
+    const len = Math.sqrt(dx * dx + dz * dz);
+    if (len < 0.1) return true;
+    const steps = Math.ceil(len / 1.0);
+    for (let i = 1; i < steps; i++) {
+        const t = i / steps;
+        const px = ax + dx * t, pz = az + dz * t;
+        if (checkCollisionAABB(px, pz, 0.1)) return false;
+    }
+    return true;
+}
+
+// ============================================================================
+// === MULTIPLAYER NETWORKING ===
+// This section only activates when isOnlineMode is true
+// All offline code above remains completely untouched
+// ============================================================================
+
+let _ws = null;
+let _myServerId = null;
+let _roster = {}; // id -> { username, team, isBot }
+let _remotePlayers = new Map(); // serverId -> { player: Player, targetX, targetZ, targetRot, lastUpdate }
+let _serverState = new Map(); // serverId -> latest decoded state
+let _lastSendTime = 0;
+
+const BYTES_PER_PLAYER = 28;
+const INTERP_SPEED = 12; // units/sec for interpolation
+
+function connectToServer() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = protocol + '//' + window.location.host;
+    console.log('Connecting to', url);
+
+    _ws = new WebSocket(url);
+    _ws.binaryType = 'arraybuffer';
+
+    _ws.onopen = () => {
+        console.log('WebSocket connected');
+        // Send join message
+        _ws.send(JSON.stringify({
+            t: 'join',
+            n: gameState.username,
+            m: gameState.team
+        }));
+
+        // Show chat box
+        document.getElementById('chatBox')?.classList.remove('hidden');
+    };
+
+    _ws.onmessage = (evt) => {
+        if (evt.data instanceof ArrayBuffer) {
+            handleBinaryState(evt.data);
+        } else {
+            handleJsonMessage(JSON.parse(evt.data));
+        }
+    };
+
+    _ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        addChatSystem('Disconnected from server');
+        // Try reconnect after 3s
+        setTimeout(() => {
+            if (isOnlineMode && gameState.gameStarted) connectToServer();
+        }, 3000);
+    };
+
+    _ws.onerror = (err) => {
+        console.error('WebSocket error:', err);
+    };
+}
+
+function handleBinaryState(buf) {
+    const view = new DataView(buf);
+    const count = view.getUint16(0, true);
+    let off = 2;
+
+    const seenIds = new Set();
+
+    for (let i = 0; i < count; i++) {
+        const id = view.getUint16(off, true); off += 2;
+        const x = view.getFloat32(off, true); off += 4;
+        const z = view.getFloat32(off, true); off += 4;
+        const rot = view.getFloat32(off, true); off += 4;
+        const alive = view.getUint8(off); off += 1;
+        const kills = view.getInt16(off, true); off += 2;
+        const deaths = view.getInt16(off, true); off += 2;
+        const price = view.getFloat32(off, true); off += 4;
+        const flags = view.getUint8(off); off += 1;
+        const streak = view.getInt16(off, true); off += 2;
+        const gold = view.getInt16(off, true); off += 2;
+
+        const isWindwalk = !!(flags & 1);
+        const isSpawnProt = !!(flags & 2);
+        const isBot = !!(flags & 4);
+        const isBlue = !!(flags & 8);
+        const team = isBlue ? 'blue' : 'red';
+
+        seenIds.add(id);
+
+        if (id === _myServerId) {
+            // Update local player state from server
+            if (gameState.player) {
+                gameState.player.kills = kills;
+                gameState.player.deaths = deaths;
+                gameState.player.price = price;
+                gameState.player.gold = gold;
+                gameState.player.streak = streak;
+                gameState.player._spawnProtection = isSpawnProt ? 1.0 : -1;
+
+                // Sync health state
+                const wasAlive = gameState.player.health > 0;
+                if (alive && !wasAlive) {
+                    // Respawned
+                    gameState.player.health = 100;
+                    gameState.player.mesh.visible = true;
+                    gameState.player.position.set(x, Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.5, z);
+                    document.getElementById('deathPopup')?.classList.add('hidden');
+                } else if (!alive && wasAlive) {
+                    // Died (handled by kill event)
+                }
+
+                // Update HUD
+                gameState.kills = kills;
+                gameState.deaths = deaths;
+                gameState.gold = gold;
+                gameState.killStreak = streak;
+                _playerPrice = price;
+                document.getElementById('killCount').textContent = kills;
+                document.getElementById('deathCount').textContent = deaths;
+                updateGoldUI();
+                _priceHistory.push(price);
+                if (_priceHistory.length > 120) _priceHistory.shift();
+                updateTerminal();
+            }
+        } else {
+            // Remote player
+            _serverState.set(id, { x, z, rot, alive: !!alive, kills, deaths, price, gold, streak, team, isBot, isWindwalk, isSpawnProt });
+
+            let remote = _remotePlayers.get(id);
+            if (!remote) {
+                // Create new remote player mesh
+                const name = (_roster[id] && _roster[id].username) || (isBot ? 'Bot' : 'Player');
+                const rPlayer = new Player(name, team, false);
+                rPlayer.position.set(x, Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.5, z);
+                rPlayer.kills = kills;
+                rPlayer.deaths = deaths;
+                rPlayer.price = price;
+                rPlayer.gold = gold;
+                rPlayer.health = alive ? 100 : 0;
+                rPlayer.mesh.visible = !!alive;
+                gameState.bots.push(rPlayer);
+                remote = { player: rPlayer, targetX: x, targetZ: z, targetRot: rot, lastUpdate: performance.now() };
+                _remotePlayers.set(id, remote);
+            }
+
+            remote.targetX = x;
+            remote.targetZ = z;
+            remote.targetRot = rot;
+            remote.lastUpdate = performance.now();
+            remote.player.kills = kills;
+            remote.player.deaths = deaths;
+            remote.player.price = price;
+            remote.player.gold = gold;
+            remote.player.streak = streak;
+
+            // Health sync
+            const wasAlive = remote.player.health > 0;
+            remote.player.health = alive ? 100 : 0;
+            remote.player.mesh.visible = !!alive;
+
+            // Windwalk visual
+            remote.player.isWindwalking = isWindwalk;
+
+            // Spawn prot
+            remote.player._spawnProtection = isSpawnProt ? 1.0 : -1;
+        }
+    }
+
+    // Remove remote players no longer in state (left or out of vision)
+    for (const [rid, remote] of _remotePlayers) {
+        if (!seenIds.has(rid) && rid !== _myServerId) {
+            // Hide but keep for potential re-appear
+            remote.player.mesh.visible = false;
+        }
+    }
+}
+
+function handleJsonMessage(msg) {
+    switch (msg.t) {
+        case 'j': {
+            // Join confirmation
+            _myServerId = msg.id;
+            console.log('Joined as id', _myServerId);
+            // Store roster
+            if (msg.roster) {
+                msg.roster.forEach(r => {
+                    _roster[r.id] = { username: r.n, team: r.m, isBot: !!r.b };
+                });
+            }
+            break;
+        }
+        case 'pj': {
+            // Player joined
+            addChatSystem(msg.n + ' joined ' + msg.m);
+            break;
+        }
+        case 'pl': {
+            // Player left
+            addChatSystem(msg.n + ' left');
+            break;
+        }
+        case 'k': {
+            // Kill event
+            addKillFeed(msg.kn, msg.vn);
+
+            // If the killer is our player
+            if (msg.ki === _myServerId) {
+                audioManager.play('headshot');
+                audioManager.play('sniperFire');
+
+                // First blood
+                if (msg.fb) {
+                    audioManager.play('firstBlood');
+                    showStreakPopup('FIRST BLOOD', '#ff4444');
+                }
+
+                // Streak sounds
+                const streakMap = {
+                    5: ['killingSpree', 'KILLING SPREE', '#ff8800'],
+                    10: ['rampage', 'RAMPAGE', '#ff4400'],
+                    15: ['dominating', 'DOMINATING', '#ff0044'],
+                    20: ['unstoppable', 'UNSTOPPABLE', '#cc00ff'],
+                    25: ['godlike', 'GODLIKE', '#ffdd00'],
+                };
+                if (streakMap[msg.s]) {
+                    audioManager.play(streakMap[msg.s][0]);
+                    showStreakPopup(streakMap[msg.s][1], streakMap[msg.s][2]);
+                }
+
+                showGoldPopup('+' + msg.g + 'c');
+            }
+
+            // If the victim is our player
+            if (msg.vi === _myServerId && gameState.player) {
+                gameState.player.health = 0;
+                gameState.player.mesh.visible = false;
+                gameState.moveTarget = null;
+                gameState.targetLock = null;
+
+                const popup = document.getElementById('deathPopup');
+                document.getElementById('deathKiller').innerHTML =
+                    'Rugged by ' + msg.kn +
+                    '<div style="margin-top:0.4rem;font-size:0.9rem;color:#ff4444;">$' + _playerPrice.toFixed(2) + ' -> $' + (_playerPrice * 0.5).toFixed(2) + '</div>';
+                popup.classList.add('hidden');
+                void popup.offsetHeight;
+                popup.classList.remove('hidden');
+                drawDeathChart();
+                setTimeout(() => popup.classList.add('hidden'), 5000);
+                resetStreakChart();
+            }
+
+            // Trigger VFX if we can see either player
+            const killer = findRemoteOrLocal(msg.ki);
+            const victim = findRemoteOrLocal(msg.vi);
+            if (killer && victim && killer.mesh.visible) {
+                killer.createShootingEffect(victim.position);
+            }
+            break;
+        }
+        case 'r': {
+            // Respawn event
+            if (msg.id === _myServerId && gameState.player) {
+                gameState.player.health = 100;
+                gameState.player.mesh.visible = true;
+                const ty = Math.sin(msg.x * 0.1) * Math.cos(msg.z * 0.1) * 2 + 0.5;
+                gameState.player.position.set(msg.x, ty, msg.z);
+                gameState.player._spawnProtection = 1.5;
+                document.getElementById('deathPopup')?.classList.add('hidden');
+            }
+            break;
+        }
+        case 'shld': {
+            // Shield blocked
+            if (msg.vi === _myServerId) {
+                showStreakPopup('SHIELD BLOCKED!', '#44aaff');
+            }
+            break;
+        }
+        case 'bought': {
+            // Shop purchase confirmed
+            if (gameState.player) {
+                gameState.player.gold = msg.g;
+                gameState.player.inventory[msg.i] = true;
+                gameState.player._applyItems();
+                gameState.gold = msg.g;
+                updateGoldUI();
+                updateShopUI();
+                audioManager.play('headshot');
+            }
+            break;
+        }
+        case 'ch': {
+            // Chat message
+            addChatMessage(msg.n, msg.m, msg.x);
+            break;
+        }
+    }
+}
+
+function findRemoteOrLocal(serverId) {
+    if (serverId === _myServerId) return gameState.player;
+    const remote = _remotePlayers.get(serverId);
+    return remote ? remote.player : null;
+}
+
+function updateRemotePlayers(dt) {
+    const now = performance.now();
+    for (const [id, remote] of _remotePlayers) {
+        const p = remote.player;
+        if (!p.mesh.visible) continue;
+
+        // Interpolate position
+        const dx = remote.targetX - p.position.x;
+        const dz = remote.targetZ - p.position.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+
+        if (dist > 0.1) {
+            const step = Math.min(INTERP_SPEED * dt, dist);
+            p.position.x += (dx / dist) * step;
+            p.position.z += (dz / dist) * step;
+            p.position.y = Math.sin(p.position.x * 0.1) * Math.cos(p.position.z * 0.1) * 2 + 0.5;
+            p.velocity.set(dx, 0, dz).normalize().multiplyScalar(step);
+        } else {
+            p.velocity.set(0, 0, 0);
+        }
+
+        // Interpolate rotation
+        let rotDiff = remote.targetRot - (p.mesh.rotation.y || 0);
+        while (rotDiff > Math.PI) rotDiff -= 2 * Math.PI;
+        while (rotDiff < -Math.PI) rotDiff += 2 * Math.PI;
+        if (p.weapon) {
+            const lookTarget = p.position.clone().add(
+                new THREE.Vector3(Math.sin(remote.targetRot), 0, Math.cos(remote.targetRot)).multiplyScalar(5)
+            );
+            p.weapon.lookAt(lookTarget);
+        }
+
+        // Run animation updates (handles leg swing, cape, etc.)
+        // Call the animation part only (shootCooldown, spawn prot visual, etc.)
+        if (p.shootCooldown > 0) p.shootCooldown -= dt;
+
+        // Spawn protection visual
+        if (p._spawnProtection > 0) {
+            const flicker = Math.sin(Date.now() * 0.015) > 0;
+            p.mesh.traverse(child => {
+                if (child.material && !child.isSprite) {
+                    child.material.transparent = true;
+                    child.material.opacity = flicker ? 0.4 : 0.8;
+                }
+            });
+        }
+
+        // Animation (movement idle/walk)
+        const isMoving = dist > 0.5;
+        const time = Date.now() * 0.001;
+        if (isMoving && p.leftLeg && p.rightLeg) {
+            const runTime = time * 10;
+            p.leftLeg.rotation.x = Math.sin(runTime) * 0.6;
+            p.rightLeg.rotation.x = Math.sin(runTime + Math.PI) * 0.6;
+            if (p.leftShoe) p.leftShoe.rotation.x = -Math.PI / 2 + Math.sin(runTime) * 0.3;
+            if (p.rightShoe) p.rightShoe.rotation.x = -Math.PI / 2 + Math.sin(runTime + Math.PI) * 0.3;
+            if (p.leftArm) p.leftArm.rotation.x = Math.sin(runTime + Math.PI) * 0.4;
+            if (p.rightArm) p.rightArm.rotation.x = Math.sin(runTime) * 0.4;
+            if (p.cape) p.cape.rotation.x = 0.3 + Math.sin(runTime * 1.5) * 0.15;
+        } else if (p.leftLeg && p.rightLeg) {
+            p.leftLeg.rotation.x = 0;
+            p.rightLeg.rotation.x = 0;
+            if (p.leftShoe) p.leftShoe.rotation.x = -Math.PI / 2;
+            if (p.rightShoe) p.rightShoe.rotation.x = -Math.PI / 2;
+            if (p.leftArm) p.leftArm.rotation.x = Math.sin(time * 2) * 0.05;
+            if (p.rightArm) p.rightArm.rotation.x = Math.sin(time * 2 + 0.5) * 0.05;
+            if (p.cape) p.cape.rotation.x = 0.1 + Math.sin(time * 1.5) * 0.05;
+        }
+    }
+
+    // Send player rotation to server for FOV-based auto-aim
+    if (_ws && _ws.readyState === 1 && gameState.player && gameState.player.weapon) {
+        const now2 = performance.now();
+        if (now2 - _lastSendTime > 100) { // 10hz rotation updates
+            const wdir = new THREE.Vector3(0, 0, 1);
+            wdir.applyQuaternion(gameState.player.weapon.getWorldQuaternion(new THREE.Quaternion()));
+            const rot = Math.atan2(wdir.x, wdir.z);
+            _ws.send(JSON.stringify({ t: 'rot', r: rot }));
+            _lastSendTime = now2;
+        }
+    }
+}
+
+// === ONLINE MODE: Override movement to send to server ===
+// Intercept click-to-move in online mode
+const _origMouseDown = document.onmousedown;
+
+// We hook into the existing mousedown handler by checking isOnlineMode in
+// the move target section. The existing code sets gameState.moveTarget which
+// drives local movement. In online mode, we also send the move command.
+// We add a frame-level check to send move commands.
+let _lastMoveTarget = null;
+
+function checkAndSendMove() {
+    if (!isOnlineMode || !_ws || _ws.readyState !== 1) return;
+    if (!gameState.moveTarget) return;
+
+    const mt = gameState.moveTarget;
+    if (_lastMoveTarget && _lastMoveTarget.x === mt.x && _lastMoveTarget.z === mt.z) return;
+    _lastMoveTarget = { x: mt.x, z: mt.z };
+
+    _ws.send(JSON.stringify({ t: 'mv', x: mt.x, z: mt.z }));
+}
+
+// Abilities in online mode send network messages via the keydown listener below
+// Local ability functions still run for client-side visuals
+
+// Override shop buying in online mode
+const _origBuyItem = Player.prototype.buyItem;
+Player.prototype.buyItem = function(itemId) {
+    if (isOnlineMode && _ws && _ws.readyState === 1) {
+        _ws.send(JSON.stringify({ t: 'buy', i: itemId }));
+        return true; // Optimistic — server confirms
+    }
+    return _origBuyItem.call(this, itemId);
+};
+
+// Override ability key handlers to also send to server
+document.addEventListener('keydown', (e) => {
+    if (!isOnlineMode || !_ws || _ws.readyState !== 1) return;
+    if (e.key.toLowerCase() === 'q') {
+        _ws.send(JSON.stringify({ t: 'ab', a: 'ww' }));
+    }
+    if (e.key.toLowerCase() === 'e' && gameState.player) {
+        // Send farsight with position
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(gameState.mousePos, camera);
+        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+        const pt = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, pt);
+        _ws.send(JSON.stringify({ t: 'ab', a: 'fs', x: pt.x, z: pt.z }));
+    }
+    // Chat
+    if (e.key === 'Enter') {
+        const input = document.getElementById('chatInput');
+        if (input && document.activeElement === input) {
+            const text = input.value.trim();
+            if (text) {
+                _ws.send(JSON.stringify({ t: 'ch', x: text }));
+                input.value = '';
+            }
+            input.blur();
+            e.preventDefault();
+        } else if (input) {
+            input.focus();
+            e.preventDefault();
+        }
+    }
+});
+
+// Chat UI helpers
+function addChatMessage(name, team, text) {
+    const el = document.getElementById('chatMessages');
+    if (!el) return;
+    const msg = document.createElement('div');
+    msg.className = 'chat-msg';
+    const nameClass = team === 'red' ? 'chat-name-red' : 'chat-name-blue';
+    msg.innerHTML = '<span class="' + nameClass + '">' + escapeHtml(name) + ':</span> ' + escapeHtml(text);
+    el.appendChild(msg);
+    el.scrollTop = el.scrollHeight;
+    // Trim old messages
+    while (el.children.length > 50) el.removeChild(el.firstChild);
+}
+
+function addChatSystem(text) {
+    const el = document.getElementById('chatMessages');
+    if (!el) return;
+    const msg = document.createElement('div');
+    msg.className = 'chat-sys';
+    msg.textContent = text;
+    el.appendChild(msg);
+    el.scrollTop = el.scrollHeight;
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// Start network tick loop (does nothing in offline mode)
+requestAnimationFrame(function netLoop() {
+    requestAnimationFrame(netLoop);
+    if (isOnlineMode) checkAndSendMove();
+});
+
+console.log('Multiplayer module loaded');
