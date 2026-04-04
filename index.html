@@ -253,9 +253,17 @@
         @keyframes streakPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
         @keyframes streakOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-20px); } }
         @keyframes candleGrow { 0% { transform: scaleY(0); } 80% { transform: scaleY(1.1); } 100% { transform: scaleY(1); } }
-        @keyframes goldFloat { 0% { opacity: 1; transform: translateY(0); } 60% { opacity: 1; } 100% { opacity: 0; transform: translateY(-80px); } }
         @keyframes screenFlash { 0% { opacity: 0.3; } 100% { opacity: 0; } }
-        @keyframes sparkle { 0% { opacity: 1; transform: translate(-50%,-50%) rotate(var(--angle, 0deg)) translateY(0) scale(1); } 100% { opacity: 0; transform: translate(-50%,-50%) rotate(var(--angle, 0deg)) translateY(-40px) scale(0); } }
+
+        /* Flying candle that moves from center to HUD chart */
+        .flying-candle {
+            position: fixed;
+            z-index: 9999;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
 
         /* === DARK SOULS DEATH SCREEN === */
         #deathPopup {
@@ -417,8 +425,11 @@
             text-align: left;
             font-size: 0.55rem;
             border-radius: 3px;
+            font-family: 'Courier New', monospace;
             animation: fadeIn 0.3s, fadeOut 0.5s 2.5s;
         }
+        .kill-message.buy { border-color: #00ff4444; color: #00ff44; }
+        .kill-message.sell { border-color: #ff444444; color: #ff4444; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
@@ -472,10 +483,27 @@
         </div>
 
         <div id="hud" class="hidden">
-            <div class="stat" id="playerName">Player</div>
-            <div class="stat" id="killCount">Kills: 0</div>
-            <div class="stat" id="deathCount">Deaths: 0</div>
-            <div class="stat" id="goldCount" style="color:#ffd700;border-color:#ffd70066;">Gold: 0</div>
+            <div id="terminal" style="
+                background:rgba(0,0,0,0.85);
+                border:1px solid #00ff0033;
+                border-radius:6px;
+                padding:6px 10px;
+                min-width:160px;
+                font-family:'Courier New',monospace;
+                pointer-events:all;
+            ">
+                <div style="display:flex;align-items:baseline;gap:6px;">
+                    <span id="ticker" style="color:#00ff44;font-size:1rem;font-weight:900;letter-spacing:0.05em;">$YOU</span>
+                    <span id="price" style="color:#fff;font-size:0.9rem;font-weight:700;">1.00</span>
+                    <span id="pctChange" style="color:#00ff44;font-size:0.7rem;">+0.0%</span>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:3px;font-size:0.6rem;color:#888;">
+                    <span>K: <span id="killCount" style="color:#00ff44;">0</span></span>
+                    <span>D: <span id="deathCount" style="color:#ff4444;">0</span></span>
+                    <span>G: <span id="goldCount" style="color:#ffd700;">0</span></span>
+                </div>
+                <canvas id="hudChart" width="150" height="50" style="margin-top:4px;border-radius:3px;background:#0a0a0a;"></canvas>
+            </div>
         </div>
 
         <div id="scoreboard" class="hidden">
@@ -560,7 +588,7 @@
                 <div style="width:24px;height:80px;background:linear-gradient(to bottom,#cc0000,#ff2222);box-shadow:0 0 20px #ff2222,0 0 40px #cc000066;border-radius:2px;animation:candleGrow 0.25s ease-out 0.2s both;transform-origin:top;"></div>
                 <div style="width:5px;height:16px;background:#990000;margin-top:2px;"></div>
             </div>
-            <div id="deathText">YOU DIED</div>
+            <div id="deathText">LIQUIDATED</div>
             <div style="position:relative;z-index:1;color:#ff222288;font-size:0.8rem;margin-top:0.3rem;animation:deathSubIn 0.5s ease-out 1.2s forwards;opacity:0;">📉</div>
             <div id="deathKiller"></div>
             <button id="respawnBtn">RETURN TO SPAWN</button>

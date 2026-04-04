@@ -1931,9 +1931,11 @@ class Player {
                 }).filter(Boolean).join('  ');
                 killerItems = `\n${items}`;
             }
+            const preBefore = _playerPrice.toFixed(2);
             document.getElementById('deathKiller').innerHTML =
-                `Felled by ${killerName}` +
-                (killerItems ? `<div style="margin-top:0.4rem;font-size:0.7rem;color:#ffd700;">${killerItems}</div>` : '');
+                `Rugged by ${killerName}` +
+                `<div style="margin-top:0.4rem;font-size:0.9rem;color:#ff4444;">$${preBefore} → $${(_playerPrice * 0.5).toFixed(2)}</div>` +
+                (killerItems ? `<div style="margin-top:0.3rem;font-size:0.7rem;color:#ffd700;">${killerItems}</div>` : '');
 
             popup.classList.add('hidden');
             void popup.offsetHeight;
@@ -2064,78 +2066,121 @@ function updateGoldUI() {
     if (el) el.textContent = `Gold: ${gameState.gold}`;
 }
 
-// === OHLC CANDLE CHART ===
-let _chartCandles = [];
+// === TRADING TERMINAL — price tracking + HUD chart ===
+let _playerPrice = 1.00;
+let _priceHistory = [1.00];
+let _startPrice = 1.00;
 
-function _addCandle(boost) {
-    const prev = _chartCandles.length > 0 ? _chartCandles[_chartCandles.length - 1] : null;
-    const open = prev ? prev.close : 20;
-    const close = open + boost + Math.random() * 10;
-    const high = close + Math.random() * 10;
-    const low = open - Math.random() * 5;
-    _chartCandles.push({ open, close, high, low });
-    if (_chartCandles.length > 25) _chartCandles.shift();
+function updateTerminal() {
+    const pct = ((_playerPrice - _startPrice) / _startPrice * 100);
+    const el = document.getElementById('price');
+    if (el) el.textContent = _playerPrice.toFixed(2);
+    const pctEl = document.getElementById('pctChange');
+    if (pctEl) {
+        pctEl.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+        pctEl.style.color = pct >= 0 ? '#00ff44' : '#ff4444';
+    }
+    drawHudChart();
 }
 
-function _renderChart(label, labelColor) {
-    const popup = document.getElementById('streakPopup');
-    popup.innerHTML = '';
-    const clr = labelColor || '#00ff44';
+function drawHudChart() {
+    const canvas = document.getElementById('hudChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
 
-    const chart = document.createElement('div');
-    const chartW = Math.min(350, _chartCandles.length * 16);
-    chart.style.cssText = `display:flex;align-items:flex-end;pointer-events:none;height:200px;width:${chartW}px;`;
+    if (_priceHistory.length < 2) return;
 
-    let minVal = Infinity, maxVal = -Infinity;
-    _chartCandles.forEach(c => { minVal = Math.min(minVal, c.low); maxVal = Math.max(maxVal, c.high); });
-    const range = maxVal - minVal || 1;
-    const scale = 180 / range;
-    const w = Math.max(4, Math.min(12, (chartW - _chartCandles.length * 2) / _chartCandles.length));
+    const prices = _priceHistory.slice(-60); // Last 60 data points
+    const min = Math.min(...prices) * 0.95;
+    const max = Math.max(...prices) * 1.05;
+    const range = max - min || 1;
 
-    _chartCandles.forEach((c, i) => {
-        const isNew = i === _chartCandles.length - 1;
-        const bodyTop = Math.max(c.open, c.close);
-        const bodyBot = Math.min(c.open, c.close);
-        const bodyH = Math.max(2, (bodyTop - bodyBot) * scale);
-        const wickTopH = Math.max(0, (c.high - bodyTop) * scale);
-        const wickBotH = Math.max(0, (bodyBot - c.low) * scale);
-        const bottom = (c.low - minVal) * scale;
-        const color = '#00cc44';
-        const glow = isNew ? 'box-shadow:0 0 12px #00ff44,0 0 24px #00ff4466;' : '';
-        const anim = isNew ? 'animation:candleGrow 0.12s cubic-bezier(0,0.8,0.2,1.3) forwards;transform-origin:bottom;' : '';
-
-        chart.innerHTML += `<div style="flex-shrink:0;width:${w + 2}px;display:flex;flex-direction:column;align-items:center;align-self:flex-end;margin-bottom:${bottom}px;">
-            <div style="width:2px;height:${wickTopH}px;background:${color};"></div>
-            <div style="width:${w}px;height:${bodyH}px;background:${color};border-radius:1px;${glow}${anim}"></div>
-            <div style="width:2px;height:${wickBotH}px;background:${color};margin-top:1px;"></div>
-        </div>`;
+    // Draw line chart
+    ctx.beginPath();
+    ctx.strokeStyle = _playerPrice >= _startPrice ? '#00ff44' : '#ff4444';
+    ctx.lineWidth = 1.5;
+    prices.forEach((p, i) => {
+        const x = (i / (prices.length - 1)) * w;
+        const y = h - ((p - min) / range) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
     });
-    popup.appendChild(chart);
+    ctx.stroke();
 
-    if (label) {
-        const el = document.createElement('div');
-        el.style.cssText = `color:${clr};font-size:clamp(0.9rem,3vw,1.4rem);font-weight:900;text-shadow:0 0 15px ${clr};pointer-events:none;margin-top:4px;font-family:monospace;`;
-        el.textContent = label;
-        popup.appendChild(el);
-    }
+    // Fill under the line
+    const lastX = w;
+    const lastY = h - ((prices[prices.length - 1] - min) / range) * h;
+    ctx.lineTo(lastX, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    ctx.fillStyle = _playerPrice >= _startPrice ? 'rgba(0,255,68,0.08)' : 'rgba(255,68,68,0.08)';
+    ctx.fill();
+}
 
-    clearTimeout(popup._fadeTimer);
-    popup._fadeTimer = setTimeout(() => {
-        popup.style.transition = 'opacity 1s';
-        popup.style.opacity = '0';
-        setTimeout(() => { popup.style.transition = ''; popup.style.opacity = '1'; popup.innerHTML = ''; }, 1000);
-    }, 2500);
+function pumpPrice(amount) {
+    _playerPrice += amount;
+    _priceHistory.push(_playerPrice);
+    updateTerminal();
+}
+
+function dumpPrice() {
+    _playerPrice = Math.max(0.10, _playerPrice * 0.5);
+    _priceHistory.push(_playerPrice);
+    updateTerminal();
+}
+
+// Flying candle animation — spawns center, flies to HUD chart
+function spawnFlyingCandle(text, color, boost) {
+    const candle = document.createElement('div');
+    candle.className = 'flying-candle';
+
+    const bodyH = Math.min(15 + boost * 2, 60);
+    const wickH = Math.round(bodyH * 0.3);
+    const bodyW = Math.min(8 + boost, 20);
+
+    candle.innerHTML = `
+        <div style="width:2px;height:${wickH}px;background:${color};"></div>
+        <div style="width:${bodyW}px;height:${bodyH}px;background:${color};border-radius:1px;box-shadow:0 0 10px ${color};animation:candleGrow 0.1s ease-out forwards;transform-origin:bottom;"></div>
+        <div style="width:2px;height:${Math.round(wickH*0.4)}px;background:${color};margin-top:1px;"></div>
+        <div style="color:${color};font-size:0.8rem;font-weight:900;margin-top:3px;font-family:monospace;text-shadow:0 0 8px ${color};">${text}</div>
+    `;
+
+    // Start at center of screen
+    candle.style.left = '50%';
+    candle.style.top = '40%';
+    candle.style.transform = 'translate(-50%, -50%) scale(1.5)';
+    candle.style.opacity = '1';
+    candle.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+    document.body.appendChild(candle);
+
+    // After a beat, fly to the HUD chart
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            const chart = document.getElementById('hudChart');
+            if (chart) {
+                const rect = chart.getBoundingClientRect();
+                candle.style.left = rect.left + rect.width / 2 + 'px';
+                candle.style.top = rect.top + rect.height / 2 + 'px';
+                candle.style.transform = 'translate(-50%, -50%) scale(0.3)';
+                candle.style.opacity = '0.5';
+            }
+        });
+    });
+
+    // Remove after animation
+    setTimeout(() => candle.remove(), 700);
 }
 
 function showGoldPopup(text) {
-    _addCandle(5 + Math.random() * 10);
-    _renderChart(text, '#00ff44');
+    const boost = parseFloat(text.replace(/[^0-9.]/g, '')) / 50 || 0.5;
+    pumpPrice(boost);
+    spawnFlyingCandle(text, '#00ff44', boost * 10);
 }
 
 function resetStreakChart() {
-    _chartCandles = [];
-    const popup = document.getElementById('streakPopup');
-    if (popup) popup.innerHTML = '';
+    dumpPrice();
 }
 
 function updateShopUI() {
@@ -2201,12 +2246,13 @@ function checkShopProximity() {
 // UI Functions
 function showStreakPopup(text, color) {
     const boosts = {
-        'FIRST BLOOD':20, 'KILLING SPREE':30, 'RAMPAGE':45, 'DOMINATING':60,
-        'UNSTOPPABLE':80, 'GODLIKE':120, 'DOUBLE KILL':25, 'MULTI KILL':35,
-        'MEGA KILL':50, 'ULTRA KILL':70, 'MONSTER KILL':90, 'LUDICROUS KILL':130,
-        'SHIELD BLOCKED!':10,
+        'FIRST BLOOD':2, 'KILLING SPREE':3, 'RAMPAGE':5, 'DOMINATING':8,
+        'UNSTOPPABLE':12, 'GODLIKE':20, 'DOUBLE KILL':2.5, 'MULTI KILL':4,
+        'MEGA KILL':6, 'ULTRA KILL':9, 'MONSTER KILL':13, 'LUDICROUS KILL':25,
+        'SHIELD BLOCKED!':0,
     };
-    _addCandle(boosts[text] || 20);
+    const boost = boosts[text] || 1;
+    pumpPrice(boost);
 
     // Screen flash
     const flash = document.createElement('div');
@@ -2214,14 +2260,19 @@ function showStreakPopup(text, color) {
     document.body.appendChild(flash);
     setTimeout(() => flash.remove(), 400);
 
-    _renderChart(text, color);
+    // Big flying candle for streaks
+    spawnFlyingCandle(text, color, boost * 5);
 }
 
 function addKillFeed(killer, victim) {
     const killFeed = document.getElementById('killFeed');
     const message = document.createElement('div');
-    message.className = 'kill-message';
-    message.textContent = `${killer} eliminated ${victim}`;
+    const isPlayerKill = gameState.player && killer === gameState.player.username;
+    const isPlayerDeath = gameState.player && victim === gameState.player.username;
+    message.className = 'kill-message ' + (isPlayerKill ? 'buy' : isPlayerDeath ? 'sell' : '');
+    message.textContent = isPlayerKill ? `BUY $${killer} +${_playerPrice.toFixed(2)} (killed ${victim})`
+        : isPlayerDeath ? `LIQUIDATED $${victim} (by ${killer})`
+        : `${killer} > ${victim}`;
     killFeed.appendChild(message);
 
     setTimeout(() => message.remove(), 3000);
@@ -2611,7 +2662,13 @@ document.getElementById('startBtn').addEventListener('click', () => {
     document.getElementById('controls').classList.remove('hidden');
     document.querySelector('.minimap').classList.remove('hidden');
 
-    document.getElementById('playerName').textContent = username;
+    // Set ticker to player name
+    const tickerEl = document.getElementById('ticker');
+    if (tickerEl) tickerEl.textContent = '$' + username.toUpperCase().slice(0, 5);
+    _playerPrice = 1.00;
+    _priceHistory = [1.00];
+    _startPrice = 1.00;
+    updateTerminal();
 
     startGame();
 });
