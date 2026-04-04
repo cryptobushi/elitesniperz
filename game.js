@@ -3501,7 +3501,6 @@ function connectToServer() {
 }
 
 function handleBinaryState(buf) {
-    if (!gameState.gameStarted) return;
     const view = new DataView(buf);
     const count = view.getUint16(0, true);
     if (!handleBinaryState._logged) {

@@ -12,6 +12,11 @@ const { collidesWithWall, hasLineOfSight } = require('./shared/collision');
 // === EXPRESS + STATIC ===
 const app = express();
 app.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+app.get('/debug', (req, res) => {
+    const list = [];
+    players.forEach((p, id) => list.push({ id, name: p.username, team: p.team, isBot: p.isBot, x: Math.round(p.x), z: Math.round(p.z), health: p.health }));
+    res.json({ players: list, total: players.size, clients: wss.clients.size });
+});
 app.use(express.static(path.join(__dirname)));
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
