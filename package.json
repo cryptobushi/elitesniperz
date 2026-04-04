@@ -18,10 +18,10 @@
   },
   "homepage": "https://github.com/cryptobushi/elitesniperz#readme",
   "dependencies": {
-    "@colyseus/schema": "^4.0.19",
-    "@colyseus/ws-transport": "^0.17.11",
-    "colyseus": "^0.17.8",
-    "colyseus.js": "^0.16.22",
+    "@colyseus/schema": "^2.0.37",
+    "@colyseus/ws-transport": "^0.15.3",
+    "colyseus": "^0.15.57",
+    "colyseus.js": "^0.15.28",
     "express": "^5.2.1",
     "ws": "^8.20.0"
   }
