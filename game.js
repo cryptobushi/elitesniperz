@@ -756,7 +756,7 @@ class Player {
         this.speed = 8;
         this.normalSpeed = 8;
         this.windwalkSpeed = 14;
-        this.shootRange = 40;
+        this.shootRange = 25; // Matches vision radius
         this.damage = 25;
         this.isWindwalking = false;
         this.farsightActive = false;
@@ -773,7 +773,7 @@ class Player {
         this.hasShield = false;
         this.goldMultiplier = 1.0;
         this.baseSpeed = 8;
-        this.baseRange = 40;
+        this.baseRange = 25;
         this.baseCooldown = 1.0;
 
         this.createMesh(team);
@@ -1131,61 +1131,36 @@ class Player {
             allEnemies.push(gameState.player);
         }
 
-        const visibleEnemies = allEnemies.filter(enemy =>
-            enemy &&
-            enemy !== this &&
-            enemy.team !== this.team &&
-            enemy.health > 0 &&
-            enemy.mesh.visible // This checks fog of war visibility
-        );
+        // Find closest enemy in range + LOS
+        let bestTarget = null;
+        let bestDist = Infinity;
 
-        if (visibleEnemies.length === 0) return;
+        for (const enemy of allEnemies) {
+            if (!enemy || enemy === this || enemy.team === this.team) continue;
+            if (enemy.health <= 0) continue;
 
-        // Get weapon direction (where the rifle is pointing)
-        const weaponDirection = new THREE.Vector3(0, 0, 1);
-        if (this.weapon) {
-            weaponDirection.applyQuaternion(this.weapon.getWorldQuaternion(new THREE.Quaternion()));
+            const distance = this.position.distanceTo(enemy.position);
+            if (distance > this.shootRange) continue;
+            if (distance >= bestDist) continue;
+
+            // Wall LOS check
+            const dir = new THREE.Vector3().subVectors(enemy.position, this.position).normalize();
+            const ray = new THREE.Raycaster();
+            ray.set(this.position, dir);
+            const hits = ray.intersectObjects(gameState._wallObjects || [], false);
+            let blocked = false;
+            for (const hit of hits) {
+                if (hit.distance < distance) { blocked = true; break; }
+            }
+            if (blocked) continue;
+
+            bestTarget = enemy;
+            bestDist = distance;
         }
 
-        const fovAngle = 30; // 30 degree FOV cone
-        const fovRadians = (fovAngle * Math.PI) / 180;
-
-        // Check each enemy
-        for (let enemy of visibleEnemies) {
-            const toEnemy = new THREE.Vector3().subVectors(enemy.position, this.position).normalize();
-            const angle = weaponDirection.angleTo(toEnemy);
-
-            // If enemy is within FOV cone and in range
-            if (angle < fovRadians) {
-                const distance = this.position.distanceTo(enemy.position);
-                if (distance <= this.shootRange) {
-                    // Double-check fog of war visibility
-                    const enemyVisible = fogOfWar.isVisible(enemy.position.x, enemy.position.z);
-                    if (!enemyVisible) {
-                        continue; // Skip this enemy, can't see them in fog
-                    }
-
-                    // Check line of sight (walls blocking)
-                    const raycaster = new THREE.Raycaster();
-                    raycaster.set(this.position, toEnemy);
-                    const intersects = raycaster.intersectObjects(gameState._wallObjects || [], false);
-
-                    let blocked = false;
-                    for (let intersect of intersects) {
-                        if (intersect.distance < distance) {
-                            blocked = true;
-                            break;
-                        }
-                    }
-
-                    if (!blocked) {
-                        // SHOOT!
-                        this.shoot(enemy);
-                        this.shootCooldown = this.shootCooldownTime;
-                        return; // Only shoot one target per check
-                    }
-                }
-            }
+        if (bestTarget) {
+            this.shoot(bestTarget);
+            this.shootCooldown = this.shootCooldownTime;
         }
     }
 
