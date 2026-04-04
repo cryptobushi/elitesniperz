@@ -2181,30 +2181,36 @@ function spawnFlyingCandle(text, color, boost) {
         <div style="color:${color};font-size:0.8rem;font-weight:900;margin-top:3px;font-family:monospace;text-shadow:0 0 8px ${color};">${text}</div>
     `;
 
-    // Start at center of screen
+    // Start at center of screen — big and bold
     candle.style.left = '50%';
     candle.style.top = '40%';
-    candle.style.transform = 'translate(-50%, -50%) scale(1.5)';
+    candle.style.transform = 'translate(-50%, -50%) scale(2)';
     candle.style.opacity = '1';
-    candle.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+    candle.style.transition = 'transform 0.15s ease-out';
     document.body.appendChild(candle);
 
-    // After a beat, fly to the HUD chart
+    // Pop in to normal size
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-            const chart = document.getElementById('hudChart');
-            if (chart) {
-                const rect = chart.getBoundingClientRect();
-                candle.style.left = rect.left + rect.width / 2 + 'px';
-                candle.style.top = rect.top + rect.height / 2 + 'px';
-                candle.style.transform = 'translate(-50%, -50%) scale(0.3)';
-                candle.style.opacity = '0.5';
-            }
+            candle.style.transform = 'translate(-50%, -50%) scale(1)';
         });
     });
 
-    // Remove after animation
-    setTimeout(() => candle.remove(), 700);
+    // Hold center for 0.8s, then fly to chart
+    setTimeout(() => {
+        candle.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        const chart = document.getElementById('hudChart');
+        if (chart) {
+            const rect = chart.getBoundingClientRect();
+            candle.style.left = rect.left + rect.width / 2 + 'px';
+            candle.style.top = rect.top + rect.height / 2 + 'px';
+            candle.style.transform = 'translate(-50%, -50%) scale(0.3)';
+            candle.style.opacity = '0';
+        }
+    }, 800);
+
+    // Remove after flight
+    setTimeout(() => candle.remove(), 1400);
 }
 
 function showGoldPopup(text) {
