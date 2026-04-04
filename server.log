@@ -1,0 +1,5 @@
+Collision walls loaded from shared/collision.js
+Initialized 10 bots
+Elite Snipers server on port 3000 (10 bots, 64hz tick, 30hz send)
+Sniper joined red. Total: 10
+Sniper left, bot added

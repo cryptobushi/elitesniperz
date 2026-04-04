@@ -11,6 +11,7 @@ const { collidesWithWall, hasLineOfSight } = require('./shared/collision');
 
 // === EXPRESS + STATIC ===
 const app = express();
+app.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 app.use(express.static(path.join(__dirname)));
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
