@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 
+// Online mode state (declared early to avoid temporal dead zone)
+let isOnlineMode = false;
+let _remotePlayers = new Map();
+
 // Game State
 const gameState = {
     player: null,
@@ -2422,7 +2426,7 @@ function updateScoreboard() {
 
     // Collect all players (offline bots + online remote players)
     const all = [...gameState.bots];
-    if (typeof _remotePlayers !== 'undefined') {
+    if (isOnlineMode && _remotePlayers.size > 0) {
         _remotePlayers.forEach(r => all.push(r.player));
     }
     if (gameState.player) all.push(gameState.player);
@@ -2802,9 +2806,7 @@ function createMoveMarker(position) {
 
 // Game Setup
 let selectedTeamValue = null;
-let isOnlineMode = false;
-
-// Mode selection
+// Mode selection (isOnlineMode declared at top of file)
 document.querySelectorAll('.modeBtn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.modeBtn').forEach(b => {
@@ -3445,7 +3447,7 @@ function hasLineOfSightAABB(ax, az, bx, bz) {
 let _ws = null;
 let _myServerId = null;
 let _roster = {}; // id -> { username, team, isBot }
-let _remotePlayers = new Map(); // serverId -> { player: Player, targetX, targetZ, targetRot, lastUpdate }
+// _remotePlayers declared at top of file
 let _serverState = new Map(); // serverId -> latest decoded state
 let _lastSendTime = 0;
 
