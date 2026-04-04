@@ -2890,18 +2890,15 @@ document.querySelectorAll('.ability').forEach(el => {
     });
 });
 
-// Click/tap scoreboard to close
+// Scoreboard + shop close handlers — only when game is running
 document.getElementById('scoreboard')?.addEventListener('click', () => {
-    document.getElementById('scoreboard').classList.add('hidden');
+    if (gameState.gameStarted) document.getElementById('scoreboard').classList.add('hidden');
 });
-
-// Click/tap outside shop to close
 document.addEventListener('click', (e) => {
+    if (!gameState.gameStarted) return;
     const shop = document.getElementById('shopPanel');
-    if (shop && !shop.classList.contains('hidden')) {
-        if (!e.target.closest('#shopPanel') && !e.target.closest('.ability')) {
-            shop.classList.add('hidden');
-        }
+    if (shop && !shop.classList.contains('hidden') && !e.target.closest('#shopPanel, .ability')) {
+        shop.classList.add('hidden');
     }
 });
 
