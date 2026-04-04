@@ -12,7 +12,7 @@ app.use(express.static(path.join(__dirname)));
 
 // === GAME CONSTANTS ===
 const MAP_SIZE = 200;
-const TICK_RATE = 20; // 20 ticks per second
+const TICK_RATE = 10; // 10 ticks per second (less bandwidth)
 const MAX_PLAYERS = 10; // 5 per team
 const SHOOT_RANGE = 45;
 const SHOOT_COOLDOWN = 1.0;
@@ -310,37 +310,42 @@ function gameTick() {
     // Update players
     gameState.players.forEach(player => updatePlayerMovement(player, deltaTime));
 
-    // Build state snapshot
+    // Build compact state snapshot — short keys, rounded positions
     const allUnits = [...gameState.players.values(), ...gameState.bots];
-    const snapshot = {
-        type: 'state',
-        tick: gameState.tickCount,
-        players: allUnits.map(p => ({
-            id: p.id,
-            username: p.username,
-            team: p.team,
-            isBot: p.isBot,
-            x: p.x,
-            z: p.z,
-            y: p.y,
-            rotation: p.rotation,
-            health: p.health,
-            kills: p.kills,
-            deaths: p.deaths,
-            price: p.price,
-            gold: p.gold,
-            spawnProtection: p.spawnProtection,
-            isWindwalking: p.isWindwalking,
-            streak: p._streak,
-        })),
-    };
 
-    // Send to each client (with fog — only show enemies in vision)
-    const snapshotStr = JSON.stringify(snapshot);
+    // Send per-client with fog filtering
     wss.clients.forEach(ws => {
-        if (ws.readyState === 1 && ws.playerId) {
-            ws.send(snapshotStr);
+        if (ws.readyState !== 1 || !ws.playerId) return;
+        const me = gameState.players.get(ws.playerId);
+        if (!me) return;
+
+        const players = [];
+        for (const p of allUnits) {
+            // Fog: only send enemies within vision radius
+            if (p.team !== me.team && p.health > 0) {
+                const d = Math.sqrt((p.x - me.x) ** 2 + (p.z - me.z) ** 2);
+                if (d > VISION_RADIUS) continue;
+            }
+            players.push([
+                p.id,
+                Math.round(p.x * 10) / 10,
+                Math.round(p.z * 10) / 10,
+                Math.round(p.rotation * 100) / 100,
+                p.health > 0 ? 1 : 0,
+                p.kills,
+                p.deaths,
+                Math.round(p.price * 100) / 100,
+                p.spawnProtection > 0 ? 1 : 0,
+                p.isWindwalking ? 1 : 0,
+            ]);
         }
+
+        ws.send(JSON.stringify({
+            t: 's', // type: state
+            p: players,
+            g: me.gold,
+            k: me._streak,
+        }));
     });
 }
 
@@ -398,6 +403,10 @@ function joinPlayer(ws, username, team) {
     gameState.players.set(id, player);
     ws.playerId = id;
 
+    // Send roster (all current players/bots) so client knows usernames/teams
+    const allUnits = [...gameState.players.values(), ...gameState.bots];
+    const roster = allUnits.map(p => ({ id: p.id, name: p.username, team: p.team, bot: p.isBot }));
+
     ws.send(JSON.stringify({
         type: 'joined',
         id,
@@ -405,6 +414,7 @@ function joinPlayer(ws, username, team) {
         team,
         x: player.x,
         z: player.z,
+        roster,
     }));
 
     broadcast({

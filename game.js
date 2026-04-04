@@ -15,8 +15,10 @@ function connectToServer(username, team) {
     };
 
     ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        handleServerMessage(msg);
+        try {
+            const msg = JSON.parse(event.data);
+            handleServerMessage(msg);
+        } catch {}
     };
 
     ws.onclose = () => {
@@ -29,19 +31,27 @@ function sendToServer(msg) {
     if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
 }
 
+const _serverRoster = new Map(); // id -> { name, team, bot }
+
 function handleServerMessage(msg) {
+    // Compact state update
+    if (msg.t === 's') {
+        updateFromServerCompact(msg);
+        return;
+    }
+
     switch (msg.type) {
         case 'joined':
             myPlayerId = msg.id;
+            // Load roster
+            if (msg.roster) {
+                msg.roster.forEach(r => _serverRoster.set(r.id, r));
+            }
             console.log(`Joined as ${msg.username} on ${msg.team} (id: ${msg.id})`);
             break;
 
         case 'queued':
             showQueuePopup(msg.position);
-            break;
-
-        case 'state':
-            updateFromServer(msg);
             break;
 
         case 'kill':
@@ -57,69 +67,70 @@ function handleServerMessage(msg) {
             break;
 
         case 'playerJoined':
+            _serverRoster.set(msg.id, { name: msg.username, team: msg.team });
             addChatMessage('SERVER', `${msg.username} joined ${msg.team}`, 'system');
             break;
 
         case 'playerLeft':
+            _serverRoster.delete(msg.id);
             addChatMessage('SERVER', `${msg.username} disconnected`, 'system');
             break;
     }
 }
 
-function updateFromServer(msg) {
+function updateFromServerCompact(msg) {
     if (!gameState.gameStarted) return;
+    // msg.p = array of [id, x, z, rot, alive, kills, deaths, price, spawnProt, windwalk]
+    // msg.g = my gold, msg.k = my streak
 
-    for (const p of msg.players) {
-        if (p.id === myPlayerId) {
-            // Update our own state from server (authoritative)
+    const serverIds = new Set();
+
+    for (const p of msg.p) {
+        const [id, x, z, rot, alive, kills, deaths, price, spawnProt, windwalk] = p;
+        serverIds.add(id);
+
+        if (id === myPlayerId) {
             if (gameState.player) {
-                gameState.player.health = p.health;
-                gameState.player.kills = p.kills;
-                gameState.player.deaths = p.deaths;
-                gameState.player.price = p.price;
-                gameState.player.gold = p.gold;
-                gameState.player._streak = p.streak;
-                gameState.kills = p.kills;
-                gameState.deaths = p.deaths;
-                gameState.gold = p.gold;
-                document.getElementById('killCount').textContent = p.kills;
-                document.getElementById('deathCount').textContent = p.deaths;
+                gameState.player.health = alive ? 100 : 0;
+                gameState.player.kills = kills;
+                gameState.player.deaths = deaths;
+                gameState.player.price = price;
+                gameState.player.gold = msg.g;
+                gameState.player._streak = msg.k;
+                gameState.kills = kills;
+                gameState.deaths = deaths;
+                gameState.gold = msg.g;
+                document.getElementById('killCount').textContent = kills;
+                document.getElementById('deathCount').textContent = deaths;
                 updateGoldUI();
-                pumpPrice(0); // sync price
+                pumpPrice(0);
             }
             continue;
         }
 
         // Remote player
-        let remote = remotePlayers.get(p.id);
+        let remote = remotePlayers.get(id);
         if (!remote) {
-            // Create new mesh for this player
-            const player = new Player(p.username, p.team, false);
-            player._remoteId = p.id;
-            remote = { state: p, player };
-            remotePlayers.set(p.id, remote);
+            const info = _serverRoster.get(id) || { name: 'Player', team: 'red' };
+            const player = new Player(info.name, info.team, false);
+            player._remoteId = id;
+            remote = { player };
+            remotePlayers.set(id, remote);
         }
 
-        // Update position (interpolate)
         const rp = remote.player;
-        rp.position.x += (p.x - rp.position.x) * 0.3;
-        rp.position.z += (p.z - rp.position.z) * 0.3;
-        rp.position.y = p.y;
-        rp.health = p.health;
-        rp.kills = p.kills;
-        rp.deaths = p.deaths;
-        rp.price = p.price;
-        rp.mesh.visible = p.health > 0;
-
-        if (p.rotation !== undefined) {
-            rp.mesh.rotation.y += (p.rotation - rp.mesh.rotation.y) * 0.3;
-        }
-
-        remote.state = p;
+        rp.position.x += (x - rp.position.x) * 0.3;
+        rp.position.z += (z - rp.position.z) * 0.3;
+        rp.position.y = terrainY_client(x, z) + 0.5;
+        rp.health = alive ? 100 : 0;
+        rp.kills = kills;
+        rp.deaths = deaths;
+        rp.price = price;
+        rp.mesh.visible = alive === 1;
+        rp.mesh.rotation.y += (rot - rp.mesh.rotation.y) * 0.3;
     }
 
     // Remove players no longer in state
-    const serverIds = new Set(msg.players.map(p => p.id));
     for (const [id, remote] of remotePlayers) {
         if (!serverIds.has(id)) {
             scene.remove(remote.player.mesh);
