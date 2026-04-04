@@ -3501,7 +3501,16 @@ function handleBinaryState(buf) {
     if (!gameState.gameStarted) return;
     const view = new DataView(buf);
     const count = view.getUint16(0, true);
-    if (!handleBinaryState._logged) { console.log('First binary state: ' + count + ' players, ' + buf.byteLength + ' bytes'); handleBinaryState._logged = true; }
+    if (!handleBinaryState._logged) {
+        console.log('First binary state: ' + count + ' players, ' + buf.byteLength + ' bytes');
+        handleBinaryState._logged = true;
+        // Visible debug on screen
+        const dbg = document.createElement('div');
+        dbg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#00ff44;font-size:1rem;z-index:99999;pointer-events:none;font-family:monospace;text-shadow:0 0 10px #00ff44;';
+        dbg.textContent = 'Server: ' + count + ' players connected';
+        document.body.appendChild(dbg);
+        setTimeout(() => dbg.remove(), 3000);
+    }
     let off = 2;
 
     const seenIds = new Set();
