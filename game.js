@@ -3216,14 +3216,18 @@ function startGame() {
     // Initialize camera at player position
     gameState.cameraTarget.copy(gameState.player.position);
 
-    // Create bots (5 per team)
-    const botNames = ['Elite', 'Anima', 'Game', 'ESi', 'Apathetic', 'Gem', 'Kflan', 'Jubei', 'Steve', 'Sean'];
-    for (let i = 0; i < 10; i++) {
-        const team = i < 5 ? 'red' : 'blue';
-        const bot = new Player(botNames[i], team, false);
-        gameState.bots.push(bot);
+    // Create bots only in offline mode — online mode gets them from server
+    if (!isOnlineMode) {
+        const botNames = ['Elite', 'Anima', 'Game', 'ESi', 'Apathetic', 'Gem', 'Kflan', 'Jubei', 'Steve', 'Sean'];
+        for (let i = 0; i < 10; i++) {
+            const team = i < 5 ? 'red' : 'blue';
+            const bot = new Player(botNames[i], team, false);
+            gameState.bots.push(bot);
+        }
+        console.log('Bots created:', gameState.bots.length);
+    } else {
+        console.log('Online mode — bots managed by server');
     }
-    console.log('Bots created:', gameState.bots.length);
 
     updateScoreboard();
     console.log('Game started! Player can now move with WASD');
@@ -3420,8 +3424,10 @@ function animate() {
         // Gold display updated via earnGold()
     }
 
-    // Update bots
-    gameState.bots.forEach(bot => bot.update(deltaTime));
+    // Update bots (offline only — online bots are server-managed)
+    if (!isOnlineMode) {
+        gameState.bots.forEach(bot => bot.update(deltaTime));
+    }
 
     // Update player
     if (gameState.player) {
@@ -3440,37 +3446,35 @@ function animate() {
     updateScoreboard();
     updateMinimap();
 
-    // Update fog of war with all units (player + all bots)
-    const allUnits = [...gameState.bots];
-    if (gameState.player) {
-        allUnits.push(gameState.player);
-    }
+    // Fog of war — offline only (online fog handled by server not sending hidden enemies)
+    if (!isOnlineMode) {
+        const allUnits = [...gameState.bots];
+        if (gameState.player) allUnits.push(gameState.player);
 
-    const farsightPositions = [];
-    if (gameState.player && gameState.player.farsightActive) {
-        farsightPositions.push(gameState.player.farsightPosition);
-    }
+        const farsightPositions = [];
+        if (gameState.player && gameState.player.farsightActive) {
+            farsightPositions.push(gameState.player.farsightPosition);
+        }
 
-    fogOfWar.update(gameState.player, allUnits, farsightPositions);
+        fogOfWar.update(gameState.player, allUnits, farsightPositions);
 
-    // Hide enemy units — instant hide when leaving vision, no linger
-    gameState.bots.forEach(bot => {
-        if (bot.team !== gameState.team) {
-            const inVision = fogOfWar.isVisible(bot.position.x, bot.position.z);
-            bot.mesh.visible = inVision && bot.health > 0;
-            // Reset opacity when visible
-            if (bot.mesh.visible) {
-                bot.mesh.traverse(child => {
-                    if (child.material && !child.isSprite) {
-                        child.material.transparent = false;
-                        child.material.opacity = 1;
-                    }
-                });
+        gameState.bots.forEach(bot => {
+            if (bot.team !== gameState.team) {
+                const inVision = fogOfWar.isVisible(bot.position.x, bot.position.z);
+                bot.mesh.visible = inVision && bot.health > 0;
+                if (bot.mesh.visible) {
+                    bot.mesh.traverse(child => {
+                        if (child.material && !child.isSprite) {
+                            child.material.transparent = false;
+                            child.material.opacity = 1;
+                        }
+                    });
             }
         } else {
             bot.mesh.visible = bot.health > 0;
         }
-    });
+        });
+    } // end offline fog
 
     renderer.render(scene, camera);
 }
