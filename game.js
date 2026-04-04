@@ -697,6 +697,7 @@ class Player {
         this.shootRange = 45;
         this.damage = 25;
         this._spawnProtection = 3.0; // 3s invulnerable on spawn
+        this.price = 1.00; // Everyone is a token
         this.isWindwalking = false;
         this.farsightActive = false;
         this.farsightPosition = null;
@@ -1860,10 +1861,16 @@ class Player {
                 hasSpecial = true;
             }
 
-            // Gold reward
+            // Gold reward — scales with victim's price (killing whales pays more)
             const baseGold = 50;
             const streakBonus = (killer._streak || 0) * 10;
-            killer.earnGold(baseGold + streakBonus);
+            const victimBonus = Math.round(this.price * 10);
+            killer.earnGold(baseGold + streakBonus + victimBonus);
+
+            // Price pump for killer (absorb victim's value)
+            const pumpAmount = 0.5 + this.price * 0.3;
+            killer.price += pumpAmount;
+            if (killer.isPlayer) pumpPrice(pumpAmount);
 
             // Player-specific streak/multi-kill tracking
             if (killer.isPlayer) {
@@ -1932,6 +1939,9 @@ class Player {
         // Lose all items on death
         this.inventory = {};
         this._applyItems();
+
+        // Price dumps 50% on death
+        this.price = Math.max(0.10, this.price * 0.5);
 
         // Reset kill streak when dying
         if (this.isPlayer) {
@@ -2448,12 +2458,12 @@ function updateScoreboard() {
 
     redScores.innerHTML = redPlayers
         .sort((a, b) => b.kills - a.kills)
-        .map(p => `<div class="player-score">${p.username}: ${p.kills}-${p.deaths}</div>`)
+        .map(p => `<div class="player-score">${p.username}: ${p.kills}-${p.deaths} <span style="color:#00ff44;">$${p.price.toFixed(2)}</span></div>`)
         .join('');
 
     blueScores.innerHTML = bluePlayers
         .sort((a, b) => b.kills - a.kills)
-        .map(p => `<div class="player-score">${p.username}: ${p.kills}-${p.deaths}</div>`)
+        .map(p => `<div class="player-score">${p.username}: ${p.kills}-${p.deaths} <span style="color:#00ff44;">$${p.price.toFixed(2)}</span></div>`)
         .join('');
 }
 
