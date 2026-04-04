@@ -9,9 +9,50 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 // === CONSTANTS ===
-const MAP_SIZE = 200, TICK_RATE = 20, MAX_PLAYERS = 10;
+const MAP_SIZE = 200, TICK_RATE = 128, MAX_PLAYERS = 10;
 const SHOOT_RANGE = 45, SHOOT_COOLDOWN = 1.0, SPAWN_PROTECTION = 1.5;
 const BOT_NAMES = ['Archon','Vex','Nyx','Zara','Kael','Drax','Luna','Hex','Rune','Ash'];
+
+// === WALLS — same as client map, stored as AABB [minX, minZ, maxX, maxZ] ===
+const WALLS = [];
+function addWall(cx, cz, w, d) {
+    WALLS.push([cx - w/2, cz - d/2, cx + w/2, cz + d/2]);
+}
+// Outer walls
+addWall(0, MAP_SIZE/2, MAP_SIZE, 2);
+addWall(0, -MAP_SIZE/2, MAP_SIZE, 2);
+addWall(MAP_SIZE/2, 0, 2, MAP_SIZE);
+addWall(-MAP_SIZE/2, 0, 2, MAP_SIZE);
+// Center structure
+addWall(0, 0, 15, 3);
+addWall(0, 10, 3, 10);
+addWall(0, -10, 3, 10);
+addWall(15, 8, 12, 3);
+addWall(-15, 8, 12, 3);
+addWall(15, -8, 12, 3);
+addWall(-15, -8, 12, 3);
+
+// Collision check — point vs walls (with radius)
+function collidesWithWall(x, z, r = 1.0) {
+    for (const [x1, z1, x2, z2] of WALLS) {
+        if (x + r > x1 && x - r < x2 && z + r > z1 && z - r < z2) return true;
+    }
+    return false;
+}
+
+// LOS check — simple 2D ray vs AABB
+function hasLineOfSight(ax, az, bx, bz) {
+    const dx = bx - ax, dz = bz - az;
+    const len = Math.sqrt(dx*dx + dz*dz);
+    if (len < 0.1) return true;
+    const steps = Math.ceil(len / 1.0); // Check every 1 unit
+    for (let i = 1; i < steps; i++) {
+        const t = i / steps;
+        const px = ax + dx * t, pz = az + dz * t;
+        if (collidesWithWall(px, pz, 0.1)) return false;
+    }
+    return true;
+}
 
 function terrainY(x,z){return Math.sin(x*0.1)*Math.cos(z*0.1)*2}
 function dist(a,b){return Math.sqrt((a.x-b.x)**2+(a.z-b.z)**2)}
@@ -83,17 +124,34 @@ function updateBot(bot, dt){
     }
     if(bot.botTarget){
         const dx=bot.botTarget.x-bot.x,dz=bot.botTarget.z-bot.z,d=Math.sqrt(dx*dx+dz*dz);
-        if(d>0.5){const spd=8*dt;bot.x+=dx/d*spd;bot.z+=dz/d*spd;
-            bot.x=Math.max(-MAP_SIZE/2+2,Math.min(MAP_SIZE/2-2,bot.x));
-            bot.z=Math.max(-MAP_SIZE/2+2,Math.min(MAP_SIZE/2-2,bot.z));
-            bot.y=terrainY(bot.x,bot.z)+0.5;bot.rot=Math.atan2(dx,dz);}
+        if(d>0.5){
+            const spd=8*dt;
+            const nx=bot.x+dx/d*spd, nz=bot.z+dz/d*spd;
+            if(!collidesWithWall(nx,nz)){
+                bot.x=Math.max(-MAP_SIZE/2+2,Math.min(MAP_SIZE/2-2,nx));
+                bot.z=Math.max(-MAP_SIZE/2+2,Math.min(MAP_SIZE/2-2,nz));
+            } else {
+                // Wall slide — try X only, then Z only
+                if(!collidesWithWall(nx,bot.z)) bot.x=nx;
+                else if(!collidesWithWall(bot.x,nz)) bot.z=nz;
+                else bot.botTarget=null; // Stuck, pick new target
+            }
+            bot.y=terrainY(bot.x,bot.z)+0.5;bot.rot=Math.atan2(dx,dz);
+        }
     }
 }
 
 // === SHOOTING ===
 function tryShoot(attacker){
     let closest=null,closestDist=Infinity;
-    players.forEach(p=>{if(p!==attacker&&p.team!==attacker.team&&p.health>0){const d=dist(attacker,p);if(d<closestDist&&d<=SHOOT_RANGE){closest=p;closestDist=d}}});
+    players.forEach(p=>{
+        if(p!==attacker&&p.team!==attacker.team&&p.health>0){
+            const d=dist(attacker,p);
+            if(d<closestDist&&d<=SHOOT_RANGE&&hasLineOfSight(attacker.x,attacker.z,p.x,p.z)){
+                closest=p;closestDist=d;
+            }
+        }
+    });
     if(!closest)return;
     attacker.shootCd=SHOOT_COOLDOWN;
     if(closest.spawnProt>0)return;
@@ -115,9 +173,14 @@ function tryShoot(attacker){
 
 function broadcast(data){wss.clients.forEach(ws=>{if(ws.readyState===1)ws.send(data)})}
 
-// === GAME LOOP ===
+// === GAME LOOP — 128hz simulation, 20hz network send ===
+const SEND_RATE = 20;
+let tickCount = 0;
+const sendEvery = Math.round(TICK_RATE / SEND_RATE);
+
 setInterval(()=>{
     const dt=1/TICK_RATE;
+    tickCount++;
     players.forEach(p=>{
         if(p.health<=0)return;
         if(p.spawnProt>0){p.spawnProt-=dt;if(!isNearSpawn(p))p.spawnProt=0}
@@ -126,17 +189,23 @@ setInterval(()=>{
         else if(p.moveTarget){
             const dx=p.moveTarget.x-p.x,dz=p.moveTarget.z-p.z,d=Math.sqrt(dx*dx+dz*dz);
             if(d<1){p.moveTarget=null}else{
-                const spd=(p.windwalk?14:8)*dt;p.x+=dx/d*spd;p.z+=dz/d*spd;
-                p.x=Math.max(-MAP_SIZE/2+2,Math.min(MAP_SIZE/2-2,p.x));
-                p.z=Math.max(-MAP_SIZE/2+2,Math.min(MAP_SIZE/2-2,p.z));
+                const spd=(p.windwalk?14:8)*dt;
+                const nx=p.x+dx/d*spd, nz=p.z+dz/d*spd;
+                if(!collidesWithWall(nx,nz)){
+                    p.x=Math.max(-MAP_SIZE/2+2,Math.min(MAP_SIZE/2-2,nx));
+                    p.z=Math.max(-MAP_SIZE/2+2,Math.min(MAP_SIZE/2-2,nz));
+                } else if(!collidesWithWall(nx,p.z)) p.x=nx;
+                else if(!collidesWithWall(p.x,nz)) p.z=nz;
                 p.y=terrainY(p.x,p.z)+0.5;p.rot=Math.atan2(dx,dz);
             }
         }
         if(p.shootCd<=0)tryShoot(p);
     });
-    // Send binary state to all clients
-    const buf=encodeState();
-    wss.clients.forEach(ws=>{if(ws.readyState===1)ws.send(buf)});
+    // Send state at lower rate to save bandwidth
+    if(tickCount % sendEvery === 0){
+        const buf=encodeState();
+        wss.clients.forEach(ws=>{if(ws.readyState===1)ws.send(buf)});
+    }
 },1000/TICK_RATE);
 
 // === CONNECTIONS ===
