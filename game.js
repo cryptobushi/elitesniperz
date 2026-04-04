@@ -489,16 +489,9 @@ const createMap = () => {
         return treeGroup;
     };
 
-    // Plant trees randomly across the map
-    for (let i = 0; i < 80; i++) {
-        const x = (Math.random() - 0.5) * MAP_SIZE * 0.9;
-        const z = (Math.random() - 0.5) * MAP_SIZE * 0.9;
-        // Don't plant trees in spawn areas or center
-        const distFromCenter = Math.sqrt(x*x + z*z);
-        if (distFromCenter > 15 && distFromCenter < MAP_SIZE * 0.45) {
-            createTree(x, z);
-        }
-    }
+    // Static trees from map-data.json (matches server collision)
+    const _staticTrees = [[-30,20],[25,-15],[-45,-30],[50,25],[-20,45],[35,-40],[-55,5],[15,50],[-10,-35],[60,-10],[-35,60],[40,45],[-50,-45],[20,-60],[-15,-50],[55,-35],[-40,25],[30,15],[-25,-15],[45,-5],[-60,40],[10,35],[-5,-55],[50,55],[-30,-60],[65,30],[-45,50],[20,-30],[-55,-15],[35,65],[-20,30],[55,-50],[-65,15],[40,-15],[-10,60],[25,-45],[-35,-25],[60,50],[-50,35],[15,-55],[-25,-45],[45,20],[-40,-10],[30,55],[-15,15],[50,-25],[-55,-50],[20,40],[-30,50],[65,-20],[-45,-5],[35,-55],[-60,55],[10,-40],[-5,25],[55,10]];
+    _staticTrees.forEach(([x,z]) => createTree(x, z));
 
     // Rocks/Boulders for cover
     const createRock = (x, z, size) => {
@@ -510,7 +503,7 @@ const createMap = () => {
         });
         const rock = new THREE.Mesh(rockGeometry, rockMaterial);
         rock.position.set(x, terrainY(x, z) + size * 0.7, z);
-        rock.rotation.set(Math.random(), Math.random(), Math.random());
+        rock.rotation.set(x * 0.5, z * 0.3, size); // Deterministic rotation from position
         rock.castShadow = true;
         rock.receiveShadow = true;
         rock.userData.isWall = true;
@@ -518,13 +511,9 @@ const createMap = () => {
         return rock;
     };
 
-    // Add rocks
-    for (let i = 0; i < 40; i++) {
-        const x = (Math.random() - 0.5) * MAP_SIZE * 0.85;
-        const z = (Math.random() - 0.5) * MAP_SIZE * 0.85;
-        const size = 0.8 + Math.random() * 1.5;
-        createRock(x, z, size);
-    }
+    // Static rocks from map-data.json (matches server collision)
+    const _staticRocks = [[-25,10,1.2],[30,-20,1.5],[-40,-35,0.9],[50,15,1.8],[-15,40,1.1],[35,-50,1.4],[-55,20,1.0],[20,55,1.6],[-10,-25,0.8],[60,-5,1.3],[-35,55,1.5],[45,35,1.0],[-50,-40,1.7],[15,-55,0.9],[-20,-50,1.2],[55,-30,1.1],[-45,15,1.4],[25,25,0.8],[-30,-10,1.6],[40,-40,1.3],[-60,45,1.0],[10,30,1.5],[-5,-45,1.2],[50,50,1.8],[-25,-55,0.9],[65,20,1.1],[-40,40,1.4],[20,-35,1.0],[-55,-20,1.3],[35,60,1.5]];
+    _staticRocks.forEach(([x,z,s]) => createRock(x, z, s));
 
     // Walls/Boundaries
     const wallMaterial = new THREE.MeshStandardMaterial({
@@ -558,17 +547,9 @@ const createMap = () => {
     createWall(15, -8, 12, 3);
     createWall(-15, -8, 12, 3);
 
-    // Additional scattered walls for cover
-    for (let i = 0; i < 15; i++) {
-        const x = (Math.random() - 0.5) * MAP_SIZE * 0.7;
-        const z = (Math.random() - 0.5) * MAP_SIZE * 0.7;
-        const width = 3 + Math.random() * 5;
-        const height = 3 + Math.random() * 5;
-        const distFromCenter = Math.sqrt(x*x + z*z);
-        if (distFromCenter > 25) {
-            createWall(x, z, width, height);
-        }
-    }
+    // Static scattered walls from map-data.json (matches server collision)
+    const _staticWalls = [[-45,35,6,4],[30,-50,5,7],[-60,-20,4,5],[55,40,7,3],[-25,55,5,6],[40,-25,3,8],[-50,-55,6,4],[60,15,4,5],[-35,-40,5,3],[25,60,7,4],[-55,10,4,6],[45,-60,5,5],[-20,-65,6,3],[35,30,3,7],[-40,65,5,4]];
+    _staticWalls.forEach(([x,z,w,h]) => createWall(x, z, w, h));
 
     // Team spawn markers
     const redSpawnGeometry = new THREE.CircleGeometry(5, 32);
