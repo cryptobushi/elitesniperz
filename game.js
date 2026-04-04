@@ -1074,8 +1074,8 @@ class Player {
             this.shootCooldown -= deltaTime;
         }
 
-        // Auto-shoot at enemies in FOV
-        if (this.health > 0 && this.shootCooldown <= 0) {
+        // Auto-shoot at enemies in FOV (offline only — server handles shooting in online mode)
+        if (!isOnlineMode && this.health > 0 && this.shootCooldown <= 0) {
             this.autoShootAtEnemies();
         }
 
@@ -1825,6 +1825,8 @@ class Player {
     }
 
     takeDamage(damage, attacker) {
+        // In online mode, all damage is server-authoritative
+        if (isOnlineMode) return;
         // Spawn protection
         if (this._spawnProtection > 0) return;
         // Shield blocks one shot (check before god mode so it still consumes)
@@ -3576,7 +3578,6 @@ function handleBinaryState(buf) {
                 rPlayer.gold = gold;
                 rPlayer.health = alive ? 100 : 0;
                 rPlayer.mesh.visible = !!alive;
-                gameState.bots.push(rPlayer);
                 remote = { player: rPlayer, targetX: x, targetZ: z, targetRot: rot, lastUpdate: performance.now() };
                 _remotePlayers.set(id, remote);
             }
