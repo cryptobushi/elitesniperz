@@ -2038,7 +2038,7 @@ class Player {
             gameState.gold = this.gold;
             updateGoldUI();
             // Float gold text
-            showGoldPopup(`+${earned}g`);
+            showGoldPopup(`+${earned}c`);
         }
     }
 
@@ -2097,7 +2097,7 @@ class Player {
 // Gold + Shop UI
 function updateGoldUI() {
     const el = document.getElementById('goldCount');
-    if (el) el.textContent = `Gold: ${gameState.gold}`;
+    if (el) el.textContent = `${gameState.gold}c`;
 }
 
 // === TRADING TERMINAL — price tracking + HUD chart ===
@@ -2231,7 +2231,18 @@ function spawnFlyingCandle(text, color, boost) {
 function showGoldPopup(text) {
     const boost = parseFloat(text.replace(/[^0-9.]/g, '')) / 50 || 0.5;
     pumpPrice(boost);
-    spawnFlyingCandle(text, '#00ff44', boost * 10);
+    // Small floating text — doesn't overlap with streak candles
+    const el = document.createElement('div');
+    el.style.cssText = `position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);color:#ffd700;font-size:1rem;font-weight:900;font-family:monospace;text-shadow:0 0 10px #ffd70066;pointer-events:none;z-index:9998;transition:all 0.8s ease-out;opacity:1;`;
+    el.textContent = text.replace(/g$/, 'c'); // gold → coins
+    document.body.appendChild(el);
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            el.style.top = '38%';
+            el.style.opacity = '0';
+        });
+    });
+    setTimeout(() => el.remove(), 900);
 }
 
 function resetStreakChart() {
@@ -2252,7 +2263,7 @@ function updateShopUI() {
     const inv = gameState.player.inventory;
     const gold = gameState.player.gold;
     const shopGold = document.getElementById('shopGold');
-    if (shopGold) shopGold.textContent = `Gold: ${gold}`;
+    if (shopGold) shopGold.textContent = `${gold}c`;
 
     let html = '';
     for (const [id, item] of Object.entries(SHOP_ITEMS)) {
@@ -2264,12 +2275,12 @@ function updateShopUI() {
         let status = '';
         if (owned) status = ' owned';
         else if (needsReq) status = ` (need ${SHOP_ITEMS[item.requires].name})`;
-        else if (!canAfford) status = ' (need gold)';
+        else if (!canAfford) status = ' (need coins)';
 
         html += `<div class="shop-item${disabled ? ' disabled' : ''}" data-item="${id}">
             <span class="shop-icon">${item.icon}</span>
             <span class="shop-name">${item.name}</span>
-            <span class="shop-cost">${item.cost}g</span>
+            <span class="shop-cost">${item.cost}c</span>
             <span class="shop-desc">${item.desc}${status}</span>
         </div>`;
     }
