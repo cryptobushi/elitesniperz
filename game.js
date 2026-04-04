@@ -1,197 +1,101 @@
 import * as THREE from 'three';
 
-// === NETWORKING ===
-let ws = null;
+// === NETWORKING (Colyseus) ===
+let colyseusClient = null;
+let colyseusRoom = null;
 let isOnlineMode = false;
-let myPlayerId = null;
-const remotePlayers = new Map(); // id -> { state, mesh }
+let mySessionId = null;
+const remotePlayers = new Map(); // sessionId -> { player, snapshots }
 
-function connectToServer(username, team) {
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${protocol}//${location.host}`);
+async function connectToServer(username, team) {
+    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    colyseusClient = new Colyseus.Client(`${protocol}://${location.host}`);
 
-    ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'join', username, team }));
-    };
+    try {
+        colyseusRoom = await colyseusClient.joinOrCreate('game', { username, team });
+        mySessionId = colyseusRoom.sessionId;
+        console.log(`Joined room ${colyseusRoom.id} as ${username} (${mySessionId})`);
 
-    ws.onmessage = (event) => {
-        try {
-            const msg = JSON.parse(event.data);
-            handleServerMessage(msg);
-        } catch {}
-    };
+        // State change listeners
+        colyseusRoom.state.players.onAdd((player, key) => {
+            if (key === mySessionId) return; // Skip self
+            console.log(`Player added: ${player.username} (${key})`);
+        });
 
-    ws.onclose = () => {
-        console.log('Disconnected from server');
-        // Could show reconnect UI here
-    };
+        colyseusRoom.state.players.onRemove((player, key) => {
+            const remote = remotePlayers.get(key);
+            if (remote) {
+                returnToPool(remote.player);
+                remotePlayers.delete(key);
+            }
+        });
+
+        // Kill events
+        colyseusRoom.onMessage('kill', (msg) => handleServerKill(msg));
+        colyseusRoom.onMessage('respawn', (msg) => handleServerRespawn(msg));
+        colyseusRoom.onMessage('chat', (msg) => addChatMessage(msg.username, msg.text, msg.team));
+        colyseusRoom.onMessage('playerJoined', (msg) => addChatMessage('SERVER', `${msg.username} joined ${msg.team}`, 'system'));
+        colyseusRoom.onMessage('playerLeft', (msg) => addChatMessage('SERVER', `${msg.username} disconnected`, 'system'));
+
+    } catch (e) {
+        console.error('Failed to connect:', e);
+    }
 }
 
 function sendToServer(msg) {
-    if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+    if (colyseusRoom) colyseusRoom.send(msg.type, msg);
 }
 
-const _serverRoster = new Map(); // id -> { name, team, bot }
+// Colyseus state sync — called every frame
+function syncFromColyseus() {
+    if (!colyseusRoom || !gameState.gameStarted) return;
 
-function handleServerMessage(msg) {
-    // Compact state update
-    if (msg.t === 's') {
-        updateFromServerCompact(msg);
-        return;
-    }
-
-    switch (msg.type) {
-        case 'joined':
-            myPlayerId = msg.id;
-            // Load roster
-            if (msg.roster) {
-                msg.roster.forEach(r => _serverRoster.set(r.id, r));
-            }
-            console.log(`Joined as ${msg.username} on ${msg.team} (id: ${msg.id})`);
-            break;
-
-        case 'queued':
-            showQueuePopup(msg.position);
-            break;
-
-        case 'kill':
-            handleServerKill(msg);
-            break;
-
-        case 'respawn':
-            handleServerRespawn(msg);
-            break;
-
-        case 'chat':
-            addChatMessage(msg.username, msg.text, msg.team);
-            break;
-
-        case 'playerJoined':
-            _serverRoster.set(msg.id, { name: msg.username, team: msg.team });
-            addChatMessage('SERVER', `${msg.username} joined ${msg.team}`, 'system');
-            break;
-
-        case 'playerLeft':
-            _serverRoster.delete(msg.id);
-            addChatMessage('SERVER', `${msg.username} disconnected`, 'system');
-            break;
-    }
-}
-
-const INTERP_DELAY = 100; // ms — render 100ms behind server for smooth interpolation
-let _serverTimeOffset = 0;
-let _lastServerTick = 0;
-
-function updateFromServerCompact(msg) {
-    if (!gameState.gameStarted) return;
-
-    const now = performance.now();
-    const serverIds = new Set();
-
-    for (const p of msg.p) {
-        const [id, x, z, rot, alive, kills, deaths, price, spawnProt, windwalk] = p;
-        serverIds.add(id);
-
-        if (id === myPlayerId) {
+    colyseusRoom.state.players.forEach((serverPlayer, key) => {
+        if (key === mySessionId) {
+            // Sync self stats (position is local-predicted)
             if (gameState.player) {
-                gameState.player.health = alive ? 100 : 0;
-                gameState.player.kills = kills;
-                gameState.player.deaths = deaths;
-                gameState.player.price = price;
-                gameState.player.gold = msg.g;
-                gameState.player._streak = msg.k;
-                gameState.kills = kills;
-                gameState.deaths = deaths;
-                gameState.gold = msg.g;
-                document.getElementById('killCount').textContent = kills;
-                document.getElementById('deathCount').textContent = deaths;
+                gameState.player.health = serverPlayer.health;
+                gameState.player.kills = serverPlayer.kills;
+                gameState.player.deaths = serverPlayer.deaths;
+                gameState.player.price = serverPlayer.price;
+                gameState.player.gold = serverPlayer.gold;
+                gameState.player._streak = serverPlayer.streak;
+                gameState.kills = serverPlayer.kills;
+                gameState.deaths = serverPlayer.deaths;
+                gameState.gold = serverPlayer.gold;
+                document.getElementById('killCount').textContent = serverPlayer.kills;
+                document.getElementById('deathCount').textContent = serverPlayer.deaths;
                 updateGoldUI();
                 pumpPrice(0);
             }
-            continue;
+            return;
         }
 
-        // Remote player — use pool
-        let remote = remotePlayers.get(id);
+        // Remote player
+        let remote = remotePlayers.get(key);
         if (!remote) {
-            const info = _serverRoster.get(id) || { name: 'Player', team: 'red' };
-            const player = getPooledPlayer(info.name, info.team);
-            player._remoteId = id;
-            remote = { player, snapshots: [] };
-            remotePlayers.set(id, remote);
+            const player = getPooledPlayer(serverPlayer.username, serverPlayer.team);
+            player._remoteId = key;
+            remote = { player };
+            remotePlayers.set(key, remote);
         }
 
-        // Push snapshot for interpolation
-        remote.snapshots.push({ t: now, x, z, rot, alive });
-        if (remote.snapshots.length > 5) remote.snapshots.shift();
-
-        // Update non-interpolated fields immediately
-        remote.player.health = alive ? 100 : 0;
-        remote.player.kills = kills;
-        remote.player.deaths = deaths;
-        remote.player.price = price;
-    }
-
-    // Remove players no longer in state (only on full sync)
-    if (msg.f) {
-        for (const [id, remote] of remotePlayers) {
-            if (!serverIds.has(id)) {
-                returnToPool(remote.player);
-                remotePlayers.delete(id);
-            }
-        }
-    }
-}
-
-// Called every frame in animate() for smooth remote player movement
-function interpolateRemotePlayers() {
-    const renderTime = performance.now() - INTERP_DELAY;
-
-    for (const [id, remote] of remotePlayers) {
-        const snaps = remote.snapshots;
-        if (snaps.length < 2) {
-            // Not enough data — just use latest
-            if (snaps.length === 1) {
-                const s = snaps[0];
-                remote.player.position.x = s.x;
-                remote.player.position.z = s.z;
-                remote.player.position.y = terrainY_client(s.x, s.z) + 0.5;
-                remote.player.mesh.rotation.y = s.rot;
-                remote.player.mesh.visible = s.alive === 1;
-            }
-            continue;
-        }
-
-        // Find two snapshots bracketing renderTime
-        let s0 = snaps[0], s1 = snaps[1];
-        for (let i = 0; i < snaps.length - 1; i++) {
-            if (snaps[i].t <= renderTime && snaps[i + 1].t >= renderTime) {
-                s0 = snaps[i];
-                s1 = snaps[i + 1];
-                break;
-            }
-        }
-
-        // If renderTime is past all snapshots, use latest
-        if (renderTime > snaps[snaps.length - 1].t) {
-            s0 = snaps[snaps.length - 2] || snaps[0];
-            s1 = snaps[snaps.length - 1];
-        }
-
-        const range = s1.t - s0.t;
-        const t = range > 0 ? Math.min(1, Math.max(0, (renderTime - s0.t) / range)) : 1;
-
+        // Smooth interpolation toward server position
         const rp = remote.player;
-        rp.position.x = s0.x + (s1.x - s0.x) * t;
-        rp.position.z = s0.z + (s1.z - s0.z) * t;
+        rp.position.x += (serverPlayer.x - rp.position.x) * 0.2;
+        rp.position.z += (serverPlayer.z - rp.position.z) * 0.2;
         rp.position.y = terrainY_client(rp.position.x, rp.position.z) + 0.5;
-        rp.mesh.rotation.y = s0.rot + (s1.rot - s0.rot) * t;
-        rp.mesh.visible = s1.alive === 1;
-    }
+        rp.mesh.rotation.y += (serverPlayer.rotation - rp.mesh.rotation.y) * 0.2;
+        rp.mesh.visible = serverPlayer.health > 0;
+        rp.health = serverPlayer.health;
+        rp.kills = serverPlayer.kills;
+        rp.deaths = serverPlayer.deaths;
+        rp.price = serverPlayer.price;
+    });
 }
 
 function handleServerKill(msg) {
-    if (msg.killerId === myPlayerId) {
+    if (msg.killerId === mySessionId) {
         // I got a kill
         showGoldPopup(`+${msg.gold}c`);
         if (msg.firstBlood) showStreakPopup('FIRST BLOOD', '#ff4444');
@@ -208,7 +112,7 @@ function handleServerKill(msg) {
         }
     }
 
-    if (msg.victimId === myPlayerId) {
+    if (msg.victimId === mySessionId) {
         // I died
         resetStreakChart();
     }
@@ -217,8 +121,8 @@ function handleServerKill(msg) {
 }
 
 function handleServerRespawn(msg) {
-    if (msg.id === myPlayerId && gameState.player) {
-        gameState.player.position.set(msg.x, terrainY(msg.x, msg.z) + 0.5, msg.z);
+    if (msg.id === mySessionId && gameState.player) {
+        gameState.player.position.set(msg.x, terrainY_client(msg.x, msg.z) + 0.5, msg.z);
         gameState.player.health = 100;
         gameState.player.mesh.visible = true;
     }
@@ -259,7 +163,7 @@ function initChat() {
                 e.preventDefault();
             } else if (input.value.trim()) {
                 if (isOnlineMode) {
-                    sendToServer({ type: 'chat', text: input.value.trim() });
+                    if (colyseusRoom) colyseusRoom.send('chat', { text: input.value.trim() });
                 } else {
                     addChatMessage(gameState.username, input.value.trim(), gameState.team);
                 }
@@ -2954,7 +2858,7 @@ document.addEventListener('mousedown', (e) => {
 
         // Send to server in online mode
         if (isOnlineMode) {
-            sendToServer({ type: 'move', x: intersectPoint.x, z: intersectPoint.z });
+            if (colyseusRoom) colyseusRoom.send('move', { x: intersectPoint.x, z: intersectPoint.z });
         }
 
         // Visual feedback - create click marker
@@ -3421,7 +3325,7 @@ function animate() {
     if (!isOnlineMode) {
         gameState.bots.forEach(bot => bot.update(deltaTime));
     } else {
-        interpolateRemotePlayers();
+        syncFromColyseus();
     }
 
     // Update player
