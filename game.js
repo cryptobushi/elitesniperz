@@ -9,7 +9,7 @@ const remotePlayers = new Map(); // sessionId -> { player, snapshots }
 
 async function connectToServer(username, team) {
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-    colyseusClient = new Colyseus.Client(`${protocol}://${location.host}`);
+    colyseusClient = new window.Colyseus.Client(`${protocol}://${location.host}`);
 
     try {
         colyseusRoom = await colyseusClient.joinOrCreate('game', { username, team });
@@ -38,7 +38,9 @@ async function connectToServer(username, team) {
         colyseusRoom.onMessage('playerLeft', (msg) => addChatMessage('SERVER', `${msg.username} disconnected`, 'system'));
 
     } catch (e) {
-        console.error('Failed to connect:', e);
+        console.error('Failed to connect to Colyseus:', e);
+        alert('Failed to connect to server. Switching to offline mode.');
+        isOnlineMode = false;
     }
 }
 
