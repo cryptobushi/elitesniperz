@@ -3638,13 +3638,22 @@ function handleJsonMessage(msg) {
             break;
         }
         case 'k': {
-            // Kill event
+            // Kill event — play shooting VFX
             addKillFeed(msg.kn, msg.vn);
+            audioManager.play('sniperFire');
+
+            // Find killer + victim meshes for tracer VFX
+            const killer = msg.ki === _myServerId ? gameState.player :
+                _remotePlayers.get(msg.ki)?.player;
+            const victim = msg.vi === _myServerId ? gameState.player :
+                _remotePlayers.get(msg.vi)?.player;
+            if (killer && victim && killer.createShootingEffect) {
+                killer.createShootingEffect(victim.position);
+            }
 
             // If the killer is our player
             if (msg.ki === _myServerId) {
                 audioManager.play('headshot');
-                audioManager.play('sniperFire');
 
                 // First blood
                 if (msg.fb) {

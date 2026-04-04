@@ -9,7 +9,7 @@ const SHOOT_COOLDOWN = 1.0;
 const SPAWN_PROTECTION = 1.5;
 const MAX_PLAYERS = 10;
 const TICK_RATE = 64;
-const SEND_RATE = 20;
+const SEND_RATE = 30;
 
 const SHOP_ITEMS = {
     boots1:    { name: 'Swift Boots',      cost: 100, icon: 'boots', desc: '+20% speed',        stat: 'speed',     mult: 1.2, tier: 1, group: 'boots' },
