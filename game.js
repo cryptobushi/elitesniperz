@@ -533,9 +533,9 @@ const createMap = () => {
     });
 
     const createWall = (x, y, width, height) => {
-        const wallGeometry = new THREE.BoxGeometry(width, 4, height);
+        const wallGeometry = new THREE.BoxGeometry(width, 8, height);
         const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-        wall.position.set(x, terrainY(x, y) + 2, y);
+        wall.position.set(x, terrainY(x, y), y);
         wall.castShadow = true;
         wall.receiveShadow = true;
         wall.userData.isWall = true;
