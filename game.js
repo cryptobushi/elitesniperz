@@ -3233,9 +3233,18 @@ if (isMobile) {
         !document.getElementById('scoreboard').classList.contains('hidden') ||
         !document.getElementById('deathPopup').classList.contains('hidden');
 
+    // Check if touch is over any UI element
+    const _touchOnUI = (e) => {
+        for (const t of e.changedTouches) {
+            const el = document.elementFromPoint(t.clientX, t.clientY);
+            if (el && el.closest('#abilities, #terminal, #shopPanel, #scoreboard, #deathPopup, #minimap')) return true;
+        }
+        return false;
+    };
+
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        if (_uiOpen()) return;
+        if (_uiOpen() || _touchOnUI(e)) return;
         camVelX = 0;
         camVelZ = 0;
 
@@ -3342,15 +3351,7 @@ if (isMobile) {
 
 if (!isMobile) {
 
-    // Ability buttons work via tap on the HTML elements (pointer-events: all)
-    document.querySelectorAll('.ability').forEach(btn => {
-        btn.addEventListener('touchstart', (e) => {
-            e.stopPropagation();
-            const ability = btn.dataset.ability;
-            if (ability === 'windwalk') { gameState.keys['q'] = true; setTimeout(() => gameState.keys['q'] = false, 100); }
-            if (ability === 'farsight') { gameState.keys['e'] = true; setTimeout(() => gameState.keys['e'] = false, 100); }
-        }, { passive: false });
-    });
+    // Ability buttons work via click — touch handled by blocking canvas
 
     // Fullscreen on game start
     document.getElementById('startBtn')?.addEventListener('click', () => {
