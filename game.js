@@ -2892,6 +2892,15 @@ document.getElementById('scoreboard').addEventListener('click', () => {
     document.getElementById('scoreboard').classList.add('hidden');
 });
 
+// Click outside shop to close it
+document.addEventListener('click', (e) => {
+    const shop = document.getElementById('shopPanel');
+    if (shop.classList.contains('hidden')) return;
+    if (!e.target.closest('#shopPanel') && !e.target.closest('#shopBtn')) {
+        shop.classList.add('hidden');
+    }
+});
+
 function startGame() {
     console.log('startGame() called');
     try {
