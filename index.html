@@ -337,31 +337,38 @@
             position: relative;
             z-index: 1;
             font-family: 'Times New Roman', 'Georgia', serif;
-            font-size: clamp(3rem, 12vw, 6rem);
+            font-size: clamp(1.8rem, 10vw, 6rem);
             font-weight: 400;
-            letter-spacing: 0.3em;
+            letter-spacing: clamp(0.1em, 3vw, 0.3em);
             color: #8b0000;
-            text-shadow: 0 0 60px rgba(200,0,0,0.8), 0 0 120px rgba(139,0,0,0.4), 0 0 200px rgba(139,0,0,0.2);
+            text-shadow: 0 0 60px rgba(200,0,0,0.8), 0 0 120px rgba(139,0,0,0.4);
             opacity: 0;
             transform: scale(1.8);
             animation: deathTextIn 1s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s forwards;
         }
         @keyframes deathTextIn {
-            0% { opacity: 0; transform: scale(1.8); letter-spacing: 0.8em; }
-            50% { opacity: 1; transform: scale(0.95); letter-spacing: 0.25em; }
+            0% { opacity: 0; transform: scale(1.8); letter-spacing: 0.5em; }
+            50% { opacity: 1; transform: scale(0.95); letter-spacing: 0.15em; }
             70% { transform: scale(1.05); }
-            100% { opacity: 1; transform: scale(1); letter-spacing: 0.3em; }
+            100% { opacity: 1; transform: scale(1); letter-spacing: clamp(0.1em, 3vw, 0.3em); }
+        }
+        #deathChart {
+            position: relative;
+            z-index: 1;
+            max-width: 90vw;
         }
         #deathKiller {
             position: relative;
             z-index: 1;
             font-family: 'Times New Roman', 'Georgia', serif;
-            font-size: clamp(0.8rem, 3vw, 1.2rem);
+            font-size: clamp(0.6rem, 2.5vw, 1.2rem);
             color: #777;
-            letter-spacing: 0.15em;
+            letter-spacing: 0.1em;
             opacity: 0;
             animation: deathSubIn 0.5s ease-out 1s forwards;
-            margin-top: 0.8rem;
+            margin-top: 0.5rem;
+            max-width: 90vw;
+            text-align: center;
         }
         @keyframes deathSubIn {
             0% { opacity: 0; transform: translateY(10px); }
@@ -370,25 +377,28 @@
         #respawnBtn {
             position: relative;
             z-index: 1;
-            margin-top: 1.5rem;
-            background: none;
-            border: 1px solid #8b000044;
-            color: #8b0000;
+            margin-top: clamp(0.5rem, 2vh, 1.5rem);
+            background: #4a0000;
+            border: 2px solid #8b0000;
+            color: #ff2222;
             font-family: 'Times New Roman', 'Georgia', serif;
-            font-size: clamp(0.8rem, 2.5vw, 1rem);
-            letter-spacing: 0.15em;
-            padding: 0.6rem 2rem;
+            font-size: clamp(0.7rem, 2.5vw, 1rem);
+            letter-spacing: 0.1em;
+            padding: clamp(0.4rem, 1.5vh, 0.6rem) clamp(1rem, 4vw, 2rem);
             cursor: pointer;
             pointer-events: all;
             opacity: 0;
             animation: deathSubIn 0.5s ease-out 1.3s forwards;
             -webkit-tap-highlight-color: transparent;
             transition: all 0.2s;
+            border-radius: 4px;
+            text-shadow: 0 0 10px rgba(255,0,0,0.3);
         }
         #respawnBtn:hover, #respawnBtn:active {
-            border-color: #cc0000;
-            color: #ff2222;
-            text-shadow: 0 0 20px rgba(255,0,0,0.4);
+            background: #6a0000;
+            border-color: #ff2222;
+            color: #ff4444;
+            text-shadow: 0 0 20px rgba(255,0,0,0.5);
         }
 
         /* === SHOP PANEL === */
@@ -522,11 +532,10 @@
             #scoreboard .sb-price span { display: none; } /* hide % on small screens */
 
             /* Death screen */
-            #deathText { font-size: clamp(1.8rem, 8vw, 3.5rem); }
-            #deathKiller { font-size: clamp(0.6rem, 2.5vw, 0.9rem); }
-            #deathChart { width: 180px; height: 55px; }
-            #deathCandle div:nth-child(2) { height: 50px !important; width: 16px !important; }
-            #respawnBtn { font-size: clamp(0.65rem, 2vw, 0.85rem); padding: 0.4rem 1.2rem; margin-top: 1rem; }
+            #deathPopup { padding: 0.5rem; }
+            #deathCandle { transform: scale(0.6); }
+            #deathChart { width: 150px !important; height: 40px !important; }
+            #respawnBtn { margin-top: 0.5rem; }
 
             /* Shop */
             #shopPanel { padding: 0.6rem; }
