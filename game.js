@@ -3233,18 +3233,26 @@ if (isMobile) {
         !document.getElementById('scoreboard').classList.contains('hidden') ||
         !document.getElementById('deathPopup').classList.contains('hidden');
 
-    // Check if touch is over any UI element
-    const _touchOnUI = (e) => {
+    // Check if touch Y is in the bottom UI zone (abilities bar area)
+    const _touchInBottomUI = (e) => {
+        const cutoff = window.innerHeight * 0.82; // Bottom ~18% is UI
         for (const t of e.changedTouches) {
-            const el = document.elementFromPoint(t.clientX, t.clientY);
-            if (el && el.closest('#abilities, #terminal, #shopPanel, #scoreboard, #deathPopup, #minimap')) return true;
+            if (t.clientY > cutoff) return true;
+        }
+        return false;
+    };
+
+    // Check if touch is in top-left HUD area
+    const _touchInHUD = (e) => {
+        for (const t of e.changedTouches) {
+            if (t.clientX < 180 && t.clientY < 120) return true;
         }
         return false;
     };
 
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        if (_uiOpen() || _touchOnUI(e)) return;
+        if (_uiOpen() || _touchInBottomUI(e) || _touchInHUD(e)) return;
         camVelX = 0;
         camVelZ = 0;
 
