@@ -2068,6 +2068,7 @@ class Player {
     }
 
     buyItem(itemId) {
+        return false; // Shop disabled
         const item = SHOP_ITEMS[itemId];
         if (!item) return false;
         if (this.gold < item.cost) return false;
@@ -2283,6 +2284,7 @@ function useWindwalk() {
 }
 
 function useFarsight() {
+    return; // Disabled
     const ability = gameState.abilities.farsight;
     if (ability.cooldown > 0 || !gameState.player) return;
 
