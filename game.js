@@ -1961,7 +1961,11 @@ class Player {
             gameState.moveTarget = null;
             gameState.targetLock = null;
 
-            // Dark Souls death screen
+            // Hide HUD on death
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('abilities').classList.add('hidden');
+            document.querySelector('.minimap').classList.add('hidden');
+
             const popup = document.getElementById('deathPopup');
             const killerName = killer ? killer.username : 'the darkness';
 
@@ -2022,7 +2026,9 @@ class Player {
         this.mesh.visible = true;
 
         if (this.isPlayer) {
-            // Player alive
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('abilities').classList.remove('hidden');
+            document.querySelector('.minimap').classList.remove('hidden');
         } else {
             // Bot auto-buy: prioritize items they don't have
             this._botShop();
