@@ -1143,6 +1143,12 @@ class Player {
             if (distance > this.shootRange) continue;
             if (distance >= bestDist) continue;
 
+            // FOV cone — must be facing the enemy (90 degree cone)
+            const forward = new THREE.Vector3(0, 0, 1);
+            if (this.mesh) forward.applyQuaternion(this.mesh.quaternion);
+            const toEnemy = new THREE.Vector3().subVectors(enemy.position, this.position).normalize();
+            if (forward.angleTo(toEnemy) > Math.PI / 4) continue;
+
             // Wall LOS check
             const dir = new THREE.Vector3().subVectors(enemy.position, this.position).normalize();
             const ray = new THREE.Raycaster();
