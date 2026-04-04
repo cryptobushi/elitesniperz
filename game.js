@@ -2809,9 +2809,11 @@ function updateAbilityUI() {
 
 // Input Handlers
 document.addEventListener('keydown', (e) => {
+    // Don't intercept keys when typing in an input field
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
     gameState.keys[e.key.toLowerCase()] = true;
 
-    // Debug key presses
     if (['w', 'a', 's', 'd'].includes(e.key.toLowerCase())) {
         console.log('Key pressed:', e.key.toLowerCase());
     }
@@ -2878,6 +2880,7 @@ function updateDebugFPS() {
 updateDebugFPS();
 
 document.addEventListener('keyup', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     gameState.keys[e.key.toLowerCase()] = false;
     if (!e.shiftKey) gameState.attackWalk = false;
     if (e.key === 'Tab') {
