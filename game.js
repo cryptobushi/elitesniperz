@@ -594,10 +594,34 @@ const FARSIGHT_RADIUS = 70;
 class FogOfWar {
     constructor() {
         this.visionSources = [];
-        this.fogMesh = null; // Keep reference so scene cleanup doesn't break
+        this.fogMesh = null;
+        this.canvas = document.createElement('canvas');
+        this.canvas.width = 256;
+        this.canvas.height = 256;
+        this.ctx = this.canvas.getContext('2d');
     }
 
-    init() {} // No mesh to create
+    init() {
+        this.fogTexture = new THREE.CanvasTexture(this.canvas);
+        this.fogTexture.magFilter = THREE.LinearFilter;
+        this.fogTexture.minFilter = THREE.LinearFilter;
+
+        const fogMaterial = new THREE.MeshBasicMaterial({
+            map: this.fogTexture,
+            transparent: true,
+            opacity: 0.55,
+            color: 0x000000,
+            depthWrite: false,
+            depthTest: false,
+        });
+
+        const fogGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE);
+        this.fogMesh = new THREE.Mesh(fogGeometry, fogMaterial);
+        this.fogMesh.rotation.x = -Math.PI / 2;
+        this.fogMesh.position.y = 10;
+        this.fogMesh.renderOrder = 10000;
+        scene.add(this.fogMesh);
+    }
 
     update(player, allUnits, farsightPositions = []) {
         this.visionSources = [];
@@ -618,6 +642,30 @@ class FogOfWar {
         farsightPositions.forEach(pos => {
             this.visionSources.push({ x: pos.x, z: pos.z, r: FARSIGHT_RADIUS });
         });
+
+        // Render visual fog overlay
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+        this.ctx.fillRect(0, 0, 256, 256);
+
+        this.ctx.globalCompositeOperation = 'destination-out';
+        for (const src of this.visionSources) {
+            const x = ((src.x + MAP_SIZE / 2) / MAP_SIZE) * 256;
+            const y = ((src.z + MAP_SIZE / 2) / MAP_SIZE) * 256;
+            const rPx = (src.r / MAP_SIZE) * 256;
+
+            const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, rPx);
+            gradient.addColorStop(0, 'rgba(255,255,255,1)');
+            gradient.addColorStop(0.8, 'rgba(255,255,255,1)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+
+            this.ctx.fillStyle = gradient;
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, rPx, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+        this.ctx.globalCompositeOperation = 'source-over';
+
+        this.fogTexture.needsUpdate = true;
     }
 
     isVisible(worldX, worldZ) {
@@ -631,6 +679,7 @@ class FogOfWar {
 }
 
 const fogOfWar = new FogOfWar();
+fogOfWar.init();
 
 // Player Class
 class Player {
@@ -2533,7 +2582,7 @@ function startGame() {
 
     // Remove preview ground (not fog mesh)
     const toRemove = scene.children.filter(child =>
-        child.geometry && child.geometry.type === 'PlaneGeometry'
+        child.geometry && child.geometry.type === 'PlaneGeometry' && child !== fogOfWar.fogMesh
     );
     toRemove.forEach(child => scene.remove(child));
 
