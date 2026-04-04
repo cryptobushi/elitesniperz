@@ -3695,12 +3695,6 @@ function handleJsonMessage(msg) {
                 resetStreakChart();
             }
 
-            // Trigger VFX if we can see either player
-            const killer = findRemoteOrLocal(msg.ki);
-            const victim = findRemoteOrLocal(msg.vi);
-            if (killer && victim && killer.mesh.visible) {
-                killer.createShootingEffect(victim.position);
-            }
             break;
         }
         case 'r': {

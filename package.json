@@ -19,6 +19,7 @@
   "homepage": "https://github.com/cryptobushi/elitesniperz#readme",
   "dependencies": {
     "express": "^5.2.1",
+    "puppeteer": "^24.40.0",
     "ws": "^8.20.0"
   }
 }
