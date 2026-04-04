@@ -1903,6 +1903,7 @@ class Player {
         // Reset kill streak when dying
         if (this.isPlayer) {
             gameState.killStreak = 0;
+            resetStreakChart();
             gameState.gold = this.gold;
             updateGoldUI();
         }
@@ -2063,26 +2064,78 @@ function updateGoldUI() {
     if (el) el.textContent = `Gold: ${gameState.gold}`;
 }
 
-let _goldPopupEl = null;
-function showGoldPopup(text) {
-    // Remove previous gold popup
-    if (_goldPopupEl) _goldPopupEl.remove();
+// === OHLC CANDLE CHART ===
+let _chartCandles = [];
 
+function _addCandle(boost) {
+    const prev = _chartCandles.length > 0 ? _chartCandles[_chartCandles.length - 1] : null;
+    const open = prev ? prev.close : 20;
+    const close = open + boost + Math.random() * 10;
+    const high = close + Math.random() * 10;
+    const low = open - Math.random() * 5;
+    _chartCandles.push({ open, close, high, low });
+    if (_chartCandles.length > 25) _chartCandles.shift();
+}
+
+function _renderChart(label, labelColor) {
     const popup = document.getElementById('streakPopup');
-    const el = document.createElement('div');
-    el.style.cssText = `
-        color: #ffd700;
-        font-size: clamp(1.5rem, 5vw, 2.5rem);
-        font-weight: 900;
-        text-shadow: 0 0 20px #ffd700, 0 0 40px #ff880088, 0 2px 4px rgba(0,0,0,0.8);
-        letter-spacing: 0.05em;
-        animation: goldSlam 0.15s ease-out forwards, goldFloat 1.2s 0.15s ease-out forwards;
-        pointer-events: none;
-    `;
-    el.textContent = text;
-    popup.appendChild(el);
-    _goldPopupEl = el;
-    setTimeout(() => { if (_goldPopupEl === el) { el.remove(); _goldPopupEl = null; } }, 1500);
+    popup.innerHTML = '';
+    const clr = labelColor || '#00ff44';
+
+    const chart = document.createElement('div');
+    const chartW = Math.min(350, _chartCandles.length * 16);
+    chart.style.cssText = `display:flex;align-items:flex-end;pointer-events:none;height:200px;width:${chartW}px;`;
+
+    let minVal = Infinity, maxVal = -Infinity;
+    _chartCandles.forEach(c => { minVal = Math.min(minVal, c.low); maxVal = Math.max(maxVal, c.high); });
+    const range = maxVal - minVal || 1;
+    const scale = 180 / range;
+    const w = Math.max(4, Math.min(12, (chartW - _chartCandles.length * 2) / _chartCandles.length));
+
+    _chartCandles.forEach((c, i) => {
+        const isNew = i === _chartCandles.length - 1;
+        const bodyTop = Math.max(c.open, c.close);
+        const bodyBot = Math.min(c.open, c.close);
+        const bodyH = Math.max(2, (bodyTop - bodyBot) * scale);
+        const wickTopH = Math.max(0, (c.high - bodyTop) * scale);
+        const wickBotH = Math.max(0, (bodyBot - c.low) * scale);
+        const bottom = (c.low - minVal) * scale;
+        const color = '#00cc44';
+        const glow = isNew ? 'box-shadow:0 0 12px #00ff44,0 0 24px #00ff4466;' : '';
+        const anim = isNew ? 'animation:candleGrow 0.12s cubic-bezier(0,0.8,0.2,1.3) forwards;transform-origin:bottom;' : '';
+
+        chart.innerHTML += `<div style="flex-shrink:0;width:${w + 2}px;display:flex;flex-direction:column;align-items:center;align-self:flex-end;margin-bottom:${bottom}px;">
+            <div style="width:2px;height:${wickTopH}px;background:${color};"></div>
+            <div style="width:${w}px;height:${bodyH}px;background:${color};border-radius:1px;${glow}${anim}"></div>
+            <div style="width:2px;height:${wickBotH}px;background:${color};margin-top:1px;"></div>
+        </div>`;
+    });
+    popup.appendChild(chart);
+
+    if (label) {
+        const el = document.createElement('div');
+        el.style.cssText = `color:${clr};font-size:clamp(0.9rem,3vw,1.4rem);font-weight:900;text-shadow:0 0 15px ${clr};pointer-events:none;margin-top:4px;font-family:monospace;`;
+        el.textContent = label;
+        popup.appendChild(el);
+    }
+
+    clearTimeout(popup._fadeTimer);
+    popup._fadeTimer = setTimeout(() => {
+        popup.style.transition = 'opacity 1s';
+        popup.style.opacity = '0';
+        setTimeout(() => { popup.style.transition = ''; popup.style.opacity = '1'; popup.innerHTML = ''; }, 1000);
+    }, 2500);
+}
+
+function showGoldPopup(text) {
+    _addCandle(5 + Math.random() * 10);
+    _renderChart(text, '#00ff44');
+}
+
+function resetStreakChart() {
+    _chartCandles = [];
+    const popup = document.getElementById('streakPopup');
+    if (popup) popup.innerHTML = '';
 }
 
 function updateShopUI() {
@@ -2147,14 +2200,21 @@ function checkShopProximity() {
 
 // UI Functions
 function showStreakPopup(text, color) {
-    const popup = document.getElementById('streakPopup');
-    const el = document.createElement('div');
-    el.className = 'streak-text';
-    el.style.color = color;
-    el.textContent = text;
-    popup.innerHTML = '';
-    popup.appendChild(el);
-    setTimeout(() => el.remove(), 2200);
+    const boosts = {
+        'FIRST BLOOD':20, 'KILLING SPREE':30, 'RAMPAGE':45, 'DOMINATING':60,
+        'UNSTOPPABLE':80, 'GODLIKE':120, 'DOUBLE KILL':25, 'MULTI KILL':35,
+        'MEGA KILL':50, 'ULTRA KILL':70, 'MONSTER KILL':90, 'LUDICROUS KILL':130,
+        'SHIELD BLOCKED!':10,
+    };
+    _addCandle(boosts[text] || 20);
+
+    // Screen flash
+    const flash = document.createElement('div');
+    flash.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:${color};opacity:0.2;pointer-events:none;z-index:9998;animation:screenFlash 0.3s ease-out forwards;`;
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 400);
+
+    _renderChart(text, color);
 }
 
 function addKillFeed(killer, victim) {
