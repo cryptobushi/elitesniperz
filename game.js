@@ -8,6 +8,12 @@ let mySessionId = null;
 const remotePlayers = new Map(); // sessionId -> { player, snapshots }
 
 async function connectToServer(username, team) {
+    console.log('Connecting to Colyseus...');
+    if (!window.Colyseus) {
+        console.error('Colyseus SDK not loaded!');
+        isOnlineMode = false;
+        return;
+    }
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
     colyseusClient = new window.Colyseus.Client(`${protocol}://${location.host}`);
 
@@ -39,8 +45,17 @@ async function connectToServer(username, team) {
 
     } catch (e) {
         console.error('Failed to connect to Colyseus:', e);
-        alert('Failed to connect to server. Switching to offline mode.');
+        console.log('Falling back to offline mode');
         isOnlineMode = false;
+        // Create local bots as fallback
+        if (gameState.bots.length === 0 && gameState.gameStarted) {
+            const botNames = ['Elite', 'Anima', 'Game', 'ESi', 'Apathetic', 'Gem', 'Kflan', 'Jubei', 'Steve', 'Sean'];
+            for (let i = 0; i < 10; i++) {
+                const team = i < 5 ? 'red' : 'blue';
+                const bot = new Player(botNames[i], team, false);
+                gameState.bots.push(bot);
+            }
+        }
     }
 }
 
