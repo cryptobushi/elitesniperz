@@ -1290,28 +1290,14 @@ class Player {
 
                     if (!moved) {
                         this._stuckFrames++;
-                        if (this._stuckFrames > 10) {
-                            // Find nearest bot and run AWAY from it + the wall
-                            let escapeDir = new THREE.Vector3((Math.random() - 0.5), 0, (Math.random() - 0.5)).normalize();
-
-                            for (const other of gameState.bots) {
-                                if (other === this || other.health <= 0) continue;
-                                const dist = this.position.distanceTo(other.position);
-                                if (dist < 5) {
-                                    // Run away from nearby bot
-                                    escapeDir.add(new THREE.Vector3().subVectors(this.position, other.position).normalize());
-                                }
-                            }
-                            escapeDir.normalize();
-
+                        if (this._stuckFrames > 5) {
+                            // Stuck — abandon target, pick random new position
                             this.targetPosition = new THREE.Vector3(
-                                this.position.x + escapeDir.x * 25,
+                                (Math.random() - 0.5) * MAP_SIZE * 0.7,
                                 0.5,
-                                this.position.z + escapeDir.z * 25
+                                (Math.random() - 0.5) * MAP_SIZE * 0.7
                             );
-                            // Clamp to map bounds
-                            this.targetPosition.x = Math.max(-MAP_SIZE/2 + 10, Math.min(MAP_SIZE/2 - 10, this.targetPosition.x));
-                            this.targetPosition.z = Math.max(-MAP_SIZE/2 + 10, Math.min(MAP_SIZE/2 - 10, this.targetPosition.z));
+                            this._botState = 'explore';
                             this._stuckFrames = 0;
                         }
                     } else {
@@ -1340,7 +1326,7 @@ class Player {
             }
         });
 
-        // If enemy found, aim at them and chase
+        // If enemy found, aim at them and chase (but not through walls forever)
         if (closestEnemy) {
             this.weapon.lookAt(closestEnemy.position);
 
@@ -1348,10 +1334,22 @@ class Player {
                 .subVectors(closestEnemy.position, this.position)
                 .normalize();
 
-            // Switch to chase state and pursue enemy
-            this._botState = 'chase';
-            this._campTimer = 0;
-            this.targetPosition = this.position.clone().add(enemyDirection.multiplyScalar(10));
+            // Only chase if we have LOS — don't run at walls
+            const ray = new THREE.Raycaster();
+            const eyePos = this.position.clone(); eyePos.y += 1.0;
+            ray.set(eyePos, enemyDirection);
+            const hits = ray.intersectObjects(gameState._wallObjects || [], false);
+            const dist = this.position.distanceTo(closestEnemy.position);
+            const wallBlocked = hits.some(h => h.distance < dist);
+
+            if (!wallBlocked) {
+                this._botState = 'chase';
+                this._campTimer = 0;
+                this.targetPosition = this.position.clone().add(enemyDirection.multiplyScalar(10));
+            } else {
+                // Can see enemy but wall in the way — go explore instead
+                if (this._botState === 'chase') this._botState = 'explore';
+            }
         } else if (this.targetPosition) {
             // No enemy — aim in movement direction
             this.weapon.lookAt(this.targetPosition);
