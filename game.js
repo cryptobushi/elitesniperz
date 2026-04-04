@@ -980,7 +980,7 @@ class Player {
             });
             const halo = new THREE.Mesh(haloGeometry, haloMaterial);
             halo.rotation.x = -Math.PI / 2;
-            halo.position.y = -0.55;
+            halo.position.y = -0.2;
             halo.raycast = () => {};
             group.add(halo);
         }
