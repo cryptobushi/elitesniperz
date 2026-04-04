@@ -703,7 +703,7 @@ class Player {
         this.windwalkSpeed = 14;
         this.shootRange = 45;
         this.damage = 25;
-        this._spawnProtection = 3.0; // 3s invulnerable on spawn
+        this._spawnProtection = 1.5;
         this.price = 1.00; // Everyone is a token
         this.isWindwalking = false;
         this.farsightActive = false;
@@ -1055,7 +1055,10 @@ class Player {
             this.mesh.position.y += Math.sin(time * 2) * 0.008;
         }
 
-        // Spawn protection countdown + visual
+        // Spawn protection — cancel if player leaves spawn area
+        if (this._spawnProtection > 0 && !this.isNearSpawn()) {
+            this._spawnProtection = 0;
+        }
         if (this._spawnProtection > 0) {
             this._spawnProtection -= deltaTime;
             // Flicker transparency to show invulnerability
@@ -3278,6 +3281,17 @@ Player.prototype.respawn = function() {
 
 // === MOBILE TOUCH — drag anywhere to scroll camera, tap to move/attack ===
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('ontouchstart' in window);
+
+// Disable canvas touch when UI overlays are open
+function syncCanvasPointerEvents() {
+    const canvas = document.getElementById('gameCanvas');
+    const shopOpen = !document.getElementById('shopPanel').classList.contains('hidden');
+    const sbOpen = !document.getElementById('scoreboard').classList.contains('hidden');
+    const deathOpen = !document.getElementById('deathPopup').classList.contains('hidden');
+    canvas.style.pointerEvents = (shopOpen || sbOpen || deathOpen) ? 'none' : 'auto';
+}
+// Poll every frame
+setInterval(syncCanvasPointerEvents, 50);
 
 if (isMobile) {
     const canvas = document.getElementById('gameCanvas');
