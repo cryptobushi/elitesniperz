@@ -2166,7 +2166,27 @@ function dumpPrice() {
 }
 
 // Flying candle animation — spawns center, flies to HUD chart
+let _activeCandle = null;
+let _candleHoldTimer = null;
+
 function spawnFlyingCandle(text, color, boost) {
+    // If there's already a candle showing, send it flying immediately
+    if (_activeCandle) {
+        const old = _activeCandle;
+        clearTimeout(_candleHoldTimer);
+        old.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+        const chart = document.getElementById('hudChart');
+        if (chart) {
+            const rect = chart.getBoundingClientRect();
+            old.style.left = rect.left + rect.width / 2 + 'px';
+            old.style.top = rect.top + rect.height / 2 + 'px';
+            old.style.transform = 'translate(-50%, -50%) scale(0.2)';
+            old.style.opacity = '0';
+        }
+        setTimeout(() => old.remove(), 500);
+        _activeCandle = null;
+    }
+
     const candle = document.createElement('div');
     candle.className = 'flying-candle';
 
@@ -2204,6 +2224,7 @@ function spawnFlyingCandle(text, color, boost) {
     candle.style.opacity = '1';
     candle.style.transition = 'transform 0.15s cubic-bezier(0,0.8,0.2,1.2)';
     document.body.appendChild(candle);
+    _activeCandle = candle;
 
     // Pop to normal
     requestAnimationFrame(() => {
@@ -2213,7 +2234,9 @@ function spawnFlyingCandle(text, color, boost) {
     });
 
     // Hold 1s, then fly to chart
-    setTimeout(() => {
+    _candleHoldTimer = setTimeout(() => {
+        if (_activeCandle !== candle) return; // Replaced by newer candle
+        _activeCandle = null;
         candle.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
         const chart = document.getElementById('hudChart');
         if (chart) {
@@ -2223,9 +2246,8 @@ function spawnFlyingCandle(text, color, boost) {
             candle.style.transform = 'translate(-50%, -50%) scale(0.2)';
             candle.style.opacity = '0';
         }
+        setTimeout(() => candle.remove(), 700);
     }, 1000);
-
-    setTimeout(() => candle.remove(), 1700);
 }
 
 function showGoldPopup(text) {
