@@ -1,6 +1,8 @@
 const express = require('express');
 const { WebSocketServer } = require('ws');
 const http = require('http');
+const https = require('https');
+const fs = require('fs');
 const path = require('path');
 const {
     MAP_SIZE, SHOOT_RANGE, SHOOT_COOLDOWN, SPAWN_PROTECTION,
@@ -12,14 +14,29 @@ const { collidesWithWall, hasLineOfSight } = require('./shared/collision');
 // === EXPRESS + STATIC ===
 const app = express();
 app.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+app.use(express.static(path.join(__dirname)));
+
+// === TLS (Let's Encrypt) ===
+const CERT_DIR = '/etc/letsencrypt/live/sniperz.fun';
+let server, hasTLS = false;
+try {
+    server = https.createServer({
+        cert: fs.readFileSync(path.join(CERT_DIR, 'fullchain.pem')),
+        key: fs.readFileSync(path.join(CERT_DIR, 'privkey.pem'))
+    }, app);
+    hasTLS = true;
+} catch (e) {
+    console.log('No TLS certs, falling back to HTTP:', e.message);
+    server = http.createServer(app);
+}
+const wss = new WebSocketServer({ server });
+
+// /debug needs wss defined
 app.get('/debug', (req, res) => {
     const list = [];
     players.forEach((p, id) => list.push({ id, name: p.username, team: p.team, isBot: p.isBot, x: Math.round(p.x), z: Math.round(p.z), health: p.health }));
     res.json({ players: list, total: players.size, clients: wss.clients.size });
 });
-app.use(express.static(path.join(__dirname)));
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
 
 console.log('Collision walls loaded from shared/collision.js');
 
@@ -553,6 +570,17 @@ wss.on('connection', function(ws) {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', function() {
-    console.log('Elite Snipers server on port ' + PORT + ' (' + players.size + ' bots, ' + TICK_RATE + 'hz tick, ' + SEND_RATE + 'hz send)');
-});
+
+if (hasTLS) {
+    // HTTPS + WSS on 443
+    server.listen(443, '0.0.0.0', () =>
+        console.log('HTTPS + WSS on :443 (' + players.size + ' bots, ' + TICK_RATE + 'hz tick, ' + SEND_RATE + 'hz send)'));
+    // HTTP :80 → redirect to HTTPS
+    const redirect = express();
+    redirect.all('/{*splat}', (req, res) => res.redirect('https://' + req.headers.host + req.url));
+    http.createServer(redirect).listen(80, '0.0.0.0', () => console.log('HTTP :80 → HTTPS redirect'));
+} else {
+    server.listen(PORT, '0.0.0.0', function() {
+        console.log('Elite Snipers server on port ' + PORT + ' (' + players.size + ' bots, ' + TICK_RATE + 'hz tick, ' + SEND_RATE + 'hz send)');
+    });
+}
