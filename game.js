@@ -2281,36 +2281,45 @@ function drawDeathChart() {
     const min = Math.min(...prices) * 0.9;
     const max = Math.max(...prices) * 1.1;
     const range = max - min || 1;
+    const toX = (i) => (i / (prices.length - 1)) * w;
+    const toY = (p) => h - ((p - min) / range) * h;
+    const crashIdx = Math.max(1, prices.length - 3);
 
-    // Line chart — green then crashes red at the end
-    const crashStart = Math.max(0, prices.length - 3);
+    // Green section (full line up to crash point)
     ctx.beginPath();
     ctx.strokeStyle = '#00ff44';
     ctx.lineWidth = 2;
-    prices.forEach((p, i) => {
-        if (i === crashStart) {
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.strokeStyle = '#ff2222';
-            ctx.lineWidth = 2.5;
-            const x = (i / (prices.length - 1)) * w;
-            const y = h - ((p - min) / range) * h;
-            ctx.moveTo(x, y);
-        }
-        const x = (i / (prices.length - 1)) * w;
-        const y = h - ((p - min) / range) * h;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-    });
+    for (let i = 0; i <= crashIdx && i < prices.length; i++) {
+        if (i === 0) ctx.moveTo(toX(i), toY(prices[i]));
+        else ctx.lineTo(toX(i), toY(prices[i]));
+    }
     ctx.stroke();
 
-    // Fill under with red at end
-    const lastY = h - ((prices[prices.length - 1] - min) / range) * h;
-    ctx.lineTo(w, h);
+    // Green fill
+    ctx.lineTo(toX(crashIdx), h);
     ctx.lineTo(0, h);
     ctx.closePath();
-    ctx.fillStyle = 'rgba(255,34,34,0.1)';
+    ctx.fillStyle = 'rgba(0,255,68,0.06)';
     ctx.fill();
+
+    // Red crash section (connected from crash point to end)
+    if (prices.length > crashIdx) {
+        ctx.beginPath();
+        ctx.strokeStyle = '#ff2222';
+        ctx.lineWidth = 2.5;
+        ctx.moveTo(toX(crashIdx), toY(prices[crashIdx]));
+        for (let i = crashIdx + 1; i < prices.length; i++) {
+            ctx.lineTo(toX(i), toY(prices[i]));
+        }
+        ctx.stroke();
+
+        // Red fill under crash
+        ctx.lineTo(toX(prices.length - 1), h);
+        ctx.lineTo(toX(crashIdx), h);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255,34,34,0.12)';
+        ctx.fill();
+    }
 }
 
 function resetStreakChart() {
