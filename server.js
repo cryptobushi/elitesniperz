@@ -415,6 +415,8 @@ function tryShoot(attacker) {
     players.forEach(function(p) {
         if (p === attacker || p.team === attacker.team || p.health <= 0) return;
         if (p.windwalk) return;
+        if (p.spawnProt > 0) return; // Can't target spawn-protected players
+        if (p.godMode) return; // Skip god mode players
         if (!isTeamVisible(p, attacker.team)) return; // Can't shoot what you can't see
         const d = dist(attacker, p);
         if (d < closestDist && d <= attacker.shootRange) {
@@ -435,13 +437,8 @@ function tryShoot(attacker) {
     });
 
     if (!closest) return;
-    if (matchOver) return; // No kills during end state
+    if (matchOver) return;
     attacker.shootCd = attacker.shootCooldownTime;
-
-    // God mode blocks damage
-    if (closest.godMode) return;
-    // Spawn protection blocks damage
-    if (closest.spawnProt > 0) return;
 
     // Shield blocks one hit
     if (closest.hasShield) {
