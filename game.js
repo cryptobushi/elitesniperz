@@ -1210,14 +1210,35 @@ class Player {
             if (d < closestDistance && d < 50) { closestDistance = d; closestEnemy = enemy; }
         }
 
-        // Chase enemy in vision
+        // Chase enemy — go direct if LOS clear, otherwise detour around wall
         if (closestEnemy && closestDistance < 50) {
-            this.targetPosition = closestEnemy.position.clone();
+            // Check LOS using fog system (client-side)
+            const hasLOS = fogOfWar.isVisible(closestEnemy.position.x, closestEnemy.position.z);
+            if (hasLOS && !this.checkCollision(closestEnemy.position)) {
+                this.targetPosition = closestEnemy.position.clone();
+                this._chaseDetour = false;
+                this._stuckFrames = 0;
+            } else if (!this._chaseDetour) {
+                // Wall between us — pick perpendicular waypoint
+                const toEnemy = new THREE.Vector3().subVectors(closestEnemy.position, this.position);
+                const angle = Math.atan2(toEnemy.z, toEnemy.x);
+                const side = (Math.random() < 0.5) ? 1 : -1;
+                const detourAngle = angle + side * (Math.PI / 2 + Math.random() * 0.5);
+                const detourDist = 15 + Math.random() * 15;
+                this.targetPosition = new THREE.Vector3(
+                    Math.max(-MAP_SIZE/2+5, Math.min(MAP_SIZE/2-5, this.position.x + Math.cos(detourAngle) * detourDist)),
+                    0.5,
+                    Math.max(-MAP_SIZE/2+5, Math.min(MAP_SIZE/2-5, this.position.z + Math.sin(detourAngle) * detourDist))
+                );
+                this._chaseDetour = true;
+                this._stuckFrames = 0;
+            }
         }
 
         // Pick new target when needed
         if (!this.targetPosition || this.position.distanceTo(this.targetPosition) < 3) {
             this.targetPosition = this._pickExploreTarget();
+            this._chaseDetour = false;
             this._stuckFrames = 0;
         }
 

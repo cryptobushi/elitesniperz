@@ -256,14 +256,34 @@ function updateBot(bot, dt) {
         }
     });
 
-    // Chase enemy in vision
+    // Chase enemy in vision — but only set direct target if we have LOS
     if (closestEnemy && closestDist < 50) {
-        bot.botTarget = { x: closestEnemy.x, z: closestEnemy.z };
+        if (hasLineOfSight(bot.x, bot.z, closestEnemy.x, closestEnemy.z)) {
+            // Clear path — go straight at them
+            bot.botTarget = { x: closestEnemy.x, z: closestEnemy.z };
+            bot.chaseDetour = false;
+            bot.stuckFrames = 0;
+        } else if (!bot.chaseDetour) {
+            // Wall between us — pick a perpendicular waypoint to go around
+            var angle = Math.atan2(closestEnemy.z - bot.z, closestEnemy.x - bot.x);
+            var side = (Math.random() < 0.5) ? 1 : -1;
+            var detourAngle = angle + side * (Math.PI / 2 + Math.random() * 0.5);
+            var detourDist = 15 + Math.random() * 15;
+            var wx = bot.x + Math.cos(detourAngle) * detourDist;
+            var wz = bot.z + Math.sin(detourAngle) * detourDist;
+            wx = Math.max(-MAP_SIZE/2+5, Math.min(MAP_SIZE/2-5, wx));
+            wz = Math.max(-MAP_SIZE/2+5, Math.min(MAP_SIZE/2-5, wz));
+            bot.botTarget = { x: wx, z: wz };
+            bot.chaseDetour = true;
+            bot.stuckFrames = 0;
+        }
+        // If already detouring, keep current waypoint until reached
     }
 
     // Pick new target when needed
     if (!bot.botTarget || dist(bot, bot.botTarget) < 3) {
         bot.botTarget = pickTarget(bot);
+        bot.chaseDetour = false;
         bot.stuckFrames = 0;
     }
 
@@ -281,9 +301,10 @@ function updateBot(bot, dt) {
             if (bot.stuckFrames > 8) {
                 // Pick completely new target
                 bot.botTarget = pickTarget(bot);
+                bot.chaseDetour = false;
                 bot.stuckFrames = 0;
             } else {
-                // Try a random perpendicular nudge
+                // Perpendicular nudge
                 var angle = Math.atan2(dz, dx);
                 var side = (bot.stuckFrames % 2 === 0) ? 1 : -1;
                 var nudgeAngle = angle + side * Math.PI / 2;
