@@ -398,26 +398,15 @@ function tryShoot(attacker) {
     // Use aimRot (from client mouse/weapon aim) if available, otherwise movement rot
     const aimDir = attacker.aimRot !== undefined ? attacker.aimRot : attacker.rot;
 
-    // Check if enemy is visible to attacker's team (within vision radius of any ally)
-    function isTeamVisible(enemy, team) {
-        var visible = false;
-        players.forEach(function(ally) {
-            if (visible) return;
-            if (ally.team === team && ally.health > 0) {
-                var dx = enemy.x - ally.x, dz = enemy.z - ally.z;
-                if (dx * dx + dz * dz <= 50 * 50) visible = true;
-            }
-        });
-        return visible;
-    }
-
     let closest = null, closestDist = Infinity;
     players.forEach(function(p) {
         if (p === attacker || p.team === attacker.team || p.health <= 0) return;
         if (p.windwalk) return;
-        if (p.spawnProt > 0) return; // Can't target spawn-protected players
-        if (p.godMode) return; // Skip god mode players
-        if (!isTeamVisible(p, attacker.team)) return; // Can't shoot what you can't see
+        if (p.spawnProt > 0) return;
+        if (p.godMode) return;
+        // Must be within attacker's personal vision (same as client fog radius)
+        var vdx = p.x - attacker.x, vdz = p.z - attacker.z;
+        if (vdx * vdx + vdz * vdz > 50 * 50) return;
         const d = dist(attacker, p);
         if (d < closestDist && d <= attacker.shootRange) {
             // FOV cone: 30° for everyone
