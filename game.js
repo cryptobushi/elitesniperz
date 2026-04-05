@@ -3631,18 +3631,25 @@ function handleBinaryState(buf) {
             remote.player.gold = gold;
             remote.player.streak = streak;
 
-            // Health sync
+            // Health sync — snap position on respawn to avoid ghost at death spot
+            const wasDead = remote.player.health <= 0;
             remote.player.health = alive ? 100 : 0;
+            if (wasDead && alive) {
+                // Just respawned — snap to server position immediately
+                remote.player.position.x = x;
+                remote.player.position.z = z;
+                remote.player.position.y = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.6;
+            }
             remote.player._inFog = inFog;
 
             // Visibility: use CLIENT-SIDE fog check for enemies, not server flag
-            // This prevents desync between what the fog overlay shows and what's rendered
+            // Use server position (x,z) for fog check — player.position may lag behind
             if (remote.player.team === gameState.team) {
                 // Teammates always visible
                 remote.player.mesh.visible = !!alive;
             } else {
                 // Enemies: visible if alive AND client fog says their position is revealed
-                const clientVisible = alive && fogOfWar.isVisible(remote.player.position.x, remote.player.position.z);
+                const clientVisible = alive && fogOfWar.isVisible(x, z);
                 remote.player.mesh.visible = clientVisible;
             }
 
