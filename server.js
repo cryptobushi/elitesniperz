@@ -434,30 +434,7 @@ function tryShoot(attacker) {
         }
     });
 
-    if (!closest) {
-        if (!attacker.isBot && (!attacker._dbg || Date.now() - attacker._dbg > 500)) {
-            attacker._dbg = Date.now();
-            var near = [];
-            players.forEach(function(p) {
-                if (p === attacker || p.team === attacker.team || p.health <= 0) return;
-                var d2 = dist(attacker, p);
-                if (d2 > 60) return;
-                var dx2 = p.x - attacker.x, dz2 = p.z - attacker.z;
-                var ang = Math.atan2(dx2, dz2);
-                var diff2 = ang - aimDir;
-                while (diff2 > Math.PI) diff2 -= 2*Math.PI;
-                while (diff2 < -Math.PI) diff2 += 2*Math.PI;
-                var fails = [];
-                if (d2 > attacker.shootRange) fails.push('RANGE(' + d2.toFixed(0) + ')');
-                if (Math.abs(diff2) >= (30 * Math.PI / 180)) fails.push('FOV(' + (Math.abs(diff2)*180/Math.PI).toFixed(0) + '°)');
-                if (!hasLineOfSight(attacker.x, attacker.z, p.x, p.z)) fails.push('LOS');
-                if (p.windwalk) fails.push('WW');
-                if (fails.length) near.push(p.username + ' d:' + d2.toFixed(0) + ' ' + fails.join('+'));
-            });
-            if (near.length) console.log('[' + attacker.username + ' aim:' + (aimDir*180/Math.PI).toFixed(0) + '° at:' + Math.round(attacker.x) + ',' + Math.round(attacker.z) + '] ' + near.join(' | '));
-        }
-        return;
-    }
+    if (!closest) return;
     if (matchOver) return; // No kills during end state
     attacker.shootCd = attacker.shootCooldownTime;
 
