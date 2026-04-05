@@ -3767,6 +3767,10 @@ function handleJsonMessage(msg) {
                 const ty = Math.sin(msg.x * 0.1) * Math.cos(msg.z * 0.1) * 2 + 0.5;
                 gameState.player.position.set(msg.x, ty, msg.z);
                 gameState.player._spawnProtection = 1.5;
+                // Clear move targets — player should sit idle until clicked
+                gameState.moveTarget = null;
+                gameState.targetLock = null;
+                _lastMoveTarget = null;
                 document.getElementById('deathPopup')?.classList.add('hidden');
             }
             break;
@@ -3918,6 +3922,10 @@ function handleNewMatch(msg) {
         gameState.player._applyItems();
         gameState.player.mesh.visible = true;
         gameState.player._spawnProtection = 1.5;
+        // Clear move targets — idle until player clicks
+        gameState.moveTarget = null;
+        gameState.targetLock = null;
+        _lastMoveTarget = null;
         gameState.kills = 0;
         gameState.deaths = 0;
         gameState.killStreak = 0;
@@ -4000,6 +4008,16 @@ function updateRemotePlayers(dt) {
                     child.material.opacity = flicker ? 0.4 : 0.8;
                 }
             });
+            p._wasSpawnProt = true;
+        } else if (p._wasSpawnProt) {
+            // Spawn protection ended — restore full opacity
+            p.mesh.traverse(child => {
+                if (child.material && !child.isSprite) {
+                    child.material.transparent = false;
+                    child.material.opacity = 1;
+                }
+            });
+            p._wasSpawnProt = false;
         }
 
         // Animation (movement idle/walk)
