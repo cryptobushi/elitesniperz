@@ -194,79 +194,58 @@ function buyItem(p, itemId) {
 
 // === BOT AI ===
 
-// Check if a point is clear (no wall collision)
-function isClear(x, z, r) { return !collidesWithWall(x, z, r || 1.0); }
-
-// Cast a ray from (x,z) in direction (dx,dz), return distance to first wall
-function raycast(x, z, dx, dz, maxDist) {
-    for (var d = 1.0; d <= maxDist; d += 1.0) {
-        if (collidesWithWall(x + dx * d, z + dz * d, 0.8)) return d;
-    }
-    return maxDist;
-}
-
-// Find best movement direction using feeler rays (steering-based avoidance)
-function steerAroundWalls(bot, goalDx, goalDz, spd) {
-    var goalAngle = Math.atan2(goalDz, goalDx);
-    var lookahead = 6;
-
-    // Test 24 directions evenly spread + goal-biased
-    var candidates = [0, 0.3, -0.3, 0.6, -0.6, 1.0, -1.0, 1.4, -1.4,
-        Math.PI/2, -Math.PI/2, 2.0, -2.0, 2.5, -2.5, Math.PI,
-        0.15, -0.15, 0.45, -0.45, 0.8, -0.8, 1.2, -1.2];
-    var bestAngle = null;
-    var bestScore = -Infinity;
-
-    for (var i = 0; i < candidates.length; i++) {
-        var angle = goalAngle + candidates[i];
-        var cdx = Math.cos(angle), cdz = Math.sin(angle);
-        var clearDist = raycast(bot.x, bot.z, cdx, cdz, lookahead);
-
-        var directionBonus = (1.0 - Math.abs(candidates[i]) / Math.PI) * lookahead * 0.5;
-        var score = clearDist + directionBonus;
-
-        if (score > bestScore && clearDist > 1.2) {
-            bestScore = score;
-            bestAngle = angle;
-        }
-    }
-
-    // Fallback: if no direction has 1.2 clearance, try ANY direction that's immediately clear
-    if (bestAngle === null) {
-        for (var a = 0; a < Math.PI * 2; a += Math.PI / 8) {
-            var fx = bot.x + Math.cos(a) * 0.5;
-            var fz = bot.z + Math.sin(a) * 0.5;
-            if (isClear(fx, fz, 0.8)) {
-                bestAngle = a;
-                break;
-            }
-        }
-    }
-
-    // Last resort: just go backward from goal
-    if (bestAngle === null) bestAngle = goalAngle + Math.PI;
-
-    return { dx: Math.cos(bestAngle), dz: Math.sin(bestAngle) };
-}
-
-function pickExploreTarget(bot) {
-    // Favor center and own half — avoid spawns
+function pickTarget(bot) {
     var bias = bot.team === 'red' ? -0.2 : 0.2;
-    for (var attempt = 0; attempt < 10; attempt++) {
+    for (var i = 0; i < 20; i++) {
         var tx = (Math.random() - 0.5 + bias) * MAP_SIZE * 0.7;
         var tz = (Math.random() - 0.5 + bias) * MAP_SIZE * 0.7;
-        // Don't target enemy spawn area
         var esx = bot.team === 'red' ? 70 : -70;
         if (Math.sqrt((tx-esx)*(tx-esx)+(tz-esx)*(tz-esx)) < 25) continue;
-        // Don't target inside a wall
-        if (!isClear(tx, tz)) continue;
+        if (collidesWithWall(tx, tz, 1.0)) continue;
         return { x: tx, z: tz };
     }
-    return { x: (Math.random()-0.5) * MAP_SIZE * 0.4, z: (Math.random()-0.5) * MAP_SIZE * 0.4 };
+    // Fallback to spawn area (always clear)
+    var s = bot.team === 'red' ? -70 : 70;
+    return { x: s + Math.random() * 10 - 5, z: s + Math.random() * 10 - 5 };
+}
+
+// Try to move bot from current pos toward (nx, nz). Returns true if moved.
+function tryMove(bot, nx, nz) {
+    // Clamp to map
+    nx = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nx));
+    nz = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nz));
+
+    // Direct move
+    if (!collidesWithWall(nx, nz, 0.9)) {
+        bot.x = nx; bot.z = nz; return true;
+    }
+    // Wall slide X
+    if (!collidesWithWall(nx, bot.z, 0.9)) {
+        bot.x = nx; return true;
+    }
+    // Wall slide Z
+    if (!collidesWithWall(bot.x, nz, 0.9)) {
+        bot.z = nz; return true;
+    }
+    return false;
 }
 
 function updateBot(bot, dt) {
     if (bot.health <= 0) return;
+
+    // If bot is inside a wall, nudge it out
+    if (collidesWithWall(bot.x, bot.z, 0.9)) {
+        for (var a = 0; a < Math.PI * 2; a += Math.PI / 12) {
+            for (var r = 1; r <= 5; r++) {
+                var ex = bot.x + Math.cos(a) * r;
+                var ez = bot.z + Math.sin(a) * r;
+                if (!collidesWithWall(ex, ez, 0.9)) {
+                    bot.x = ex; bot.z = ez;
+                    a = 999; break; // break both loops
+                }
+            }
+        }
+    }
 
     // Find closest enemy
     var closestEnemy = null, closestDist = Infinity;
@@ -277,58 +256,55 @@ function updateBot(bot, dt) {
         }
     });
 
-    // (camping disabled)
-
-    // Chase if enemy in vision range
+    // Chase enemy in vision
     if (closestEnemy && closestDist < 50) {
-        bot.botState = 'chase';
         bot.botTarget = { x: closestEnemy.x, z: closestEnemy.z };
     }
 
-    // Pick new explore target if needed
+    // Pick new target when needed
     if (!bot.botTarget || dist(bot, bot.botTarget) < 3) {
-        // Chance to camp at current position
-        // No camping — keep moving
-        bot.botState = 'explore';
-        bot.botTarget = pickExploreTarget(bot);
+        bot.botTarget = pickTarget(bot);
+        bot.stuckFrames = 0;
     }
 
-    // Move toward target with steering-based obstacle avoidance
-    if (bot.botTarget) {
-        var dx = bot.botTarget.x - bot.x;
-        var dz = bot.botTarget.z - bot.z;
-        var d = Math.sqrt(dx * dx + dz * dz);
+    // Move toward target
+    var dx = bot.botTarget.x - bot.x;
+    var dz = bot.botTarget.z - bot.z;
+    var d = Math.sqrt(dx * dx + dz * dz);
+    if (d > 0.1) {
         var spd = (bot.windwalk ? bot.windwalkSpeed : bot.speed) * dt;
-        var dirX = d > 0.1 ? dx / d : 0, dirZ = d > 0.1 ? dz / d : 1;
+        var nx = bot.x + (dx / d) * spd;
+        var nz = bot.z + (dz / d) * spd;
 
-        // Steer around obstacles
-        var steer = steerAroundWalls(bot, dirX, dirZ, spd);
-        var nx = bot.x + steer.dx * spd;
-        var nz = bot.z + steer.dz * spd;
-
-        if (isClear(nx, nz)) {
-            bot.x = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nx));
-            bot.z = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nz));
-            bot.stuckFrames = 0;
-        } else {
+        if (!tryMove(bot, nx, nz)) {
             bot.stuckFrames++;
-            if (bot.stuckFrames > 3) {
-                bot.botTarget = pickExploreTarget(bot);
+            if (bot.stuckFrames > 8) {
+                // Pick completely new target
+                bot.botTarget = pickTarget(bot);
                 bot.stuckFrames = 0;
+            } else {
+                // Try a random perpendicular nudge
+                var angle = Math.atan2(dz, dx);
+                var side = (bot.stuckFrames % 2 === 0) ? 1 : -1;
+                var nudgeAngle = angle + side * Math.PI / 2;
+                tryMove(bot, bot.x + Math.cos(nudgeAngle) * spd, bot.z + Math.sin(nudgeAngle) * spd);
             }
+        } else {
+            bot.stuckFrames = 0;
         }
+
         bot.y = terrainY(bot.x, bot.z) + 0.5;
-        if (d > 0.1) bot.rot = Math.atan2(dx, dz);
+        bot.rot = Math.atan2(dx, dz);
     }
 
-    // Aim at closest visible enemy (so tryShoot's FOV cone works)
+    // Aim at closest enemy for shooting
     if (closestEnemy && closestDist <= bot.shootRange) {
         bot.aimRot = Math.atan2(closestEnemy.x - bot.x, closestEnemy.z - bot.z);
     } else {
         bot.aimRot = bot.rot;
     }
 
-    // Bot auto-buy on gold accumulation
+    // Auto-buy
     if (bot.gold >= 100 && isNearSpawn(bot.x, bot.z, bot.team)) {
         botShop(bot);
     }
@@ -355,13 +331,14 @@ function tryShoot(attacker) {
         if (p.windwalk) return;
         const d = dist(attacker, p);
         if (d < closestDist && d <= attacker.shootRange) {
-            // FOV cone: 30 degrees from aim direction
+            // FOV cone: 60° for humans, 45° for bots
+            const fovDeg = attacker.isBot ? 45 : 60;
             const dx = p.x - attacker.x, dz = p.z - attacker.z;
             const angle = Math.atan2(dx, dz);
             let diff = angle - aimDir;
             while (diff > Math.PI) diff -= 2 * Math.PI;
             while (diff < -Math.PI) diff += 2 * Math.PI;
-            if (Math.abs(diff) < (30 * Math.PI / 180)) {
+            if (Math.abs(diff) < (fovDeg * Math.PI / 180)) {
                 if (hasLineOfSight(attacker.x, attacker.z, p.x, p.z)) {
                     closest = p;
                     closestDist = d;

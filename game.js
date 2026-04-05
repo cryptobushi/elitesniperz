@@ -1140,76 +1140,64 @@ class Player {
         }
     }
 
-    // Steering-based obstacle avoidance — cast feeler rays to find clear path
-    _steerAround(goalDir, speed) {
-        const goalAngle = Math.atan2(goalDir.z, goalDir.x);
-        const lookahead = 6;
-        const candidates = [0, 0.3, -0.3, 0.6, -0.6, 1.0, -1.0, 1.4, -1.4,
-            Math.PI/2, -Math.PI/2, 2.0, -2.0, 2.5, -2.5, Math.PI,
-            0.15, -0.15, 0.45, -0.45, 0.8, -0.8, 1.2, -1.2];
-
-        let bestAngle = null;
-        let bestScore = -Infinity;
-        const testPos = this.position.clone();
-
-        for (const offset of candidates) {
-            const angle = goalAngle + offset;
-            const dx = Math.cos(angle), dz = Math.sin(angle);
-
-            let clearDist = lookahead;
-            for (let d = 1.0; d <= lookahead; d += 1.0) {
-                testPos.x = this.position.x + dx * d;
-                testPos.z = this.position.z + dz * d;
-                if (this.checkCollision(testPos)) { clearDist = d; break; }
-            }
-
-            const directionBonus = (1.0 - Math.abs(offset) / Math.PI) * lookahead * 0.5;
-            const score = clearDist + directionBonus;
-            if (score > bestScore && clearDist > 1.2) {
-                bestScore = score;
-                bestAngle = angle;
-            }
-        }
-
-        // Fallback: try any direction that's immediately clear
-        if (bestAngle === null) {
-            for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
-                testPos.x = this.position.x + Math.cos(a) * 0.5;
-                testPos.z = this.position.z + Math.sin(a) * 0.5;
-                if (!this.checkCollision(testPos)) { bestAngle = a; break; }
-            }
-        }
-
-        // Last resort: go backward
-        if (bestAngle === null) bestAngle = goalAngle + Math.PI;
-
-        return new THREE.Vector3(Math.cos(bestAngle), 0, Math.sin(bestAngle));
-    }
-
     _pickExploreTarget() {
-        for (let attempt = 0; attempt < 10; attempt++) {
+        for (let i = 0; i < 20; i++) {
             const x = (Math.random() - 0.5) * (MAP_SIZE * 0.7);
             const z = (Math.random() - 0.5) * (MAP_SIZE * 0.7);
             if (Math.abs(x) > MAP_SIZE / 2 - 15 || Math.abs(z) > MAP_SIZE / 2 - 15) continue;
-            // Avoid piling on other bots
+            const candidate = new THREE.Vector3(x, 0.5, z);
+            if (this.checkCollision(candidate)) continue;
             let tooClose = false;
             for (const other of gameState.bots) {
                 if (other === this || other.health <= 0) continue;
-                if (other.position.distanceTo(new THREE.Vector3(x, 0, z)) < 8) { tooClose = true; break; }
+                if (other.position.distanceTo(candidate) < 8) { tooClose = true; break; }
             }
             if (tooClose) continue;
-            return new THREE.Vector3(x, 0.5, z);
+            return candidate;
         }
-        return new THREE.Vector3((Math.random()-0.5)*MAP_SIZE*0.4, 0.5, (Math.random()-0.5)*MAP_SIZE*0.4);
+        // Fallback to spawn
+        const s = this.team === 'red' ? -70 : 70;
+        return new THREE.Vector3(s + Math.random()*10-5, 0.5, s + Math.random()*10-5);
+    }
+
+    _tryMoveClient(newPos) {
+        if (!this.checkCollision(newPos)) {
+            this.position.x = newPos.x;
+            this.position.z = newPos.z;
+            return true;
+        }
+        // Wall slide X
+        const slideX = this.position.clone(); slideX.x = newPos.x;
+        if (!this.checkCollision(slideX)) {
+            this.position.x = slideX.x;
+            return true;
+        }
+        // Wall slide Z
+        const slideZ = this.position.clone(); slideZ.z = newPos.z;
+        if (!this.checkCollision(slideZ)) {
+            this.position.z = slideZ.z;
+            return true;
+        }
+        return false;
     }
 
     botAI(deltaTime) {
-        // Initialize bot state
-        if (!this._botState) {
-            this._botState = 'explore';
-            this._campTimer = 0;
-            this._campDuration = 0;
-            this._stuckFrames = 0;
+        if (!this._stuckFrames) this._stuckFrames = 0;
+
+        // Nudge out of walls if stuck inside one
+        if (this.checkCollision(this.position)) {
+            for (let a = 0; a < Math.PI * 2; a += Math.PI / 12) {
+                for (let r = 1; r <= 5; r++) {
+                    const test = this.position.clone();
+                    test.x += Math.cos(a) * r;
+                    test.z += Math.sin(a) * r;
+                    if (!this.checkCollision(test)) {
+                        this.position.x = test.x;
+                        this.position.z = test.z;
+                        a = 999; break;
+                    }
+                }
+            }
         }
 
         // Find closest visible enemy
@@ -1222,45 +1210,43 @@ class Player {
             if (d < closestDistance && d < 50) { closestDistance = d; closestEnemy = enemy; }
         }
 
-        // (camping disabled)
-
-        // Chase enemy if in vision
+        // Chase enemy in vision
         if (closestEnemy && closestDistance < 50) {
-            this._botState = 'chase';
-            this._campTimer = 0;
             this.targetPosition = closestEnemy.position.clone();
-            this.weapon.lookAt(closestEnemy.position);
         }
 
-        // === EXPLORE/CHASE — pick target and move ===
+        // Pick new target when needed
         if (!this.targetPosition || this.position.distanceTo(this.targetPosition) < 3) {
-            // No camping — keep moving
-            this._botState = 'explore';
             this.targetPosition = this._pickExploreTarget();
+            this._stuckFrames = 0;
         }
 
-        if (this.targetPosition) {
-            const direction = new THREE.Vector3().subVectors(this.targetPosition, this.position);
-            direction.y = 0;
-            const goalDist = direction.length();
+        // Move toward target
+        const direction = new THREE.Vector3().subVectors(this.targetPosition, this.position);
+        direction.y = 0;
+        const d = direction.length();
+        if (d > 0.1) {
             direction.normalize();
             const speed = this.speed * deltaTime;
-
-            // Steer around obstacles
-            const steerDir = this._steerAround(direction, speed);
-            this.velocity.copy(steerDir).multiplyScalar(speed);
+            this.velocity.copy(direction).multiplyScalar(speed);
             const newPos = this.position.clone().add(this.velocity);
 
-            if (!this.checkCollision(newPos)) {
-                this.position.x = newPos.x;
-                this.position.z = newPos.z;
-                this._stuckFrames = 0;
-            } else {
+            if (!this._tryMoveClient(newPos)) {
                 this._stuckFrames++;
-                if (this._stuckFrames > 3) {
+                if (this._stuckFrames > 8) {
                     this.targetPosition = this._pickExploreTarget();
                     this._stuckFrames = 0;
+                } else {
+                    // Perpendicular nudge
+                    const angle = Math.atan2(direction.z, direction.x);
+                    const side = (this._stuckFrames % 2 === 0) ? 1 : -1;
+                    const nudge = this.position.clone();
+                    nudge.x += Math.cos(angle + side * Math.PI/2) * speed;
+                    nudge.z += Math.sin(angle + side * Math.PI/2) * speed;
+                    this._tryMoveClient(nudge);
                 }
+            } else {
+                this._stuckFrames = 0;
             }
             this.position.y = this.getTerrainHeight(this.position.x, this.position.z);
         }
