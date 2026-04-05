@@ -262,7 +262,7 @@ function updateBot(bot, dt) {
                 bot.stuckFrames++;
                 if (bot.stuckFrames > 3) {
                     // Stop wall-riding — camp here briefly or pick a new direction
-                    if (Math.random() < 0.4 && bot.botState !== 'chase') {
+                    if (Math.random() < 0.2 && bot.botState !== 'chase') {
                         bot.botState = 'camp';
                         bot.campTimer = 0;
                         bot.botTarget = null;

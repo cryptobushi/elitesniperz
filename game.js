@@ -1245,7 +1245,7 @@ class Player {
 
                     if (this._stuckFrames > 3) {
                         // Stop wall-riding — camp here or pick a new direction
-                        if (Math.random() < 0.4 && this._botState !== 'chase') {
+                        if (Math.random() < 0.2 && this._botState !== 'chase') {
                             this._botState = 'camp';
                             this._campTimer = 0;
                             this._campDuration = 2 + Math.random() * 5;
