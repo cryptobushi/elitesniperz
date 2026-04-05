@@ -341,11 +341,20 @@ function updateBot(bot, dt) {
         bot.rot = Math.atan2(dx, dz);
     }
 
-    // Aim at closest enemy — bot must turn to face before shooting (same as players)
+    // Aim at closest enemy — bot must turn to face + reaction delay before shooting
     if (closestEnemy && closestDist <= bot.shootRange && hasLineOfSight(bot.x, bot.z, closestEnemy.x, closestEnemy.z)) {
+        // Reaction delay: when first spotting an enemy, wait before shooting
+        if (!bot.losTarget || bot.losTarget !== closestEnemy.id) {
+            bot.losTarget = closestEnemy.id;
+            bot.losTimer = 0.4 + Math.random() * 0.6; // 0.4–1.0s reaction time
+        }
+        if (bot.losTimer > 0) {
+            bot.losTimer -= dt;
+        }
+
         var targetRot = Math.atan2(closestEnemy.x - bot.x, closestEnemy.z - bot.z);
-        // Turn toward enemy gradually (~180°/sec)
-        var turnSpeed = 3.0 * dt;
+        // Turn toward enemy gradually (~120°/sec)
+        var turnSpeed = 2.0 * dt;
         var diff = targetRot - bot.rot;
         while (diff > Math.PI) diff -= 2 * Math.PI;
         while (diff < -Math.PI) diff += 2 * Math.PI;
@@ -354,9 +363,13 @@ function updateBot(bot, dt) {
         } else {
             bot.rot += (diff > 0 ? 1 : -1) * turnSpeed;
         }
-        bot.aimRot = bot.rot; // FOV cone follows body facing
+
+        // Only allow shooting after reaction delay expires
+        bot.aimRot = (bot.losTimer <= 0) ? bot.rot : bot.rot + Math.PI; // aim away until ready
     } else {
         bot.aimRot = bot.rot;
+        bot.losTarget = null;
+        bot.losTimer = 0;
     }
 
     // Auto-buy
