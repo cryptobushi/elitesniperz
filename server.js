@@ -99,25 +99,33 @@ console.log(`Initialized ${players.size} bots`);
 // Per-player: id(2) + x(f32) + z(f32) + rot(f32) + health(1) + kills(i16) + deaths(i16) + price(f32) + flags(1) + streak(i16) + gold(i16) = 28 bytes
 const BYTES_PER_PLAYER = 28;
 
+// Track which enemies each team has seen (for hysteresis)
+const _teamVisible = { red: new Set(), blue: new Set() };
+
 function encodeState(viewerTeam) {
-    // Determine which enemies are visible in FOW
+    // Determine which enemies are visible in FOW (with hysteresis)
     const enemyVisible = new Set();
+    const prevVisible = _teamVisible[viewerTeam];
     players.forEach(function(p) {
         if (p.team === viewerTeam || p.health <= 0) return;
         if (p.windwalk) return;
+        // Hysteresis: 50 units to enter vision, 58 to leave
+        var enterRange = 50, exitRange = 58;
+        var wasVisible = prevVisible.has(p.id);
+        var vr = wasVisible ? exitRange : enterRange;
         players.forEach(function(ally) {
             if (enemyVisible.has(p.id)) return;
             if (ally.team === viewerTeam && ally.health > 0) {
-                var vr = 50;
                 if (ally.farsight) {
                     var fdx = p.x - ally.farsightX, fdz = p.z - ally.farsightZ;
-                    if (fdx * fdx + fdz * fdz <= 70 * 70) { enemyVisible.add(p.id); return; }
+                    if (fdx * fdx + fdz * fdz <= 75 * 75) { enemyVisible.add(p.id); return; }
                 }
                 var dx = p.x - ally.x, dz = p.z - ally.z;
                 if (dx * dx + dz * dz <= vr * vr) { enemyVisible.add(p.id); }
             }
         });
     });
+    _teamVisible[viewerTeam] = enemyVisible;
 
     // Always send ALL players — client uses inFog flag to hide position
     const all = [];
