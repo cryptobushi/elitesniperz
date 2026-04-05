@@ -2961,18 +2961,31 @@ function updateMinimap() {
 
     const scale = 150 / MAP_SIZE;
 
-    // Draw players
+    // Collect all players: offline bots + online remote players + local player
     const allPlayers = [...gameState.bots];
+    if (isOnlineMode) {
+        for (const [, remote] of _remotePlayers) {
+            allPlayers.push(remote.player);
+        }
+    }
     if (gameState.player) allPlayers.push(gameState.player);
 
     allPlayers.forEach(p => {
-        if (!p.mesh.visible) return;
+        if (p.health <= 0) return;
+
+        const isMe = p === gameState.player;
+        const isTeammate = p.team === gameState.team;
+
+        // Teammates always show on minimap; enemies only if visible (in FOW)
+        if (!isTeammate && !isMe) {
+            if (!p.mesh.visible) return;
+            if (!fogOfWar.isVisible(p.position.x, p.position.z)) return;
+        }
 
         const x = (p.position.x + MAP_SIZE / 2) * scale;
         const y = (p.position.z + MAP_SIZE / 2) * scale;
 
-        const isMe = p === gameState.player;
-        minimapCtx.fillStyle = isMe ? '#ffd700' : (p.team === 'red' ? '#ff0000' : '#0088ff');
+        minimapCtx.fillStyle = isMe ? '#ffd700' : (p.team === 'red' ? '#ff4444' : '#4488ff');
         minimapCtx.beginPath();
         minimapCtx.arc(x, y, isMe ? 4 : 3, 0, Math.PI * 2);
         minimapCtx.fill();

@@ -376,8 +376,8 @@ function tryShoot(attacker) {
         if (p.windwalk) return;
         const d = dist(attacker, p);
         if (d < closestDist && d <= attacker.shootRange) {
-            // FOV cone: 30 degrees
-            const fovDeg = 30;
+            // FOV cone: 30° for humans, no cone for bots (they auto-aim)
+            const fovDeg = attacker.isBot ? 180 : 30;
             const dx = p.x - attacker.x, dz = p.z - attacker.z;
             const angle = Math.atan2(dx, dz);
             let diff = angle - aimDir;
