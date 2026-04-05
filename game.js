@@ -1210,27 +1210,7 @@ class Player {
             if (d < closestDistance && d < 50) { closestDistance = d; closestEnemy = enemy; }
         }
 
-        // === CAMP STATE ===
-        if (this._botState === 'camp') {
-            this._campTimer += deltaTime;
-            this.velocity.set(0, 0, 0);
-
-            if (this.rifleGroup) {
-                const lookAngle = Math.sin(Date.now() * 0.001) * Math.PI * 0.5;
-                const lookTarget = this.position.clone().add(new THREE.Vector3(Math.sin(lookAngle), 0, Math.cos(lookAngle)).multiplyScalar(5));
-                this.rifleGroup.lookAt(lookTarget);
-            }
-
-            // Break camp if timer expires or enemy spotted
-            if (this._campTimer >= this._campDuration || (closestEnemy && closestDistance < 50)) {
-                this._botState = 'explore';
-                this.targetPosition = null;
-            }
-
-            // Aim at enemy while camping
-            if (closestEnemy) this.weapon.lookAt(closestEnemy.position);
-            return;
-        }
+        // (camping disabled)
 
         // Chase enemy if in vision
         if (closestEnemy && closestDistance < 50) {
@@ -1242,14 +1222,7 @@ class Player {
 
         // === EXPLORE/CHASE — pick target and move ===
         if (!this.targetPosition || this.position.distanceTo(this.targetPosition) < 3) {
-            if (Math.random() < 0.05 && this._botState !== 'chase') {
-                this._botState = 'camp';
-                this._campTimer = 0;
-                this._campDuration = 2 + Math.random() * 6;
-                this.velocity.set(0, 0, 0);
-                this.targetPosition = null;
-                return;
-            }
+            // No camping — keep moving
             this._botState = 'explore';
             this.targetPosition = this._pickExploreTarget();
         }

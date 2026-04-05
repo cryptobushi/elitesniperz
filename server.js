@@ -262,22 +262,7 @@ function updateBot(bot, dt) {
         }
     });
 
-    // State: camp — sit still, scan for enemies
-    if (bot.botState === 'camp') {
-        bot.campTimer += dt;
-        if (bot.campTimer > bot.campDuration || (closestEnemy && closestDist < 50)) {
-            bot.botState = 'explore';
-            bot.botTarget = null;
-        }
-        bot.rot += dt * 0.5;
-        // Aim at enemy if visible
-        if (closestEnemy && closestDist <= bot.shootRange) {
-            bot.aimRot = Math.atan2(closestEnemy.x - bot.x, closestEnemy.z - bot.z);
-        } else {
-            bot.aimRot = bot.rot;
-        }
-        return;
-    }
+    // (camping disabled)
 
     // Chase if enemy in vision range
     if (closestEnemy && closestDist < 50) {
@@ -288,14 +273,7 @@ function updateBot(bot, dt) {
     // Pick new explore target if needed
     if (!bot.botTarget || dist(bot, bot.botTarget) < 3) {
         // Chance to camp at current position
-        if (Math.random() < 0.05 && bot.botState !== 'chase') {
-            bot.botState = 'camp';
-            bot.campTimer = 0;
-            bot.campDuration = 2 + Math.random() * 6;
-            bot.botTarget = null;
-            bot.aimRot = bot.rot;
-            return;
-        }
+        // No camping — keep moving
         bot.botState = 'explore';
         bot.botTarget = pickExploreTarget(bot);
     }
