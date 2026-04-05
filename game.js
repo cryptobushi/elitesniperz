@@ -1144,9 +1144,11 @@ class Player {
     _steerAround(goalDir, speed) {
         const goalAngle = Math.atan2(goalDir.z, goalDir.x);
         const lookahead = 6;
-        const candidates = [0, 0.3, -0.3, 0.6, -0.6, 1.0, -1.0, 1.4, -1.4, Math.PI/2, -Math.PI/2, 2.0, -2.0, 2.5, -2.5, Math.PI];
+        const candidates = [0, 0.3, -0.3, 0.6, -0.6, 1.0, -1.0, 1.4, -1.4,
+            Math.PI/2, -Math.PI/2, 2.0, -2.0, 2.5, -2.5, Math.PI,
+            0.15, -0.15, 0.45, -0.45, 0.8, -0.8, 1.2, -1.2];
 
-        let bestAngle = goalAngle;
+        let bestAngle = null;
         let bestScore = -Infinity;
         const testPos = this.position.clone();
 
@@ -1168,6 +1170,18 @@ class Player {
                 bestAngle = angle;
             }
         }
+
+        // Fallback: try any direction that's immediately clear
+        if (bestAngle === null) {
+            for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+                testPos.x = this.position.x + Math.cos(a) * 0.5;
+                testPos.z = this.position.z + Math.sin(a) * 0.5;
+                if (!this.checkCollision(testPos)) { bestAngle = a; break; }
+            }
+        }
+
+        // Last resort: go backward
+        if (bestAngle === null) bestAngle = goalAngle + Math.PI;
 
         return new THREE.Vector3(Math.cos(bestAngle), 0, Math.sin(bestAngle));
     }

@@ -210,9 +210,11 @@ function steerAroundWalls(bot, goalDx, goalDz, spd) {
     var goalAngle = Math.atan2(goalDz, goalDx);
     var lookahead = 6;
 
-    // Test candidate directions: straight, then progressively wider turns
-    var candidates = [0, 0.3, -0.3, 0.6, -0.6, 1.0, -1.0, 1.4, -1.4, Math.PI/2, -Math.PI/2, 2.0, -2.0, 2.5, -2.5, Math.PI];
-    var bestAngle = goalAngle;
+    // Test 24 directions evenly spread + goal-biased
+    var candidates = [0, 0.3, -0.3, 0.6, -0.6, 1.0, -1.0, 1.4, -1.4,
+        Math.PI/2, -Math.PI/2, 2.0, -2.0, 2.5, -2.5, Math.PI,
+        0.15, -0.15, 0.45, -0.45, 0.8, -0.8, 1.2, -1.2];
+    var bestAngle = null;
     var bestScore = -Infinity;
 
     for (var i = 0; i < candidates.length; i++) {
@@ -223,12 +225,26 @@ function steerAroundWalls(bot, goalDx, goalDz, spd) {
         var directionBonus = (1.0 - Math.abs(candidates[i]) / Math.PI) * lookahead * 0.5;
         var score = clearDist + directionBonus;
 
-        // Accept any direction with at least 1.2 units clear (enough for one step)
         if (score > bestScore && clearDist > 1.2) {
             bestScore = score;
             bestAngle = angle;
         }
     }
+
+    // Fallback: if no direction has 1.2 clearance, try ANY direction that's immediately clear
+    if (bestAngle === null) {
+        for (var a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+            var fx = bot.x + Math.cos(a) * 0.5;
+            var fz = bot.z + Math.sin(a) * 0.5;
+            if (isClear(fx, fz, 0.8)) {
+                bestAngle = a;
+                break;
+            }
+        }
+    }
+
+    // Last resort: just go backward from goal
+    if (bestAngle === null) bestAngle = goalAngle + Math.PI;
 
     return { dx: Math.cos(bestAngle), dz: Math.sin(bestAngle) };
 }
