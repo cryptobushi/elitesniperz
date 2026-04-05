@@ -51,14 +51,12 @@ function hasLineOfSight(ax, az, bx, bz) {
     var dx = bx - ax, dz = bz - az;
     var len = Math.sqrt(dx * dx + dz * dz);
     if (len < 0.1) return true;
-    // Step every 0.5 units for accuracy, skip only the first and last 1 unit
-    var step = 0.5;
-    var start = Math.min(1.0, len * 0.15); // skip ~1 unit at start
-    var end = len - Math.min(1.0, len * 0.15); // skip ~1 unit at end
-    for (var d = start; d <= end; d += step) {
-        var t = d / len;
-        var px = ax + dx * t, pz = az + dz * t;
-        if (collidesWithWall(px, pz, 0.1)) return false;
+    // Skip first/last 2 units to avoid walls the shooter/target are standing next to
+    // But clamp so we still check at least the middle 50% of the ray
+    var skip = Math.min(2.0, len * 0.25);
+    for (var d = skip; d <= len - skip; d += 0.8) {
+        var px = ax + dx * (d / len), pz = az + dz * (d / len);
+        if (collidesWithWall(px, pz, 0.05)) return false;
     }
     return true;
 }
