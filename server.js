@@ -342,9 +342,20 @@ function updateBot(bot, dt) {
         bot.rot = Math.atan2(dx, dz);
     }
 
-    // Aim at closest enemy for shooting
-    if (closestEnemy && closestDist <= bot.shootRange) {
-        bot.aimRot = Math.atan2(closestEnemy.x - bot.x, closestEnemy.z - bot.z);
+    // Aim at closest enemy — bot must turn to face before shooting (same as players)
+    if (closestEnemy && closestDist <= bot.shootRange && hasLineOfSight(bot.x, bot.z, closestEnemy.x, closestEnemy.z)) {
+        var targetRot = Math.atan2(closestEnemy.x - bot.x, closestEnemy.z - bot.z);
+        // Turn toward enemy gradually (~180°/sec)
+        var turnSpeed = 3.0 * dt;
+        var diff = targetRot - bot.rot;
+        while (diff > Math.PI) diff -= 2 * Math.PI;
+        while (diff < -Math.PI) diff += 2 * Math.PI;
+        if (Math.abs(diff) < turnSpeed) {
+            bot.rot = targetRot;
+        } else {
+            bot.rot += (diff > 0 ? 1 : -1) * turnSpeed;
+        }
+        bot.aimRot = bot.rot; // FOV cone follows body facing
     } else {
         bot.aimRot = bot.rot;
     }
@@ -376,8 +387,8 @@ function tryShoot(attacker) {
         if (p.windwalk) return;
         const d = dist(attacker, p);
         if (d < closestDist && d <= attacker.shootRange) {
-            // FOV cone: 30° for humans, no cone for bots (they auto-aim)
-            const fovDeg = attacker.isBot ? 180 : 30;
+            // FOV cone: 30° for everyone — bots must face enemies to shoot
+            const fovDeg = 30;
             const dx = p.x - attacker.x, dz = p.z - attacker.z;
             const angle = Math.atan2(dx, dz);
             let diff = angle - aimDir;
