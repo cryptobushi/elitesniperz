@@ -755,14 +755,18 @@ wss.on('connection', function(ws) {
                 });
                 players.delete(ws.playerId);
                 // Replace with bot
-                const bot = createPlayer(
-                    nextId++,
-                    BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)],
-                    team, true
-                );
+                // Pick a bot name not already in use
+                var usedNames = new Set();
+                players.forEach(function(pl) { usedNames.add(pl.username); });
+                var botName = BOT_NAMES.find(n => !usedNames.has(n)) || 'Bot' + nextId;
+                const bot = createPlayer(nextId++, botName, team, true);
                 players.set(bot.id, bot);
                 broadcast(JSON.stringify({ t: 'pl', n: p.username }));
-                console.log(p.username + ' left (state saved for rejoin)');
+                // Broadcast full roster so clients register the new bot
+                var roster = [];
+                players.forEach(function(rp) { roster.push({ id: rp.id, n: rp.username, m: rp.team, b: rp.isBot ? 1 : 0 }); });
+                broadcast(JSON.stringify({ t: 'roster', roster: roster }));
+                console.log(p.username + ' left, replaced by ' + bot.username + ' (id:' + bot.id + ')');
             }
         }
     });

@@ -3695,6 +3695,15 @@ function handleJsonMessage(msg) {
             addChatSystem(msg.n + ' left');
             break;
         }
+        case 'roster': {
+            // Full roster update — register all player names/teams
+            if (msg.roster) {
+                for (const r of msg.roster) {
+                    _roster[r.id] = { username: r.n, team: r.m, isBot: !!r.b };
+                }
+            }
+            break;
+        }
         case 'k': {
             // Kill event — play shooting VFX
             addKillFeed(msg.kn, msg.vn);
