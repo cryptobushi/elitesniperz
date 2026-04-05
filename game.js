@@ -4027,12 +4027,19 @@ function updateRemotePlayers(dt) {
     }
 
     // Send player rotation to server for FOV-based auto-aim
-    if (_ws && _ws.readyState === 1 && gameState.player && gameState.player.weapon) {
+    // Use the mouse→ground intersect point directly instead of weapon quaternion
+    // This is more reliable than extracting direction from lookAt which may be inverted
+    if (_ws && _ws.readyState === 1 && gameState.player && gameState.player.health > 0) {
         const now2 = performance.now();
         if (now2 - _lastSendTime > 33) { // 30hz rotation updates
-            const wdir = new THREE.Vector3(0, 0, 1);
-            wdir.applyQuaternion(gameState.player.weapon.getWorldQuaternion(new THREE.Quaternion()));
-            const rot = Math.atan2(wdir.x, wdir.z);
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(gameState.mousePos, camera);
+            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            const aimPoint = new THREE.Vector3();
+            raycaster.ray.intersectPlane(plane, aimPoint);
+            const dx = aimPoint.x - gameState.player.position.x;
+            const dz = aimPoint.z - gameState.player.position.z;
+            const rot = Math.atan2(dx, dz);
             _ws.send(JSON.stringify({ t: 'rot', r: rot }));
             _lastSendTime = now2;
         }

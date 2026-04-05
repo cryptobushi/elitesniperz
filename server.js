@@ -421,7 +421,26 @@ function tryShoot(attacker) {
         }
     });
 
-    if (!closest) return;
+    if (!closest) {
+        // Debug: only for human players, every 1s
+        if (!attacker.isBot && (!attacker._dbg || Date.now() - attacker._dbg > 1000)) {
+            attacker._dbg = Date.now();
+            players.forEach(function(p) {
+                if (p === attacker || p.team === attacker.team || p.health <= 0 || p.windwalk) return;
+                var d2 = dist(attacker, p);
+                if (d2 > attacker.shootRange) return;
+                var dx2 = p.x - attacker.x, dz2 = p.z - attacker.z;
+                var ang = Math.atan2(dx2, dz2);
+                var diff2 = ang - aimDir;
+                while (diff2 > Math.PI) diff2 -= 2*Math.PI;
+                while (diff2 < -Math.PI) diff2 += 2*Math.PI;
+                var fovOk = Math.abs(diff2) < (30 * Math.PI / 180);
+                var losOk = hasLineOfSight(attacker.x, attacker.z, p.x, p.z);
+                console.log('MISS ' + p.username + ' d:' + d2.toFixed(1) + ' aimDir:' + (aimDir*180/Math.PI).toFixed(0) + '° enemyAngle:' + (ang*180/Math.PI).toFixed(0) + '° diff:' + (Math.abs(diff2)*180/Math.PI).toFixed(0) + '° fov:' + fovOk + ' los:' + losOk);
+            });
+        }
+        return;
+    }
     if (matchOver) return; // No kills during end state
     attacker.shootCd = attacker.shootCooldownTime;
 
