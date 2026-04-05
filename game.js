@@ -1238,59 +1238,40 @@ class Player {
                 if (!this.checkCollision(newPos)) {
                     this.position.x = newPos.x;
                     this.position.z = newPos.z;
+                    this._stuckFrames = 0;
                 } else {
-                    // Wall slide
-                    let moved = false;
-                    const slideX = this.position.clone(); slideX.x += this.velocity.x;
-                    const slideZ = this.position.clone(); slideZ.z += this.velocity.z;
+                    // Hit a wall — count all contacts including slides
+                    this._stuckFrames++;
 
-                    if (!this.checkCollision(slideX)) {
-                        this.position.x = slideX.x; moved = true;
-                    } else if (!this.checkCollision(slideZ)) {
-                        this.position.z = slideZ.z; moved = true;
-                    } else {
-                        const angle = Math.atan2(direction.z, direction.x);
-                        for (const offset of [Math.PI/4, -Math.PI/4, Math.PI/3, -Math.PI/3, Math.PI/2, -Math.PI/2]) {
-                            const alt = this.position.clone();
-                            alt.x += Math.cos(angle + offset) * speed;
-                            alt.z += Math.sin(angle + offset) * speed;
-                            if (!this.checkCollision(alt)) {
-                                this.position.x = alt.x;
-                                this.position.z = alt.z;
-                                moved = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (!moved) {
-                        this._stuckFrames++;
-                        if (this._stuckFrames > 10) {
-                            // Find nearest bot and run AWAY from it + the wall
-                            let escapeDir = new THREE.Vector3((Math.random() - 0.5), 0, (Math.random() - 0.5)).normalize();
-
-                            for (const other of gameState.bots) {
-                                if (other === this || other.health <= 0) continue;
-                                const dist = this.position.distanceTo(other.position);
-                                if (dist < 5) {
-                                    // Run away from nearby bot
-                                    escapeDir.add(new THREE.Vector3().subVectors(this.position, other.position).normalize());
-                                }
-                            }
-                            escapeDir.normalize();
-
+                    if (this._stuckFrames > 3) {
+                        // Stop wall-riding — camp here or pick a new direction
+                        if (Math.random() < 0.4 && this._botState !== 'chase') {
+                            this._botState = 'camp';
+                            this._campTimer = 0;
+                            this._campDuration = 2 + Math.random() * 5;
+                            this.velocity.set(0, 0, 0);
+                            this.targetPosition = null;
+                        } else {
+                            // Navigate around: pick perpendicular direction
+                            const angle = Math.atan2(direction.z, direction.x);
+                            const turn = (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 2 + Math.random() * 0.5);
+                            const escapeDist = 15 + Math.random() * 20;
                             this.targetPosition = new THREE.Vector3(
-                                this.position.x + escapeDir.x * 25,
+                                Math.max(-MAP_SIZE/2+10, Math.min(MAP_SIZE/2-10, this.position.x + Math.cos(angle + turn) * escapeDist)),
                                 0.5,
-                                this.position.z + escapeDir.z * 25
+                                Math.max(-MAP_SIZE/2+10, Math.min(MAP_SIZE/2-10, this.position.z + Math.sin(angle + turn) * escapeDist))
                             );
-                            // Clamp to map bounds
-                            this.targetPosition.x = Math.max(-MAP_SIZE/2 + 10, Math.min(MAP_SIZE/2 - 10, this.targetPosition.x));
-                            this.targetPosition.z = Math.max(-MAP_SIZE/2 + 10, Math.min(MAP_SIZE/2 - 10, this.targetPosition.z));
-                            this._stuckFrames = 0;
                         }
-                    } else {
                         this._stuckFrames = 0;
+                    } else {
+                        // Brief slide attempt before giving up
+                        const slideX = this.position.clone(); slideX.x += this.velocity.x;
+                        const slideZ = this.position.clone(); slideZ.z += this.velocity.z;
+                        if (!this.checkCollision(slideX)) {
+                            this.position.x = slideX.x;
+                        } else if (!this.checkCollision(slideZ)) {
+                            this.position.z = slideZ.z;
+                        }
                     }
                 }
                 this.position.y = this.getTerrainHeight(this.position.x, this.position.z);

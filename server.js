@@ -258,21 +258,32 @@ function updateBot(bot, dt) {
                 bot.z = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nz));
                 bot.stuckFrames = 0;
             } else {
-                // Wall slide: try X only, then Z only
-                if (!collidesWithWall(nx, bot.z, 1.0)) {
-                    bot.x = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nx));
-                    bot.stuckFrames = 0;
-                } else if (!collidesWithWall(bot.x, nz, 1.0)) {
-                    bot.z = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nz));
+                // Hit a wall — count ALL wall contacts (including slides)
+                bot.stuckFrames++;
+                if (bot.stuckFrames > 3) {
+                    // Stop wall-riding — camp here briefly or pick a new direction
+                    if (Math.random() < 0.4 && bot.botState !== 'chase') {
+                        bot.botState = 'camp';
+                        bot.campTimer = 0;
+                        bot.botTarget = null;
+                    } else {
+                        // Pick a perpendicular direction to navigate around
+                        var angle = Math.atan2(dz, dx);
+                        var turn = (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 2 + Math.random() * 0.5);
+                        var newAngle = angle + turn;
+                        var escapeDist = 15 + Math.random() * 20;
+                        bot.botTarget = {
+                            x: Math.max(-MAP_SIZE/2+5, Math.min(MAP_SIZE/2-5, bot.x + Math.cos(newAngle) * escapeDist)),
+                            z: Math.max(-MAP_SIZE/2+5, Math.min(MAP_SIZE/2-5, bot.z + Math.sin(newAngle) * escapeDist))
+                        };
+                    }
                     bot.stuckFrames = 0;
                 } else {
-                    bot.stuckFrames++;
-                    if (bot.stuckFrames > 10) {
-                        bot.botTarget = {
-                            x: (Math.random() - 0.5) * MAP_SIZE * 0.5,
-                            z: (Math.random() - 0.5) * MAP_SIZE * 0.5
-                        };
-                        bot.stuckFrames = 0;
+                    // Brief slide attempt before giving up
+                    if (!collidesWithWall(nx, bot.z, 1.0)) {
+                        bot.x = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nx));
+                    } else if (!collidesWithWall(bot.x, nz, 1.0)) {
+                        bot.z = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nz));
                     }
                 }
             }
