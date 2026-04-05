@@ -288,7 +288,7 @@ function updateBot(bot, dt) {
     // Pick new explore target if needed
     if (!bot.botTarget || dist(bot, bot.botTarget) < 3) {
         // Chance to camp at current position
-        if (Math.random() < 0.12 && bot.botState !== 'chase') {
+        if (Math.random() < 0.05 && bot.botState !== 'chase') {
             bot.botState = 'camp';
             bot.campTimer = 0;
             bot.campDuration = 2 + Math.random() * 6;

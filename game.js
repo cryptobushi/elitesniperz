@@ -1242,7 +1242,7 @@ class Player {
 
         // === EXPLORE/CHASE — pick target and move ===
         if (!this.targetPosition || this.position.distanceTo(this.targetPosition) < 3) {
-            if (Math.random() < 0.12 && this._botState !== 'chase') {
+            if (Math.random() < 0.05 && this._botState !== 'chase') {
                 this._botState = 'camp';
                 this._campTimer = 0;
                 this._campDuration = 2 + Math.random() * 6;
