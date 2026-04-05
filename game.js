@@ -3558,6 +3558,7 @@ function handleBinaryState(buf) {
         const isSpawnProt = !!(flags & 2);
         const isBot = !!(flags & 4);
         const isBlue = !!(flags & 8);
+        const inFog = !!(flags & 16);
         const team = isBlue ? 'blue' : 'red';
 
         seenIds.add(id);
@@ -3629,9 +3630,10 @@ function handleBinaryState(buf) {
             remote.player.streak = streak;
 
             // Health sync
-            const wasAlive = remote.player.health > 0;
             remote.player.health = alive ? 100 : 0;
-            remote.player.mesh.visible = !!alive;
+            // Enemies in fog: hide mesh but keep for scoreboard
+            remote.player.mesh.visible = !!alive && !inFog;
+            remote.player._inFog = inFog;
 
             // Windwalk visual
             remote.player.isWindwalking = isWindwalk;
@@ -3641,22 +3643,7 @@ function handleBinaryState(buf) {
         }
     }
 
-    // Handle remote players not in current state update
-    for (const [rid, remote] of _remotePlayers) {
-        if (!seenIds.has(rid) && rid !== _myServerId) {
-            // Track how long unseen
-            if (!remote._unseenSince) remote._unseenSince = performance.now();
-            remote.player.mesh.visible = false;
-
-            // Remove after 10s unseen (they left or are far in fog)
-            if (performance.now() - remote._unseenSince > 10000) {
-                if (remote.player.mesh.parent) remote.player.mesh.parent.remove(remote.player.mesh);
-                _remotePlayers.delete(rid);
-            }
-        } else {
-            remote._unseenSince = null;
-        }
-    }
+    // All players are now always sent by server — no cleanup needed
 }
 
 function handleJsonMessage(msg) {

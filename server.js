@@ -100,43 +100,41 @@ console.log(`Initialized ${players.size} bots`);
 const BYTES_PER_PLAYER = 28;
 
 function encodeState(viewerTeam) {
-    // Filter: send all allies, but only visible enemies
-    const visible = [];
+    // Determine which enemies are visible in FOW
+    const enemyVisible = new Set();
     players.forEach(function(p) {
-        if (p.team === viewerTeam) {
-            visible.push(p);
-        } else if (p.health <= 0) {
-            visible.push(p); // Dead enemies always sent (for scoreboard)
-        } else if (p.windwalk) {
-            // Windwalking enemies hidden
-        } else {
-            // Check if any allied player can see this enemy
-            let seen = false;
-            players.forEach(function(ally) {
-                if (seen) return;
-                if (ally.team === viewerTeam && ally.health > 0) {
-                    var vr = 50; // VISION_RADIUS
-                    if (ally.farsight) {
-                        // Also check farsight
-                        var fdx = p.x - ally.farsightX, fdz = p.z - ally.farsightZ;
-                        if (fdx * fdx + fdz * fdz <= 70 * 70) { seen = true; return; }
-                    }
-                    var dx = p.x - ally.x, dz = p.z - ally.z;
-                    if (dx * dx + dz * dz <= vr * vr) { seen = true; }
+        if (p.team === viewerTeam || p.health <= 0) return;
+        if (p.windwalk) return;
+        players.forEach(function(ally) {
+            if (enemyVisible.has(p.id)) return;
+            if (ally.team === viewerTeam && ally.health > 0) {
+                var vr = 50;
+                if (ally.farsight) {
+                    var fdx = p.x - ally.farsightX, fdz = p.z - ally.farsightZ;
+                    if (fdx * fdx + fdz * fdz <= 70 * 70) { enemyVisible.add(p.id); return; }
                 }
-            });
-            if (seen) visible.push(p);
-        }
+                var dx = p.x - ally.x, dz = p.z - ally.z;
+                if (dx * dx + dz * dz <= vr * vr) { enemyVisible.add(p.id); }
+            }
+        });
     });
 
-    const count = visible.length;
+    // Always send ALL players — client uses inFog flag to hide position
+    const all = [];
+    players.forEach(function(p) { all.push(p); });
+
+    const count = all.length;
     const ab = new ArrayBuffer(2 + count * BYTES_PER_PLAYER);
     const view = new DataView(ab);
     view.setUint16(0, count, true);
     let off = 2;
-    for (let i = 0; i < visible.length; i++) {
-        const p = visible[i];
+    for (let i = 0; i < all.length; i++) {
+        const p = all[i];
+        const isEnemy = p.team !== viewerTeam;
+        const inFog = isEnemy && p.health > 0 && !enemyVisible.has(p.id);
+
         view.setUint16(off, p.id, true); off += 2;
+        // Send last-known position for fog enemies (won't be rendered anyway)
         view.setFloat32(off, p.x, true); off += 4;
         view.setFloat32(off, p.z, true); off += 4;
         view.setFloat32(off, p.rot, true); off += 4;
@@ -144,12 +142,13 @@ function encodeState(viewerTeam) {
         view.setInt16(off, p.kills, true); off += 2;
         view.setInt16(off, p.deaths, true); off += 2;
         view.setFloat32(off, p.price, true); off += 4;
-        // flags: bit0=windwalk, bit1=spawnProt, bit2=isBot, bit3=blue team
+        // flags: bit0=windwalk, bit1=spawnProt, bit2=isBot, bit3=blue team, bit4=inFog
         let flags = 0;
         if (p.windwalk) flags |= 1;
         if (p.spawnProt > 0) flags |= 2;
         if (p.isBot) flags |= 4;
         if (p.team === 'blue') flags |= 8;
+        if (inFog) flags |= 16;
         view.setUint8(off, flags); off += 1;
         view.setInt16(off, p.streak, true); off += 2;
         view.setInt16(off, Math.min(p.gold, 32767), true); off += 2;
