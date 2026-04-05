@@ -68,7 +68,7 @@ function createPlayer(id, name, team, isBot) {
     const pos = spawnPos(team);
     return {
         id, username: name, team, isBot,
-        x: pos.x, z: pos.z, y: terrainY(pos.x, pos.z) + 0.8,
+        x: pos.x, z: pos.z, y: terrainY(pos.x, pos.z) + 0.6,
         rot: 0, health: 100, kills: 0, deaths: 0,
         price: 1.0, gold: 0, streak: 0,
         spawnProt: SPAWN_PROTECTION, windwalk: false, windwalkTimer: 0,
@@ -342,7 +342,7 @@ function updateBot(bot, dt) {
             bot.stuckFrames = 0;
         }
 
-        bot.y = terrainY(bot.x, bot.z) + 0.8;
+        bot.y = terrainY(bot.x, bot.z) + 0.6;
         bot.rot = Math.atan2(dx, dz);
     }
 
@@ -510,7 +510,7 @@ function tryShoot(attacker) {
         p.health = 100;
         p.x = pos.x;
         p.z = pos.z;
-        p.y = terrainY(pos.x, pos.z) + 0.8;
+        p.y = terrainY(pos.x, pos.z) + 0.6;
         p.spawnProt = SPAWN_PROTECTION;
         p.streak = 0;
         p.moveTarget = null;
@@ -605,7 +605,7 @@ setInterval(function() {
                 } else if (!collidesWithWall(p.x, nz, 1.0)) {
                     p.z = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nz));
                 }
-                p.y = terrainY(p.x, p.z) + 0.8;
+                p.y = terrainY(p.x, p.z) + 0.6;
                 p.rot = Math.atan2(dx, dz);
             }
         }
@@ -823,7 +823,7 @@ function resetMatch() {
     // Reset all players in-place (keep connections, bots, teams)
     players.forEach(function(p) {
         const pos = spawnPos(p.team);
-        p.x = pos.x; p.z = pos.z; p.y = terrainY(pos.x, pos.z) + 0.8;
+        p.x = pos.x; p.z = pos.z; p.y = terrainY(pos.x, pos.z) + 0.6;
         p.rot = 0; p.health = 100; p.kills = 0; p.deaths = 0;
         p.price = 1.0; p.gold = 0; p.streak = 0;
         p.spawnProt = SPAWN_PROTECTION; p.windwalk = false; p.windwalkTimer = 0;
