@@ -3196,12 +3196,34 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// Handle window resize
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+// Handle window resize — ignore mobile keyboard resize
+let _baseWidth = window.innerWidth;
+let _baseHeight = window.innerHeight;
+const _isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('ontouchstart' in window);
+
+function handleResize() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    // On mobile, keyboard opening shrinks innerHeight but not width — skip that
+    if (_isMobileDevice && w === _baseWidth && h < _baseHeight * 0.8) return;
+    _baseWidth = w;
+    _baseHeight = h;
+    camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
+    renderer.setSize(w, h);
+}
+window.addEventListener('resize', handleResize);
+
+// Prevent scroll when focusing chat on mobile
+if (_isMobileDevice) {
+    const _chatEl = document.getElementById('chatInput');
+    if (_chatEl) {
+        _chatEl.addEventListener('focus', () => {
+            setTimeout(() => { window.scrollTo(0, 0); }, 50);
+            setTimeout(() => { window.scrollTo(0, 0); }, 300);
+        });
+    }
+}
 
 // Initial render loop (before game starts)
 function preGameRender() {
