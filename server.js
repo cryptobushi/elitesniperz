@@ -109,8 +109,8 @@ function encodeState(viewerTeam) {
     players.forEach(function(p) {
         if (p.team === viewerTeam || p.health <= 0) return;
         if (p.windwalk) return;
-        // Hysteresis: 50 units to enter vision, 58 to leave
-        var enterRange = 50, exitRange = 58;
+        // Hysteresis: 50 units to enter vision, 53 to leave (small buffer)
+        var enterRange = 50, exitRange = 53;
         var wasVisible = prevVisible.has(p.id);
         var vr = wasVisible ? exitRange : enterRange;
         players.forEach(function(ally) {
@@ -398,13 +398,27 @@ function tryShoot(attacker) {
     // Use aimRot (from client mouse/weapon aim) if available, otherwise movement rot
     const aimDir = attacker.aimRot !== undefined ? attacker.aimRot : attacker.rot;
 
+    // Check if enemy is visible to attacker's team (within vision radius of any ally)
+    function isTeamVisible(enemy, team) {
+        var visible = false;
+        players.forEach(function(ally) {
+            if (visible) return;
+            if (ally.team === team && ally.health > 0) {
+                var dx = enemy.x - ally.x, dz = enemy.z - ally.z;
+                if (dx * dx + dz * dz <= 50 * 50) visible = true;
+            }
+        });
+        return visible;
+    }
+
     let closest = null, closestDist = Infinity;
     players.forEach(function(p) {
         if (p === attacker || p.team === attacker.team || p.health <= 0) return;
         if (p.windwalk) return;
+        if (!isTeamVisible(p, attacker.team)) return; // Can't shoot what you can't see
         const d = dist(attacker, p);
         if (d < closestDist && d <= attacker.shootRange) {
-            // FOV cone: 30° for everyone — bots must face enemies to shoot
+            // FOV cone: 30° for everyone
             const fovDeg = 30;
             const dx = p.x - attacker.x, dz = p.z - attacker.z;
             const angle = Math.atan2(dx, dz);

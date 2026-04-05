@@ -611,8 +611,8 @@ class FogOfWar {
     update(player, allUnits, farsightPositions = []) {
         this.visionSources = [];
 
-        // Player vision — use 58 to match server hysteresis exit range
-        const visionR = 58;
+        // Player vision — match server enter range (50), not exit hysteresis
+        const visionR = VISION_RADIUS;
         if (player && player.health > 0) {
             this.visionSources.push({ x: player.position.x, z: player.position.z, r: visionR });
         }
