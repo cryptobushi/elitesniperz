@@ -197,10 +197,9 @@ function buyItem(p, itemId) {
 // Check if a point is clear (no wall collision)
 function isClear(x, z, r) { return !collidesWithWall(x, z, r || 1.0); }
 
-// Cast a ray from (x,z) in direction (dx,dz), return distance to first wall (max lookahead)
+// Cast a ray from (x,z) in direction (dx,dz), return distance to first wall
 function raycast(x, z, dx, dz, maxDist) {
-    var step = 1.5;
-    for (var d = step; d <= maxDist; d += step) {
+    for (var d = 1.0; d <= maxDist; d += 1.0) {
         if (collidesWithWall(x + dx * d, z + dz * d, 0.8)) return d;
     }
     return maxDist;
@@ -209,7 +208,7 @@ function raycast(x, z, dx, dz, maxDist) {
 // Find best movement direction using feeler rays (steering-based avoidance)
 function steerAroundWalls(bot, goalDx, goalDz, spd) {
     var goalAngle = Math.atan2(goalDz, goalDx);
-    var lookahead = Math.max(4, spd * 8); // Look further at higher speed
+    var lookahead = 6;
 
     // Test candidate directions: straight, then progressively wider turns
     var candidates = [0, 0.3, -0.3, 0.6, -0.6, 1.0, -1.0, 1.4, -1.4, Math.PI/2, -Math.PI/2, 2.0, -2.0, 2.5, -2.5, Math.PI];
@@ -221,11 +220,11 @@ function steerAroundWalls(bot, goalDx, goalDz, spd) {
         var cdx = Math.cos(angle), cdz = Math.sin(angle);
         var clearDist = raycast(bot.x, bot.z, cdx, cdz, lookahead);
 
-        // Score: prefer directions with more clear space AND closer to goal direction
         var directionBonus = (1.0 - Math.abs(candidates[i]) / Math.PI) * lookahead * 0.5;
         var score = clearDist + directionBonus;
 
-        if (score > bestScore && clearDist > 2) {
+        // Accept any direction with at least 1.2 units clear (enough for one step)
+        if (score > bestScore && clearDist > 1.2) {
             bestScore = score;
             bestAngle = angle;
         }
@@ -283,31 +282,27 @@ function updateBot(bot, dt) {
         var dx = bot.botTarget.x - bot.x;
         var dz = bot.botTarget.z - bot.z;
         var d = Math.sqrt(dx * dx + dz * dz);
-        if (d > 0.5) {
-            var spd = (bot.windwalk ? bot.windwalkSpeed : bot.speed) * dt;
-            var dirX = dx / d, dirZ = dz / d;
+        var spd = (bot.windwalk ? bot.windwalkSpeed : bot.speed) * dt;
+        var dirX = d > 0.1 ? dx / d : 0, dirZ = d > 0.1 ? dz / d : 1;
 
-            // Steer around obstacles
-            var steer = steerAroundWalls(bot, dirX, dirZ, spd);
-            var nx = bot.x + steer.dx * spd;
-            var nz = bot.z + steer.dz * spd;
+        // Steer around obstacles
+        var steer = steerAroundWalls(bot, dirX, dirZ, spd);
+        var nx = bot.x + steer.dx * spd;
+        var nz = bot.z + steer.dz * spd;
 
-            if (isClear(nx, nz)) {
-                bot.x = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nx));
-                bot.z = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nz));
+        if (isClear(nx, nz)) {
+            bot.x = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nx));
+            bot.z = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nz));
+            bot.stuckFrames = 0;
+        } else {
+            bot.stuckFrames++;
+            if (bot.stuckFrames > 3) {
+                bot.botTarget = pickExploreTarget(bot);
                 bot.stuckFrames = 0;
-            } else {
-                bot.stuckFrames++;
-                if (bot.stuckFrames > 5) {
-                    // Truly stuck — pick a completely new target
-                    bot.botTarget = pickExploreTarget(bot);
-                    bot.botState = 'explore';
-                    bot.stuckFrames = 0;
-                }
             }
-            bot.y = terrainY(bot.x, bot.z) + 0.5;
-            bot.rot = Math.atan2(dx, dz);
         }
+        bot.y = terrainY(bot.x, bot.z) + 0.5;
+        if (d > 0.1) bot.rot = Math.atan2(dx, dz);
     }
 
     // Aim at closest visible enemy (so tryShoot's FOV cone works)

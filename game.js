@@ -1143,21 +1143,19 @@ class Player {
     // Steering-based obstacle avoidance — cast feeler rays to find clear path
     _steerAround(goalDir, speed) {
         const goalAngle = Math.atan2(goalDir.z, goalDir.x);
-        const lookahead = Math.max(4, speed * 8);
+        const lookahead = 6;
         const candidates = [0, 0.3, -0.3, 0.6, -0.6, 1.0, -1.0, 1.4, -1.4, Math.PI/2, -Math.PI/2, 2.0, -2.0, 2.5, -2.5, Math.PI];
 
         let bestAngle = goalAngle;
         let bestScore = -Infinity;
+        const testPos = this.position.clone();
 
         for (const offset of candidates) {
             const angle = goalAngle + offset;
             const dx = Math.cos(angle), dz = Math.sin(angle);
 
-            // Raycast: step along direction checking for collisions
             let clearDist = lookahead;
-            const step = 1.5;
-            const testPos = this.position.clone();
-            for (let d = step; d <= lookahead; d += step) {
+            for (let d = 1.0; d <= lookahead; d += 1.0) {
                 testPos.x = this.position.x + dx * d;
                 testPos.z = this.position.z + dz * d;
                 if (this.checkCollision(testPos)) { clearDist = d; break; }
@@ -1165,7 +1163,7 @@ class Player {
 
             const directionBonus = (1.0 - Math.abs(offset) / Math.PI) * lookahead * 0.5;
             const score = clearDist + directionBonus;
-            if (score > bestScore && clearDist > 2) {
+            if (score > bestScore && clearDist > 1.2) {
                 bestScore = score;
                 bestAngle = angle;
             }
@@ -1227,34 +1225,30 @@ class Player {
             this.targetPosition = this._pickExploreTarget();
         }
 
-        if (this.targetPosition && this._botState !== 'camp') {
+        if (this.targetPosition) {
             const direction = new THREE.Vector3().subVectors(this.targetPosition, this.position);
             direction.y = 0;
             const goalDist = direction.length();
-            if (goalDist > 0.5) {
-                direction.normalize();
-                const speed = this.speed * deltaTime;
+            direction.normalize();
+            const speed = this.speed * deltaTime;
 
-                // Steer around obstacles
-                const steerDir = this._steerAround(direction, speed);
-                this.velocity.copy(steerDir).multiplyScalar(speed);
-                const newPos = this.position.clone().add(this.velocity);
+            // Steer around obstacles
+            const steerDir = this._steerAround(direction, speed);
+            this.velocity.copy(steerDir).multiplyScalar(speed);
+            const newPos = this.position.clone().add(this.velocity);
 
-                if (!this.checkCollision(newPos)) {
-                    this.position.x = newPos.x;
-                    this.position.z = newPos.z;
+            if (!this.checkCollision(newPos)) {
+                this.position.x = newPos.x;
+                this.position.z = newPos.z;
+                this._stuckFrames = 0;
+            } else {
+                this._stuckFrames++;
+                if (this._stuckFrames > 3) {
+                    this.targetPosition = this._pickExploreTarget();
                     this._stuckFrames = 0;
-                } else {
-                    this._stuckFrames++;
-                    if (this._stuckFrames > 5) {
-                        // Truly stuck — new target
-                        this.targetPosition = this._pickExploreTarget();
-                        this._botState = 'explore';
-                        this._stuckFrames = 0;
-                    }
                 }
-                this.position.y = this.getTerrainHeight(this.position.x, this.position.z);
             }
+            this.position.y = this.getTerrainHeight(this.position.x, this.position.z);
         }
 
         // Aim weapon
