@@ -3675,6 +3675,14 @@ function handleJsonMessage(msg) {
                     _roster[r.id] = { username: r.n, team: r.m, isBot: !!r.b };
                 });
             }
+            // Init team score HUD
+            if (msg.limit) {
+                _matchKillLimit = msg.limit;
+                _matchTimeLimit = msg.timeLimit || 1200;
+                _matchStartTime = Date.now() - (msg.elapsed || 0) * 1000;
+                updateTeamScore(msg.rk || 0, msg.bk || 0);
+                document.getElementById('teamScore')?.classList.remove('hidden');
+            }
             break;
         }
         case 'pj': {
@@ -3691,6 +3699,9 @@ function handleJsonMessage(msg) {
             // Kill event — play shooting VFX
             addKillFeed(msg.kn, msg.vn);
             audioManager.play('sniperFire');
+
+            // Update team score HUD
+            if (msg.rk !== undefined) updateTeamScore(msg.rk, msg.bk);
 
             // Find killer + victim meshes for tracer VFX
             const killer = msg.ki === _myServerId ? gameState.player :
@@ -3785,7 +3796,153 @@ function handleJsonMessage(msg) {
             addChatMessage(msg.n, msg.m, msg.x);
             break;
         }
+        case 'gameover': {
+            showMatchEnd(msg);
+            break;
+        }
+        case 'newmatch': {
+            handleNewMatch(msg);
+            break;
+        }
     }
+}
+
+// === MATCH STATE ===
+let _matchKillLimit = 50;
+let _matchTimeLimit = 1200;
+let _matchStartTime = Date.now();
+let _matchEndCountdown = null;
+
+function updateTeamScore(redKills, blueKills) {
+    const el = document.getElementById('teamScore');
+    if (!el) return;
+    el.classList.remove('hidden');
+    document.getElementById('tsRedKills').textContent = redKills;
+    document.getElementById('tsBlueKills').textContent = blueKills;
+    document.getElementById('tsLimit').textContent = _matchKillLimit;
+}
+
+function showMatchEnd(msg) {
+    const el = document.getElementById('matchEnd');
+    if (!el) return;
+
+    const isWin = msg.win === gameState.team;
+    const isDraw = msg.win === 'draw';
+
+    // Set class for styling
+    el.className = isDraw ? 'draw' : (isWin ? 'win' : 'lose');
+
+    // Title
+    document.getElementById('matchEndTitle').textContent =
+        isDraw ? 'DRAW' : (isWin ? 'VICTORY' : 'DEFEAT');
+
+    // Score
+    document.getElementById('matchEndScore').innerHTML =
+        '<span style="color:#ff4444">' + msg.rk + '</span>' +
+        ' <span style="color:#555">—</span> ' +
+        '<span style="color:#4488ff">' + msg.bk + '</span>';
+
+    // MVP (top killer)
+    const mvp = msg.stats && msg.stats[0];
+    if (mvp) {
+        const mvpColor = mvp.m === 'red' ? '#ff4444' : '#4488ff';
+        document.getElementById('matchEndMVP').innerHTML =
+            'MVP: <span style="color:' + mvpColor + '">' + mvp.n + '</span> — ' +
+            mvp.k + ' kills / ' + mvp.d + ' deaths';
+    }
+
+    // Stats table
+    if (msg.stats) {
+        let html = '';
+        msg.stats.forEach(function(s) {
+            const isMe = s.n === gameState.username;
+            const teamClass = s.m === 'red' ? 'me-red' : 'me-blue';
+            html += '<div class="me-row ' + teamClass + '"' + (isMe ? ' style="color:#fff;font-weight:bold;"' : '') + '>' +
+                s.n + (s.b ? ' [BOT]' : '') + '  ' + s.k + '/' + s.d + '  $' + s.p.toFixed(2) +
+                '</div>';
+        });
+        document.getElementById('matchEndStats').innerHTML = html;
+    }
+
+    // Format match time
+    const mins = Math.floor(msg.time / 60);
+    const secs = msg.time % 60;
+    const timeStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
+
+    el.classList.remove('hidden');
+
+    // Countdown to next match
+    let remaining = 12;
+    const timerEl = document.getElementById('matchEndTimer');
+    timerEl.textContent = 'Match time: ' + timeStr + '  •  Next match in ' + remaining + 's';
+    _matchEndCountdown = setInterval(function() {
+        remaining--;
+        if (remaining <= 0) {
+            clearInterval(_matchEndCountdown);
+            timerEl.textContent = 'Starting...';
+        } else {
+            timerEl.textContent = 'Match time: ' + timeStr + '  •  Next match in ' + remaining + 's';
+        }
+    }, 1000);
+}
+
+function handleNewMatch(msg) {
+    // Hide match end screen
+    document.getElementById('matchEnd')?.classList.add('hidden');
+    document.getElementById('deathPopup')?.classList.add('hidden');
+    if (_matchEndCountdown) { clearInterval(_matchEndCountdown); _matchEndCountdown = null; }
+
+    // Reset match state
+    _matchKillLimit = msg.limit || 50;
+    _matchTimeLimit = msg.timeLimit || 1200;
+    _matchStartTime = Date.now();
+    updateTeamScore(0, 0);
+
+    // Update roster
+    if (msg.roster) {
+        for (const r of msg.roster) {
+            _roster[r.id] = { username: r.n, team: r.m, isBot: !!r.b };
+        }
+    }
+
+    // Reset local player
+    if (gameState.player) {
+        gameState.player.health = 100;
+        gameState.player.kills = 0;
+        gameState.player.deaths = 0;
+        gameState.player.price = 1.0;
+        gameState.player.gold = 0;
+        gameState.player.streak = 0;
+        gameState.player._streak = 0;
+        gameState.player.inventory = {};
+        gameState.player._applyItems();
+        gameState.player.mesh.visible = true;
+        gameState.player._spawnProtection = 1.5;
+        gameState.kills = 0;
+        gameState.deaths = 0;
+        gameState.killStreak = 0;
+        gameState.gold = 0;
+        gameState.firstBlood = false;
+        _playerPrice = 1.0;
+        _priceHistory.length = 0;
+        _priceHistory.push(1.0);
+        updateGoldUI();
+        updateTerminal();
+    }
+
+    // Reset remote players
+    for (const [, remote] of _remotePlayers) {
+        remote.player.kills = 0;
+        remote.player.deaths = 0;
+        remote.player.price = 1.0;
+        remote.player.gold = 0;
+        remote.player.streak = 0;
+        remote.player.health = 100;
+        remote.player.mesh.visible = true;
+        remote.player.inventory = {};
+    }
+
+    addChatSystem('⚔ New match started — first to ' + _matchKillLimit + ' kills!');
 }
 
 function findRemoteOrLocal(serverId) {

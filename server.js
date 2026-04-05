@@ -45,10 +45,19 @@ function dist(a, b) {
     return Math.sqrt((a.x - b.x) ** 2 + (a.z - b.z) ** 2);
 }
 
+// === MATCH CONFIG ===
+const KILL_LIMIT = 50;
+const TIME_LIMIT = 20 * 60; // 20 minutes in seconds
+const RESTART_DELAY = 12; // seconds between match end and new match
+
 // === STATE ===
 const players = new Map(); // id -> state
 let nextId = 1;
 let firstBlood = false;
+let teamKills = { red: 0, blue: 0 };
+let matchStartTime = Date.now();
+let matchOver = false;
+let matchTimer = null;
 
 // Track disconnected players for rejoin (username -> saved state)
 const disconnectedPlayers = new Map();
@@ -324,6 +333,7 @@ function tryShoot(attacker) {
     });
 
     if (!closest) return;
+    if (matchOver) return; // No kills during end state
     attacker.shootCd = attacker.shootCooldownTime;
 
     // Spawn protection blocks damage
@@ -359,6 +369,8 @@ function tryShoot(attacker) {
     const fb = !firstBlood;
     if (fb) firstBlood = true;
 
+    teamKills[attacker.team]++;
+
     broadcast(JSON.stringify({
         t: 'k',
         ki: attacker.id, kn: attacker.username,
@@ -367,8 +379,14 @@ function tryShoot(attacker) {
         fb: fb ? 1 : 0,
         kx: attacker.x, kz: attacker.z,
         vx: closest.x, vz: closest.z,
-        kt: attacker.team, vt: closest.team
+        kt: attacker.team, vt: closest.team,
+        rk: teamKills.red, bk: teamKills.blue
     }));
+
+    // Check win condition
+    if (teamKills[attacker.team] >= KILL_LIMIT) {
+        endMatch(attacker.team, 'kill_limit');
+    }
 
     // Respawn after 5s
     const deadId = closest.id;
@@ -540,7 +558,12 @@ wss.on('connection', function(ws) {
                 players.forEach(function(p) {
                     roster.push({ id: p.id, n: p.username, m: p.team, b: p.isBot ? 1 : 0 });
                 });
-                ws.send(JSON.stringify({ t: 'j', id: player.id, roster: roster }));
+                const elapsed = Math.round((Date.now() - matchStartTime) / 1000);
+                ws.send(JSON.stringify({
+                    t: 'j', id: player.id, roster: roster,
+                    rk: teamKills.red, bk: teamKills.blue,
+                    limit: KILL_LIMIT, timeLimit: TIME_LIMIT, elapsed: elapsed
+                }));
                 broadcast(JSON.stringify({ t: 'pj', n: name, m: team }));
                 console.log(name + ' joined ' + team + '. Total: ' + players.size);
             }
@@ -623,6 +646,82 @@ wss.on('connection', function(ws) {
         }
     });
 });
+
+// === MATCH END / RESET ===
+function endMatch(winTeam, reason) {
+    if (matchOver) return;
+    matchOver = true;
+
+    // Collect final stats
+    const stats = [];
+    players.forEach(function(p) {
+        stats.push({
+            id: p.id, n: p.username, m: p.team, b: p.isBot ? 1 : 0,
+            k: p.kills, d: p.deaths, p: p.price, g: p.gold, s: p.streak
+        });
+    });
+    stats.sort((a, b) => b.k - a.k);
+
+    const elapsed = Math.round((Date.now() - matchStartTime) / 1000);
+    broadcast(JSON.stringify({
+        t: 'gameover',
+        win: winTeam,
+        reason: reason, // 'kill_limit' or 'time_limit'
+        rk: teamKills.red,
+        bk: teamKills.blue,
+        time: elapsed,
+        limit: KILL_LIMIT,
+        stats: stats
+    }));
+
+    console.log('Match over — ' + winTeam + ' wins (' + reason + ') ' + teamKills.red + '-' + teamKills.blue + ' in ' + elapsed + 's');
+
+    // Auto-restart after delay
+    matchTimer = setTimeout(resetMatch, RESTART_DELAY * 1000);
+}
+
+function resetMatch() {
+    matchOver = false;
+    firstBlood = false;
+    teamKills = { red: 0, blue: 0 };
+    matchStartTime = Date.now();
+    disconnectedPlayers.clear();
+
+    // Reset all players in-place (keep connections, bots, teams)
+    players.forEach(function(p) {
+        const pos = spawnPos(p.team);
+        p.x = pos.x; p.z = pos.z; p.y = terrainY(pos.x, pos.z) + 0.5;
+        p.rot = 0; p.health = 100; p.kills = 0; p.deaths = 0;
+        p.price = 1.0; p.gold = 0; p.streak = 0;
+        p.spawnProt = SPAWN_PROTECTION; p.windwalk = false; p.windwalkTimer = 0;
+        p.farsight = false; p.farsightTimer = 0;
+        p.shootCd = 0; p.aimRot = 0;
+        p.hasShield = false; p.goldMultiplier = 1.0;
+        p.inventory = {};
+        applyItems(p);
+        p.moveTarget = null; p.botTarget = null; p.botState = 'explore';
+        p.afk = false; p.lastInput = Date.now();
+    });
+
+    // Send roster for new match
+    const roster = [];
+    players.forEach(function(p) {
+        roster.push({ id: p.id, n: p.username, m: p.team, b: p.isBot ? 1 : 0 });
+    });
+    broadcast(JSON.stringify({ t: 'newmatch', limit: KILL_LIMIT, timeLimit: TIME_LIMIT, roster: roster }));
+    console.log('New match started');
+}
+
+// Time limit check — every second
+setInterval(function() {
+    if (matchOver) return;
+    const elapsed = (Date.now() - matchStartTime) / 1000;
+    if (elapsed >= TIME_LIMIT) {
+        const winner = teamKills.red > teamKills.blue ? 'red' :
+                       teamKills.blue > teamKills.red ? 'blue' : 'draw';
+        endMatch(winner, 'time_limit');
+    }
+}, 1000);
 
 // Ping all clients every 30s — drop dead connections
 setInterval(function() {

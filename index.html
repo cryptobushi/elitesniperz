@@ -391,6 +391,76 @@
             text-shadow: 0 0 20px rgba(255,0,0,0.4);
         }
 
+        /* === MATCH END SCREEN === */
+        #matchEnd {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 950; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            pointer-events: none;
+        }
+        #matchEndOverlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; opacity: 0;
+            animation: deathFadeIn 0.6s ease-out forwards;
+        }
+        #matchEndContent {
+            position: relative; z-index: 1; text-align: center;
+            max-width: min(95%, 600px); width: 100%;
+        }
+        #matchEndTitle {
+            font-family: 'Times New Roman', 'Georgia', serif;
+            font-size: clamp(3rem, 12vw, 6rem); font-weight: 400;
+            letter-spacing: 0.3em; opacity: 0; transform: scale(1.8);
+            animation: deathTextIn 1s cubic-bezier(0.2,0.8,0.2,1) 0.2s forwards;
+        }
+        #matchEnd.win #matchEndTitle {
+            color: #00cc44;
+            text-shadow: 0 0 60px rgba(0,200,68,0.8), 0 0 120px rgba(0,200,68,0.4);
+        }
+        #matchEnd.lose #matchEndTitle {
+            color: #8b0000;
+            text-shadow: 0 0 60px rgba(200,0,0,0.8), 0 0 120px rgba(139,0,0,0.4);
+        }
+        #matchEnd.draw #matchEndTitle {
+            color: #888;
+            text-shadow: 0 0 60px rgba(136,136,136,0.6);
+        }
+        #matchEndScore {
+            font-family: monospace; font-size: clamp(1.5rem, 6vw, 3rem);
+            color: #fff; letter-spacing: 0.2em; margin-top: 0.5rem;
+            opacity: 0; animation: deathSubIn 0.5s ease-out 0.8s forwards;
+        }
+        #matchEndMVP {
+            font-family: monospace; font-size: clamp(0.8rem, 3vw, 1.2rem);
+            color: #ffd700; margin-top: 1rem;
+            opacity: 0; animation: deathSubIn 0.5s ease-out 1.2s forwards;
+        }
+        #matchEndStats {
+            font-family: monospace; font-size: clamp(0.6rem, 2vw, 0.85rem);
+            color: #888; margin-top: 1rem; line-height: 1.6;
+            opacity: 0; animation: deathSubIn 0.5s ease-out 1.5s forwards;
+        }
+        #matchEndStats .me-row { color: #fff; }
+        #matchEndStats .me-red { color: #ff4444; }
+        #matchEndStats .me-blue { color: #4488ff; }
+        #matchEndTimer {
+            font-family: monospace; font-size: 0.9rem;
+            color: #555; margin-top: 1.5rem;
+            opacity: 0; animation: deathSubIn 0.5s ease-out 2s forwards;
+        }
+
+        /* === TEAM SCORE HUD === */
+        #teamScore {
+            position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+            z-index: 500; font-family: monospace; font-size: clamp(0.9rem, 3vw, 1.3rem);
+            background: rgba(0,0,0,0.7); border: 1px solid #333; border-radius: 6px;
+            padding: 4px 16px; letter-spacing: 0.1em; pointer-events: none;
+        }
+        .ts-red { color: #ff4444; font-weight: 700; }
+        .ts-blue { color: #4488ff; font-weight: 700; }
+        .ts-sep { color: #555; margin: 0 6px; }
+        .ts-limit { color: #555; font-size: 0.75em; }
+
         /* === SHOP PANEL === */
         #shopPanel {
             position: absolute;
@@ -738,6 +808,26 @@
             <div id="deathKiller"></div>
             <button id="respawnBtn">RETURN TO SPAWN</button>
         </div>
+        <!-- Match End Screen -->
+        <div id="matchEnd" class="hidden">
+            <div id="matchEndOverlay"></div>
+            <div id="matchEndContent">
+                <div id="matchEndTitle">VICTORY</div>
+                <div id="matchEndScore"></div>
+                <div id="matchEndMVP"></div>
+                <div id="matchEndStats"></div>
+                <div id="matchEndTimer">Next match in...</div>
+            </div>
+        </div>
+
+        <!-- Team Score HUD -->
+        <div id="teamScore" class="hidden">
+            <span class="ts-red"><span id="tsRedKills">0</span></span>
+            <span class="ts-sep">—</span>
+            <span class="ts-blue"><span id="tsBlueKills">0</span></span>
+            <span class="ts-limit">/ <span id="tsLimit">50</span></span>
+        </div>
+
         <canvas class="minimap hidden" id="minimap"></canvas>
 
         <div id="chatBox" class="hidden">
@@ -753,6 +843,6 @@
         }
     }
     </script>
-    <script type="module" src="game.js?v=20260404b"></script>
+    <script type="module" src="game.js?v=20260405a"></script>
 </body>
 </html>
