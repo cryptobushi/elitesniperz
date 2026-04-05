@@ -1140,99 +1140,131 @@ class Player {
         }
     }
 
-    botAI(deltaTime) {
-        // Bot AI: roam, camp, explore, avoid piling up
+    // Steering-based obstacle avoidance — cast feeler rays to find clear path
+    _steerAround(goalDir, speed) {
+        const goalAngle = Math.atan2(goalDir.z, goalDir.x);
+        const lookahead = Math.max(4, speed * 8);
+        const candidates = [0, 0.3, -0.3, 0.6, -0.6, 1.0, -1.0, 1.4, -1.4, Math.PI/2, -Math.PI/2, 2.0, -2.0, 2.5, -2.5, Math.PI];
 
+        let bestAngle = goalAngle;
+        let bestScore = -Infinity;
+
+        for (const offset of candidates) {
+            const angle = goalAngle + offset;
+            const dx = Math.cos(angle), dz = Math.sin(angle);
+
+            // Raycast: step along direction checking for collisions
+            let clearDist = lookahead;
+            const step = 1.5;
+            const testPos = this.position.clone();
+            for (let d = step; d <= lookahead; d += step) {
+                testPos.x = this.position.x + dx * d;
+                testPos.z = this.position.z + dz * d;
+                if (this.checkCollision(testPos)) { clearDist = d; break; }
+            }
+
+            const directionBonus = (1.0 - Math.abs(offset) / Math.PI) * lookahead * 0.5;
+            const score = clearDist + directionBonus;
+            if (score > bestScore && clearDist > 2) {
+                bestScore = score;
+                bestAngle = angle;
+            }
+        }
+
+        return new THREE.Vector3(Math.cos(bestAngle), 0, Math.sin(bestAngle));
+    }
+
+    _pickExploreTarget() {
+        for (let attempt = 0; attempt < 10; attempt++) {
+            const x = (Math.random() - 0.5) * (MAP_SIZE * 0.7);
+            const z = (Math.random() - 0.5) * (MAP_SIZE * 0.7);
+            if (Math.abs(x) > MAP_SIZE / 2 - 15 || Math.abs(z) > MAP_SIZE / 2 - 15) continue;
+            // Avoid piling on other bots
+            let tooClose = false;
+            for (const other of gameState.bots) {
+                if (other === this || other.health <= 0) continue;
+                if (other.position.distanceTo(new THREE.Vector3(x, 0, z)) < 8) { tooClose = true; break; }
+            }
+            if (tooClose) continue;
+            return new THREE.Vector3(x, 0.5, z);
+        }
+        return new THREE.Vector3((Math.random()-0.5)*MAP_SIZE*0.4, 0.5, (Math.random()-0.5)*MAP_SIZE*0.4);
+    }
+
+    botAI(deltaTime) {
         // Initialize bot state
         if (!this._botState) {
-            this._botState = 'explore'; // explore, camp, chase
+            this._botState = 'explore';
             this._campTimer = 0;
             this._campDuration = 0;
             this._stuckFrames = 0;
-            this._lastPos = this.position.clone();
         }
 
-        // === STATE: CAMPING — sit still for a while, watch for enemies ===
+        // Find closest visible enemy
+        const allEnemies = [...gameState.bots, gameState.player].filter(p =>
+            p && p !== this && p.team !== this.team && p.health > 0 && p.mesh.visible
+        );
+        let closestEnemy = null, closestDistance = Infinity;
+        for (const enemy of allEnemies) {
+            const d = this.position.distanceTo(enemy.position);
+            if (d < closestDistance && d < 50) { closestDistance = d; closestEnemy = enemy; }
+        }
+
+        // === CAMP STATE ===
         if (this._botState === 'camp') {
             this._campTimer += deltaTime;
-            this.velocity.set(0, 0, 0); // Stop moving
+            this.velocity.set(0, 0, 0);
 
-            // Slowly rotate to look around while camping
             if (this.rifleGroup) {
                 const lookAngle = Math.sin(Date.now() * 0.001) * Math.PI * 0.5;
                 const lookTarget = this.position.clone().add(new THREE.Vector3(Math.sin(lookAngle), 0, Math.cos(lookAngle)).multiplyScalar(5));
                 this.rifleGroup.lookAt(lookTarget);
             }
 
-            if (this._campTimer >= this._campDuration) {
+            // Break camp if timer expires or enemy spotted
+            if (this._campTimer >= this._campDuration || (closestEnemy && closestDistance < 50)) {
                 this._botState = 'explore';
                 this.targetPosition = null;
             }
+
+            // Aim at enemy while camping
+            if (closestEnemy) this.weapon.lookAt(closestEnemy.position);
+            return;
         }
 
-        // === STATE: EXPLORE — pick a destination and walk there ===
-        if (this._botState === 'explore' || this._botState === 'chase') {
-            // Pick new target if needed
-            if (!this.targetPosition || this.position.distanceTo(this.targetPosition) < 3) {
-                // Chance to camp instead of picking a new target
-                if (Math.random() < 0.25 && this._botState !== 'chase') {
-                    this._botState = 'camp';
-                    this._campTimer = 0;
-                    this._campDuration = 3 + Math.random() * 8; // Camp 3-11 seconds
-                    this.velocity.set(0, 0, 0);
-                } else {
-                    // Pick new position — avoid other bots
-                    for (let attempt = 0; attempt < 15; attempt++) {
-                        const x = (Math.random() - 0.5) * (MAP_SIZE * 0.8);
-                        const z = (Math.random() - 0.5) * (MAP_SIZE * 0.8);
-                        const candidate = new THREE.Vector3(x, 0.5, z);
+        // Chase enemy if in vision
+        if (closestEnemy && closestDistance < 50) {
+            this._botState = 'chase';
+            this._campTimer = 0;
+            this.targetPosition = closestEnemy.position.clone();
+            this.weapon.lookAt(closestEnemy.position);
+        }
 
-                        // Check distance from edges
-                        if (Math.abs(x) > MAP_SIZE / 2 - 15 || Math.abs(z) > MAP_SIZE / 2 - 15) continue;
-
-                        // Avoid piling on other bots — skip if another bot is within 8 units of target
-                        let tooClose = false;
-                        for (const other of gameState.bots) {
-                            if (other === this || other.health <= 0) continue;
-                            if (other.position.distanceTo(candidate) < 8) { tooClose = true; break; }
-                        }
-                        if (tooClose) continue;
-
-                        this.targetPosition = candidate;
-                        break;
-                    }
-
-                    // Fallback
-                    if (!this.targetPosition) {
-                        this.targetPosition = new THREE.Vector3(
-                            this.position.x + (Math.random() - 0.5) * 50,
-                            0.5,
-                            this.position.z + (Math.random() - 0.5) * 50
-                        );
-                    }
-                }
+        // === EXPLORE/CHASE — pick target and move ===
+        if (!this.targetPosition || this.position.distanceTo(this.targetPosition) < 3) {
+            if (Math.random() < 0.12 && this._botState !== 'chase') {
+                this._botState = 'camp';
+                this._campTimer = 0;
+                this._campDuration = 2 + Math.random() * 6;
+                this.velocity.set(0, 0, 0);
+                this.targetPosition = null;
+                return;
             }
+            this._botState = 'explore';
+            this.targetPosition = this._pickExploreTarget();
+        }
 
-            if (this.targetPosition && this._botState !== 'camp') {
-                // Move toward target with wall sliding + bot avoidance
-                const direction = new THREE.Vector3().subVectors(this.targetPosition, this.position);
-                direction.y = 0;
+        if (this.targetPosition && this._botState !== 'camp') {
+            const direction = new THREE.Vector3().subVectors(this.targetPosition, this.position);
+            direction.y = 0;
+            const goalDist = direction.length();
+            if (goalDist > 0.5) {
                 direction.normalize();
-
-                // Avoid nearby bots — steer away from teammates within 3 units
-                const avoidForce = new THREE.Vector3();
-                for (const other of gameState.bots) {
-                    if (other === this || other.health <= 0) continue;
-                    const dist = this.position.distanceTo(other.position);
-                    if (dist < 3 && dist > 0.1) {
-                        const away = new THREE.Vector3().subVectors(this.position, other.position).normalize();
-                        avoidForce.add(away.multiplyScalar(1.5 / dist));
-                    }
-                }
-                direction.add(avoidForce).normalize();
-
                 const speed = this.speed * deltaTime;
-                this.velocity.copy(direction).multiplyScalar(speed);
+
+                // Steer around obstacles
+                const steerDir = this._steerAround(direction, speed);
+                this.velocity.copy(steerDir).multiplyScalar(speed);
                 const newPos = this.position.clone().add(this.velocity);
 
                 if (!this.checkCollision(newPos)) {
@@ -1240,76 +1272,22 @@ class Player {
                     this.position.z = newPos.z;
                     this._stuckFrames = 0;
                 } else {
-                    // Hit a wall — count all contacts including slides
                     this._stuckFrames++;
-
-                    if (this._stuckFrames > 3) {
-                        // Stop wall-riding — camp here or pick a new direction
-                        if (Math.random() < 0.2 && this._botState !== 'chase') {
-                            this._botState = 'camp';
-                            this._campTimer = 0;
-                            this._campDuration = 2 + Math.random() * 5;
-                            this.velocity.set(0, 0, 0);
-                            this.targetPosition = null;
-                        } else {
-                            // Navigate around: pick perpendicular direction
-                            const angle = Math.atan2(direction.z, direction.x);
-                            const turn = (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 2 + Math.random() * 0.5);
-                            const escapeDist = 15 + Math.random() * 20;
-                            this.targetPosition = new THREE.Vector3(
-                                Math.max(-MAP_SIZE/2+10, Math.min(MAP_SIZE/2-10, this.position.x + Math.cos(angle + turn) * escapeDist)),
-                                0.5,
-                                Math.max(-MAP_SIZE/2+10, Math.min(MAP_SIZE/2-10, this.position.z + Math.sin(angle + turn) * escapeDist))
-                            );
-                        }
+                    if (this._stuckFrames > 5) {
+                        // Truly stuck — new target
+                        this.targetPosition = this._pickExploreTarget();
+                        this._botState = 'explore';
                         this._stuckFrames = 0;
-                    } else {
-                        // Brief slide attempt before giving up
-                        const slideX = this.position.clone(); slideX.x += this.velocity.x;
-                        const slideZ = this.position.clone(); slideZ.z += this.velocity.z;
-                        if (!this.checkCollision(slideX)) {
-                            this.position.x = slideX.x;
-                        } else if (!this.checkCollision(slideZ)) {
-                            this.position.z = slideZ.z;
-                        }
                     }
                 }
                 this.position.y = this.getTerrainHeight(this.position.x, this.position.z);
             }
         }
 
-        // Look for enemies (including all bots and player)
-        const allEnemies = [...gameState.bots, gameState.player].filter(p =>
-            p && p !== this && p.team !== this.team && p.health > 0 && p.mesh.visible
-        );
-
-        let closestEnemy = null;
-        let closestDistance = Infinity;
-
-        // Find closest visible enemy (bots have shorter range)
-        const visionRange = this.isPlayer ? 45 : 20;
-        allEnemies.forEach(enemy => {
-            const distance = this.position.distanceTo(enemy.position);
-            if (distance < closestDistance && distance < visionRange) {
-                closestDistance = distance;
-                closestEnemy = enemy;
-            }
-        });
-
-        // If enemy found, aim at them and chase
+        // Aim weapon
         if (closestEnemy) {
             this.weapon.lookAt(closestEnemy.position);
-
-            const enemyDirection = new THREE.Vector3()
-                .subVectors(closestEnemy.position, this.position)
-                .normalize();
-
-            // Switch to chase state and pursue enemy
-            this._botState = 'chase';
-            this._campTimer = 0;
-            this.targetPosition = this.position.clone().add(enemyDirection.multiplyScalar(10));
         } else if (this.targetPosition) {
-            // No enemy — aim in movement direction
             this.weapon.lookAt(this.targetPosition);
         }
     }
