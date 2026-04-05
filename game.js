@@ -3906,6 +3906,13 @@ function handleNewMatch(msg) {
         gameState.player._applyItems();
         gameState.player.mesh.visible = true;
         gameState.player._spawnProtection = 1.5;
+        // Respawn at team spawn
+        const spawnX = gameState.player.team === 'red' ? -70 : 70;
+        const spawnZ = gameState.player.team === 'red' ? -70 : 70;
+        const spawnY = Math.sin(spawnX * 0.1) * Math.cos(spawnZ * 0.1) * 2 + 0.8;
+        gameState.player.position.set(spawnX, spawnY, spawnZ);
+        gameState.cameraTarget.x = spawnX;
+        gameState.cameraTarget.z = spawnZ;
         // Clear move targets — idle until player clicks
         gameState.moveTarget = null;
         gameState.targetLock = null;
