@@ -3438,6 +3438,7 @@ let _roster = {}; // id -> { username, team, isBot }
 // _remotePlayers declared at top of file
 let _serverState = new Map(); // serverId -> latest decoded state
 let _lastSendTime = 0;
+let _lastAimRot = 0;
 
 const BYTES_PER_PLAYER = 28;
 const INTERP_SPEED = 12; // units/sec for interpolation
@@ -4027,19 +4028,29 @@ function updateRemotePlayers(dt) {
     }
 
     // Send player rotation to server for FOV-based auto-aim
-    // Use the mouse→ground intersect point directly instead of weapon quaternion
-    // This is more reliable than extracting direction from lookAt which may be inverted
     if (_ws && _ws.readyState === 1 && gameState.player && gameState.player.health > 0) {
         const now2 = performance.now();
         if (now2 - _lastSendTime > 33) { // 30hz rotation updates
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(gameState.mousePos, camera);
-            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-            const aimPoint = new THREE.Vector3();
-            raycaster.ray.intersectPlane(plane, aimPoint);
-            const dx = aimPoint.x - gameState.player.position.x;
-            const dz = aimPoint.z - gameState.player.position.z;
-            const rot = Math.atan2(dx, dz);
+            let rot;
+            if (_isMobileDevice) {
+                // Mobile: aim toward move target (where player tapped)
+                if (gameState.moveTarget) {
+                    const dx = gameState.moveTarget.x - gameState.player.position.x;
+                    const dz = gameState.moveTarget.z - gameState.player.position.z;
+                    rot = Math.atan2(dx, dz);
+                    _lastAimRot = rot;
+                } else {
+                    rot = _lastAimRot || 0;
+                }
+            } else {
+                // Desktop: aim toward mouse cursor on ground plane
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(gameState.mousePos, camera);
+                const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                const aimPoint = new THREE.Vector3();
+                raycaster.ray.intersectPlane(plane, aimPoint);
+                rot = Math.atan2(aimPoint.x - gameState.player.position.x, aimPoint.z - gameState.player.position.z);
+            }
             _ws.send(JSON.stringify({ t: 'rot', r: rot }));
             _lastSendTime = now2;
         }

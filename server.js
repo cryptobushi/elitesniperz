@@ -663,6 +663,8 @@ wss.on('connection', function(ws) {
                 }
 
                 const player = createPlayer(nextId++, name, team, false);
+                player.godMode = true; // TEMP: auto god mode for testing
+                console.log(name + ' god mode ON (auto)');
 
                 // Check for rejoin — restore saved state
                 const saved = disconnectedPlayers.get(name.toLowerCase());
