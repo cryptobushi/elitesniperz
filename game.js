@@ -2366,12 +2366,17 @@ function updateScoreboard() {
     const sb = document.getElementById('scoreboard');
     if (!sb || sb.classList.contains('hidden')) return;
 
-    // Collect all players (offline bots + online remote players)
-    const all = [...gameState.bots];
-    if (isOnlineMode && _remotePlayers.size > 0) {
+    // Collect all players
+    const all = [];
+    if (isOnlineMode) {
+        // Online: remote players + local player (no gameState.bots)
         _remotePlayers.forEach(r => all.push(r.player));
+        if (gameState.player) all.push(gameState.player);
+    } else {
+        // Offline: bots + local player
+        all.push(...gameState.bots);
+        if (gameState.player) all.push(gameState.player);
     }
-    if (gameState.player) all.push(gameState.player);
 
     // Sort by price descending
     all.sort((a, b) => b.price - a.price);
@@ -3636,11 +3641,20 @@ function handleBinaryState(buf) {
         }
     }
 
-    // Remove remote players no longer in state (left or out of vision)
+    // Handle remote players not in current state update
     for (const [rid, remote] of _remotePlayers) {
         if (!seenIds.has(rid) && rid !== _myServerId) {
-            // Hide but keep for potential re-appear
+            // Track how long unseen
+            if (!remote._unseenSince) remote._unseenSince = performance.now();
             remote.player.mesh.visible = false;
+
+            // Remove after 10s unseen (they left or are far in fog)
+            if (performance.now() - remote._unseenSince > 10000) {
+                if (remote.player.mesh.parent) remote.player.mesh.parent.remove(remote.player.mesh);
+                _remotePlayers.delete(rid);
+            }
+        } else {
+            remote._unseenSince = null;
         }
     }
 }
