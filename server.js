@@ -201,7 +201,7 @@ function pickTarget(bot) {
         var tz = (Math.random() - 0.5 + bias) * MAP_SIZE * 0.7;
         var esx = bot.team === 'red' ? 70 : -70;
         if (Math.sqrt((tx-esx)*(tx-esx)+(tz-esx)*(tz-esx)) < 25) continue;
-        if (collidesWithWall(tx, tz, 1.0)) continue;
+        if (collidesWithWall(tx, tz, 1.5)) continue;
         return { x: tx, z: tz };
     }
     // Fallback to spawn area (always clear)
@@ -216,15 +216,15 @@ function tryMove(bot, nx, nz) {
     nz = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nz));
 
     // Direct move
-    if (!collidesWithWall(nx, nz, 0.9)) {
+    if (!collidesWithWall(nx, nz, 1.2)) {
         bot.x = nx; bot.z = nz; return true;
     }
     // Wall slide X
-    if (!collidesWithWall(nx, bot.z, 0.9)) {
+    if (!collidesWithWall(nx, bot.z, 1.2)) {
         bot.x = nx; return true;
     }
     // Wall slide Z
-    if (!collidesWithWall(bot.x, nz, 0.9)) {
+    if (!collidesWithWall(bot.x, nz, 1.2)) {
         bot.z = nz; return true;
     }
     return false;
@@ -234,12 +234,12 @@ function updateBot(bot, dt) {
     if (bot.health <= 0) return;
 
     // If bot is inside a wall, nudge it out
-    if (collidesWithWall(bot.x, bot.z, 0.9)) {
+    if (collidesWithWall(bot.x, bot.z, 1.2)) {
         for (var a = 0; a < Math.PI * 2; a += Math.PI / 12) {
             for (var r = 1; r <= 5; r++) {
                 var ex = bot.x + Math.cos(a) * r;
                 var ez = bot.z + Math.sin(a) * r;
-                if (!collidesWithWall(ex, ez, 0.9)) {
+                if (!collidesWithWall(ex, ez, 1.2)) {
                     bot.x = ex; bot.z = ez;
                     a = 999; break; // break both loops
                 }
