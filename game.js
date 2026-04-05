@@ -3654,7 +3654,13 @@ function handleBinaryState(buf) {
         }
     }
 
-    // All players are now always sent by server — no cleanup needed
+    // Remove stale remote players whose IDs are no longer in the server state
+    for (const [rid, remote] of _remotePlayers) {
+        if (!seenIds.has(rid) && rid !== _myServerId) {
+            if (remote.player.mesh.parent) remote.player.mesh.parent.remove(remote.player.mesh);
+            _remotePlayers.delete(rid);
+        }
+    }
 }
 
 function handleJsonMessage(msg) {
