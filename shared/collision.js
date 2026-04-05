@@ -51,14 +51,12 @@ function hasLineOfSight(ax, az, bx, bz) {
     var dx = bx - ax, dz = bz - az;
     var len = Math.sqrt(dx * dx + dz * dz);
     if (len < 0.1) return true;
-    var steps = Math.ceil(len / 1.0);
-    // Skip first and last 2 units (avoids false negatives when standing near/in walls)
-    var skipDist = 2.0;
-    var startT = Math.min(skipDist / len, 0.3);
-    var endT = Math.max(1.0 - skipDist / len, 0.7);
-    for (var i = 1; i < steps; i++) {
-        var t = i / steps;
-        if (t < startT || t > endT) continue;
+    // Step every 0.5 units for accuracy, skip only the first and last 1 unit
+    var step = 0.5;
+    var start = Math.min(1.0, len * 0.15); // skip ~1 unit at start
+    var end = len - Math.min(1.0, len * 0.15); // skip ~1 unit at end
+    for (var d = start; d <= end; d += step) {
+        var t = d / len;
         var px = ax + dx * t, pz = az + dz * t;
         if (collidesWithWall(px, pz, 0.1)) return false;
     }
