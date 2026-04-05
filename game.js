@@ -3633,9 +3633,18 @@ function handleBinaryState(buf) {
 
             // Health sync
             remote.player.health = alive ? 100 : 0;
-            // Enemies in fog: hide mesh but keep for scoreboard
-            remote.player.mesh.visible = !!alive && !inFog;
             remote.player._inFog = inFog;
+
+            // Visibility: use CLIENT-SIDE fog check for enemies, not server flag
+            // This prevents desync between what the fog overlay shows and what's rendered
+            if (remote.player.team === gameState.team) {
+                // Teammates always visible
+                remote.player.mesh.visible = !!alive;
+            } else {
+                // Enemies: visible if alive AND client fog says their position is revealed
+                const clientVisible = alive && fogOfWar.isVisible(remote.player.position.x, remote.player.position.z);
+                remote.player.mesh.visible = clientVisible;
+            }
 
             // Windwalk visual
             remote.player.isWindwalking = isWindwalk;
@@ -4041,7 +4050,7 @@ function updateRemotePlayers(dt) {
         if (now2 - _lastSendTime > 33) { // 30hz rotation updates
             let rot;
             if (_isMobileDevice) {
-                // Mobile: aim toward move target (where player tapped)
+                // Mobile: aim toward move target (positioning is the skill)
                 if (gameState.moveTarget) {
                     const dx = gameState.moveTarget.x - gameState.player.position.x;
                     const dz = gameState.moveTarget.z - gameState.player.position.z;
