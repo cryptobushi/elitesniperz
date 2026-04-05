@@ -4,7 +4,7 @@
 const MAP_SIZE = 200;
 const VISION_RADIUS = 50;
 const FARSIGHT_RADIUS = 70;
-const SHOOT_RANGE = 45;
+const SHOOT_RANGE = 50; // Match vision radius — if you can see them, you can shoot them
 const SHOOT_COOLDOWN = 1.0;
 const SPAWN_PROTECTION = 1.5;
 const MAX_PLAYERS = 10;
