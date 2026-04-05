@@ -1283,7 +1283,7 @@ class Player {
     getTerrainHeight(x, z) {
         // Calculate terrain height based on the ground formula
         const height = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2;
-        return height + 0.5; // Add character offset
+        return height + 0.8; // Add character offset (raised to prevent ground clipping)
     }
 
     move(direction, deltaTime) {
@@ -3560,7 +3560,7 @@ function handleBinaryState(buf) {
                     // Respawned
                     gameState.player.health = 100;
                     gameState.player.mesh.visible = true;
-                    gameState.player.position.set(x, Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.5, z);
+                    gameState.player.position.set(x, Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.8, z);
                     document.getElementById('deathPopup')?.classList.add('hidden');
                 } else if (!alive && wasAlive) {
                     // Died (handled by kill event)
@@ -3589,7 +3589,7 @@ function handleBinaryState(buf) {
                 const name = (_roster[id] && _roster[id].username) || (isBot ? 'Bot' : 'Player');
                 console.log('Creating remote: ' + name + ' id=' + id + ' team=' + team);
                 const rPlayer = new Player(name, team, false);
-                rPlayer.position.set(x, Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.5, z);
+                rPlayer.position.set(x, Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.8, z);
                 rPlayer.kills = kills;
                 rPlayer.deaths = deaths;
                 rPlayer.price = price;
@@ -3733,7 +3733,7 @@ function handleJsonMessage(msg) {
             if (msg.id === _myServerId && gameState.player) {
                 gameState.player.health = 100;
                 gameState.player.mesh.visible = true;
-                const ty = Math.sin(msg.x * 0.1) * Math.cos(msg.z * 0.1) * 2 + 0.5;
+                const ty = Math.sin(msg.x * 0.1) * Math.cos(msg.z * 0.1) * 2 + 0.8;
                 gameState.player.position.set(msg.x, ty, msg.z);
                 gameState.player._spawnProtection = 1.5;
                 // Clear move targets — player should sit idle until clicked
@@ -3947,7 +3947,7 @@ function updateRemotePlayers(dt) {
             const step = Math.min(INTERP_SPEED * dt, dist);
             p.position.x += (dx / dist) * step;
             p.position.z += (dz / dist) * step;
-            p.position.y = Math.sin(p.position.x * 0.1) * Math.cos(p.position.z * 0.1) * 2 + 0.5;
+            p.position.y = Math.sin(p.position.x * 0.1) * Math.cos(p.position.z * 0.1) * 2 + 0.8;
             p.velocity.set(dx, 0, dz).normalize().multiplyScalar(step);
         } else {
             p.velocity.set(0, 0, 0);
