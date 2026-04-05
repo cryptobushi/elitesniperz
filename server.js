@@ -594,14 +594,29 @@ wss.on('connection', function(ws) {
 
             if (msg.t === 'join') {
                 const name = (msg.n || 'Sniper').slice(0, 12);
-                const team = msg.m === 'blue' ? 'blue' : 'red';
+                let team = msg.m === 'blue' ? 'blue' : 'red';
 
-                // Remove a bot from this team to make room
+                // Count players per team
+                let redCount = 0, blueCount = 0;
+                players.forEach(p => { if (p.team === 'red') redCount++; else blueCount++; });
+
+                // Auto-balance: if requested team is full (5) or has more, put on other team
+                if (team === 'red' && redCount >= 5 && blueCount < 5) team = 'blue';
+                else if (team === 'blue' && blueCount >= 5 && redCount < 5) team = 'red';
+
+                // Remove a bot from this team to make room (keep 5v5)
+                let removed = false;
                 for (const [id, p] of players) {
                     if (p.isBot && p.team === team) {
                         players.delete(id);
+                        removed = true;
                         break;
                     }
+                }
+                // If no bot on that team, refuse join (server full for that team)
+                if (!removed && (team === 'red' ? redCount : blueCount) >= 5) {
+                    ws.send(JSON.stringify({ t: 'err', x: 'Team is full' }));
+                    return;
                 }
 
                 const player = createPlayer(nextId++, name, team, false);
