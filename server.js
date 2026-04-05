@@ -239,19 +239,17 @@ function tryMove(bot, nx, nz) {
 function updateBot(bot, dt) {
     if (bot.health <= 0) return;
 
-    // Track actual movement — if position unchanged for too long, force unstuck
+    // Track actual movement — if stuck too long, pick new target (no teleport)
     if (!bot._lastRealX) { bot._lastRealX = bot.x; bot._lastRealZ = bot.z; bot._idleTicks = 0; }
     var moved = Math.abs(bot.x - bot._lastRealX) > 0.1 || Math.abs(bot.z - bot._lastRealZ) > 0.1;
     if (moved) {
         bot._lastRealX = bot.x; bot._lastRealZ = bot.z; bot._idleTicks = 0;
     } else {
         bot._idleTicks++;
-        if (bot._idleTicks > 128) { // ~2 seconds at 64hz — teleport to a clear spot
-            var target = pickTarget(bot);
-            bot.x = target.x; bot.z = target.z;
-            bot.y = terrainY(bot.x, bot.z) + 0.8;
-            bot.botTarget = null; bot.stuckFrames = 0; bot.chaseDetour = false;
-            bot._lastRealX = bot.x; bot._lastRealZ = bot.z; bot._idleTicks = 0;
+        if (bot._idleTicks > 128) {
+            bot.botTarget = pickTarget(bot);
+            bot.stuckFrames = 0; bot.chaseDetour = false;
+            bot._idleTicks = 0;
         }
     }
 
