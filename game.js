@@ -4086,6 +4086,9 @@ document.addEventListener('keydown', (e) => {
     // Allow typing in chat (except Enter which is handled below)
     const chatInput = document.getElementById('chatInput');
     if (chatInput && document.activeElement === chatInput && e.key !== 'Enter') return;
+    if (e.key.toLowerCase() === 'g') {
+        _ws.send(JSON.stringify({ t: 'god' }));
+    }
     if (e.key.toLowerCase() === 'q') {
         _ws.send(JSON.stringify({ t: 'ab', a: 'ww' }));
     }

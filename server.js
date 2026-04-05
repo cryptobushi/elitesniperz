@@ -422,28 +422,34 @@ function tryShoot(attacker) {
     });
 
     if (!closest) {
-        // Debug: only for human players, every 1s
-        if (!attacker.isBot && (!attacker._dbg || Date.now() - attacker._dbg > 1000)) {
+        if (!attacker.isBot && (!attacker._dbg || Date.now() - attacker._dbg > 500)) {
             attacker._dbg = Date.now();
+            var near = [];
             players.forEach(function(p) {
-                if (p === attacker || p.team === attacker.team || p.health <= 0 || p.windwalk) return;
+                if (p === attacker || p.team === attacker.team || p.health <= 0) return;
                 var d2 = dist(attacker, p);
-                if (d2 > attacker.shootRange) return;
+                if (d2 > 60) return;
                 var dx2 = p.x - attacker.x, dz2 = p.z - attacker.z;
                 var ang = Math.atan2(dx2, dz2);
                 var diff2 = ang - aimDir;
                 while (diff2 > Math.PI) diff2 -= 2*Math.PI;
                 while (diff2 < -Math.PI) diff2 += 2*Math.PI;
-                var fovOk = Math.abs(diff2) < (30 * Math.PI / 180);
-                var losOk = hasLineOfSight(attacker.x, attacker.z, p.x, p.z);
-                console.log('MISS ' + p.username + ' d:' + d2.toFixed(1) + ' aimDir:' + (aimDir*180/Math.PI).toFixed(0) + '° enemyAngle:' + (ang*180/Math.PI).toFixed(0) + '° diff:' + (Math.abs(diff2)*180/Math.PI).toFixed(0) + '° fov:' + fovOk + ' los:' + losOk);
+                var fails = [];
+                if (d2 > attacker.shootRange) fails.push('RANGE(' + d2.toFixed(0) + ')');
+                if (Math.abs(diff2) >= (30 * Math.PI / 180)) fails.push('FOV(' + (Math.abs(diff2)*180/Math.PI).toFixed(0) + '°)');
+                if (!hasLineOfSight(attacker.x, attacker.z, p.x, p.z)) fails.push('LOS');
+                if (p.windwalk) fails.push('WW');
+                if (fails.length) near.push(p.username + ' d:' + d2.toFixed(0) + ' ' + fails.join('+'));
             });
+            if (near.length) console.log('[' + attacker.username + ' aim:' + (aimDir*180/Math.PI).toFixed(0) + '° at:' + Math.round(attacker.x) + ',' + Math.round(attacker.z) + '] ' + near.join(' | '));
         }
         return;
     }
     if (matchOver) return; // No kills during end state
     attacker.shootCd = attacker.shootCooldownTime;
 
+    // God mode blocks damage
+    if (closest.godMode) return;
     // Spawn protection blocks damage
     if (closest.spawnProt > 0) return;
 
@@ -702,6 +708,10 @@ wss.on('connection', function(ws) {
             else if (msg.t === 'rot' && ws.playerId) {
                 const p = players.get(ws.playerId);
                 if (p) { p.aimRot = msg.r || 0; p.rot = msg.r || 0; p.lastInput = Date.now(); }
+            }
+            else if (msg.t === 'god' && ws.playerId) {
+                const p = players.get(ws.playerId);
+                if (p) { p.godMode = !p.godMode; console.log(p.username + ' god mode: ' + p.godMode); }
             }
             else if (msg.t === 'ab' && ws.playerId) {
                 const p = players.get(ws.playerId);
