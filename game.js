@@ -611,15 +611,16 @@ class FogOfWar {
     update(player, allUnits, farsightPositions = []) {
         this.visionSources = [];
 
-        // Player vision
+        // Player vision — use 58 to match server hysteresis exit range
+        const visionR = 58;
         if (player && player.health > 0) {
-            this.visionSources.push({ x: player.position.x, z: player.position.z, r: VISION_RADIUS });
+            this.visionSources.push({ x: player.position.x, z: player.position.z, r: visionR });
         }
 
         // Teammate vision
         allUnits.forEach(unit => {
             if (unit.team === gameState.team && unit.health > 0 && unit !== player) {
-                this.visionSources.push({ x: unit.position.x, z: unit.position.z, r: VISION_RADIUS });
+                this.visionSources.push({ x: unit.position.x, z: unit.position.z, r: visionR });
             }
         });
 

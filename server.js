@@ -261,16 +261,15 @@ function updateBot(bot, dt) {
         }
     }
 
-    // If bot is inside a wall, nudge it out
+    // If bot is inside a wall, push it out gradually (no teleport)
     if (collidesWithWall(bot.x, bot.z, 1.0)) {
-        for (var a = 0; a < Math.PI * 2; a += Math.PI / 12) {
-            for (var r = 1; r <= 8; r++) {
-                var ex = bot.x + Math.cos(a) * r;
-                var ez = bot.z + Math.sin(a) * r;
-                if (!collidesWithWall(ex, ez, 1.0)) {
-                    bot.x = ex; bot.z = ez;
-                    a = 999; break;
-                }
+        var pushSpd = bot.speed * dt * 2; // push out at 2x speed
+        for (var a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+            var px = bot.x + Math.cos(a) * pushSpd;
+            var pz = bot.z + Math.sin(a) * pushSpd;
+            if (!collidesWithWall(px, pz, 1.0)) {
+                bot.x = px; bot.z = pz;
+                break;
             }
         }
     }
