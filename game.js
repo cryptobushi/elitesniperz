@@ -580,24 +580,113 @@ class FogOfWar {
     constructor() {
         this.visionSources = [];
         this.fogMesh = null;
-        this.canvas = document.createElement('canvas');
-        this.canvas.width = 256;
-        this.canvas.height = 256;
-        this.ctx = this.canvas.getContext('2d');
+        this._maxSources = 12; // Max vision sources in shader
     }
 
     init() {
-        this.fogTexture = new THREE.CanvasTexture(this.canvas);
-        this.fogTexture.magFilter = THREE.LinearFilter;
-        this.fogTexture.minFilter = THREE.LinearFilter;
+        // Shader-based fog of war — GPU noise for organic edges
+        const fogVert = `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `;
 
-        const fogMaterial = new THREE.MeshBasicMaterial({
-            map: this.fogTexture,
+        const fogFrag = `
+            uniform float uTime;
+            uniform float uMapSize;
+            uniform int uSourceCount;
+            uniform vec3 uSources[12]; // xy=position, z=radius
+            varying vec2 vUv;
+
+            // Hash-based noise
+            float hash(vec2 p) {
+                float h = dot(p, vec2(127.1, 311.7));
+                return fract(sin(h) * 43758.5453);
+            }
+
+            // Value noise with smooth interpolation
+            float noise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+                vec2 u = f * f * (3.0 - 2.0 * f);
+                return mix(
+                    mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+                    mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+                    u.y
+                );
+            }
+
+            // Fractal brownian motion — 4 octaves for rich detail
+            float fbm(vec2 p) {
+                float v = 0.0;
+                float a = 0.5;
+                mat2 rot = mat2(0.8, 0.6, -0.6, 0.8); // Domain rotation to reduce axis artifacts
+                for (int i = 0; i < 4; i++) {
+                    v += a * noise(p);
+                    p = rot * p * 2.1;
+                    a *= 0.5;
+                }
+                return v;
+            }
+
+            void main() {
+                // World position from UV
+                vec2 worldPos = (vUv - 0.5) * uMapSize;
+
+                float maxVis = 0.0;
+                for (int i = 0; i < 12; i++) {
+                    if (i >= uSourceCount) break;
+                    vec2 srcPos = uSources[i].xy;
+                    float srcR = uSources[i].z;
+
+                    vec2 delta = worldPos - srcPos;
+                    float dist = length(delta);
+                    float normDist = dist / srcR;
+
+                    if (normDist < 1.3) {
+                        // Noise warp based on angle + distance + time for organic edges
+                        float angle = atan(delta.y, delta.x);
+                        vec2 noiseCoord = vec2(angle * 1.5, normDist * 3.0) + uTime * vec2(0.15, 0.08);
+                        float n = fbm(noiseCoord);
+
+                        // Strong warp — ±30% radius variation
+                        float warp = (n - 0.5) * 0.6;
+                        float warpedDist = normDist + warp;
+
+                        // Smooth falloff
+                        float vis;
+                        if (warpedDist < 0.55) {
+                            vis = 1.0;
+                        } else if (warpedDist < 1.0) {
+                            vis = 1.0 - smoothstep(0.55, 1.0, warpedDist);
+                        } else {
+                            vis = 0.0;
+                        }
+                        maxVis = max(maxVis, vis);
+                    }
+                }
+
+                // Fog color with slight noise texture in the fog itself
+                float fogNoise = fbm(worldPos * 0.04 + uTime * 0.3) * 0.15;
+                float alpha = (1.0 - maxVis) * (0.6 + fogNoise);
+                gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
+            }
+        `;
+
+        const fogMaterial = new THREE.ShaderMaterial({
+            vertexShader: fogVert,
+            fragmentShader: fogFrag,
             transparent: true,
-            opacity: 0.55,
-            color: 0x000000,
             depthWrite: false,
             depthTest: false,
+            uniforms: {
+                uTime: { value: 0 },
+                uMapSize: { value: MAP_SIZE },
+                uSourceCount: { value: 0 },
+                uSources: { value: new Array(this._maxSources).fill(null).map(() => new THREE.Vector3(0, 0, 0)) },
+            }
         });
 
         const fogGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE);
@@ -611,7 +700,6 @@ class FogOfWar {
     update(player, allUnits, farsightPositions = []) {
         this.visionSources = [];
 
-        // Player vision — match server enter range (50), not exit hysteresis
         const visionR = VISION_RADIUS;
         if (player && player.health > 0) {
             this.visionSources.push({ x: player.position.x, z: player.position.z, r: visionR });
@@ -629,29 +717,18 @@ class FogOfWar {
             this.visionSources.push({ x: pos.x, z: pos.z, r: FARSIGHT_RADIUS });
         });
 
-        // Render visual fog overlay
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 1)';
-        this.ctx.fillRect(0, 0, 256, 256);
-
-        this.ctx.globalCompositeOperation = 'destination-out';
-        for (const src of this.visionSources) {
-            const x = ((src.x + MAP_SIZE / 2) / MAP_SIZE) * 256;
-            const y = ((src.z + MAP_SIZE / 2) / MAP_SIZE) * 256;
-            const rPx = (src.r / MAP_SIZE) * 256;
-
-            const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, rPx);
-            gradient.addColorStop(0, 'rgba(255,255,255,1)');
-            gradient.addColorStop(0.8, 'rgba(255,255,255,1)');
-            gradient.addColorStop(1, 'rgba(255,255,255,0)');
-
-            this.ctx.fillStyle = gradient;
-            this.ctx.beginPath();
-            this.ctx.arc(x, y, rPx, 0, Math.PI * 2);
-            this.ctx.fill();
+        // Push to shader uniforms
+        const mat = this.fogMesh.material;
+        mat.uniforms.uTime.value = performance.now() * 0.001;
+        mat.uniforms.uSourceCount.value = Math.min(this.visionSources.length, this._maxSources);
+        for (let i = 0; i < this._maxSources; i++) {
+            if (i < this.visionSources.length) {
+                const src = this.visionSources[i];
+                mat.uniforms.uSources.value[i].set(src.x, src.z, src.r);
+            } else {
+                mat.uniforms.uSources.value[i].set(0, 0, 0);
+            }
         }
-        this.ctx.globalCompositeOperation = 'source-over';
-
-        this.fogTexture.needsUpdate = true;
     }
 
     isVisible(worldX, worldZ) {
@@ -3587,6 +3664,25 @@ function handleBinaryState(buf) {
                     // Died (handled by kill event)
                 }
 
+                // Server-authoritative position reconciliation
+                // Correct client position toward server position to prevent drift
+                if (alive) {
+                    const cdx = x - gameState.player.position.x;
+                    const cdz = z - gameState.player.position.z;
+                    const drift = Math.sqrt(cdx * cdx + cdz * cdz);
+                    if (drift > 15) {
+                        // Major desync — snap to server position
+                        gameState.player.position.x = x;
+                        gameState.player.position.z = z;
+                        gameState.player.position.y = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.6;
+                    } else if (drift > 2) {
+                        // Moderate drift — lerp toward server position
+                        gameState.player.position.x += cdx * 0.15;
+                        gameState.player.position.z += cdz * 0.15;
+                        gameState.player.position.y = Math.sin(gameState.player.position.x * 0.1) * Math.cos(gameState.player.position.z * 0.1) * 2 + 0.6;
+                    }
+                }
+
                 // Update HUD
                 gameState.kills = kills;
                 gameState.deaths = deaths;
@@ -3639,8 +3735,19 @@ function handleBinaryState(buf) {
                 remote.player.position.x = x;
                 remote.player.position.z = z;
                 remote.player.position.y = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.6;
+                remote._killedAt = 0; // Clear kill lock on respawn
             }
             remote.player._inFog = inFog;
+
+            // If recently killed by JSON message, don't let binary state re-show for 1s
+            if (remote._killedAt && performance.now() - remote._killedAt < 1000) {
+                remote.player.mesh.visible = false;
+                // Still update target position so respawn snap works
+                remote.targetX = x;
+                remote.targetZ = z;
+                remote.targetRot = rot;
+                continue;
+            }
 
             // Visibility: use CLIENT-SIDE fog check for enemies, not server flag
             // Use server position (x,z) for fog check — player.position may lag behind
@@ -3726,6 +3833,16 @@ function handleJsonMessage(msg) {
                 _remotePlayers.get(msg.vi)?.player;
             if (killer && victim && killer.createShootingEffect) {
                 killer.createShootingEffect(victim.position);
+            }
+
+            // Immediately hide remote victim — don't wait for binary state update
+            if (msg.vi !== _myServerId) {
+                const remote = _remotePlayers.get(msg.vi);
+                if (remote) {
+                    remote.player.health = 0;
+                    remote.player.mesh.visible = false;
+                    remote._killedAt = performance.now(); // Prevent binary state from re-showing
+                }
             }
 
             // If the killer is our player

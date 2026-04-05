@@ -40,6 +40,56 @@ app.get('/debug', (req, res) => {
 
 console.log('Collision walls loaded from shared/collision.js');
 
+// === TEST MODE ===
+// GET /test-mode?on=1  → enter test mode (1 passive bot at center, verbose logs)
+// GET /test-mode?on=0  → exit test mode (restore normal 5v5)
+app.get('/test-mode', (req, res) => {
+    if (req.query.on === '1') {
+        enterTestMode();
+        res.json({ mode: 'test', players: players.size });
+    } else {
+        exitTestMode();
+        res.json({ mode: 'normal', players: players.size });
+    }
+});
+
+function enterTestMode() {
+    TEST_MODE = true;
+    // Clear all players
+    players.clear();
+    // Spawn one passive bot near map center on enemy team (blue)
+    const dummy = createPlayer(nextId++, 'TargetDummy', 'blue', true);
+    dummy.x = -3; dummy.z = -3; dummy.y = terrainY(-3, -3) + 0.6;
+    dummy._passive = false; // Uses normal bot AI — moves and explores but won't shoot player (god mode)
+    players.set(dummy.id, dummy);
+    // Broadcast roster update
+    broadcastRoster();
+    console.log('[TEST MODE] Entered — 1 passive bot at center');
+}
+
+function exitTestMode() {
+    TEST_MODE = false;
+    // Remove passive bots
+    players.clear();
+    nextId = 1;
+    // Re-init normal 5v5
+    for (let i = 0; i < MAX_PLAYERS; i++) {
+        const team = i < 5 ? 'red' : 'blue';
+        const bot = createPlayer(nextId++, BOT_NAMES[i], team, true);
+        players.set(bot.id, bot);
+    }
+    broadcastRoster();
+    console.log('[TEST MODE] Exited — normal 5v5 restored');
+}
+
+function broadcastRoster() {
+    const roster = [];
+    players.forEach(function(p) {
+        roster.push({ id: p.id, n: p.username, m: p.team, b: p.isBot ? 1 : 0 });
+    });
+    broadcast(JSON.stringify({ t: 'roster', r: roster }));
+}
+
 // === HELPER ===
 function dist(a, b) {
     return Math.sqrt((a.x - b.x) ** 2 + (a.z - b.z) ** 2);
@@ -58,6 +108,7 @@ let teamKills = { red: 0, blue: 0 };
 let matchStartTime = Date.now();
 let matchOver = false;
 let matchTimer = null;
+let TEST_MODE = false; // Activated via ?test — single passive bot, verbose logging
 
 // Track disconnected players for rejoin (username -> saved state)
 const disconnectedPlayers = new Map();
@@ -246,6 +297,7 @@ function tryMove(bot, nx, nz) {
 
 function updateBot(bot, dt) {
     if (bot.health <= 0) return;
+    if (bot._passive) return; // Test mode dummy — don't move or shoot
 
     // Track actual movement — if stuck too long, pick new target (no teleport)
     if (!bot._lastRealX) { bot._lastRealX = bot.x; bot._lastRealZ = bot.z; bot._idleTicks = 0; }
@@ -393,40 +445,54 @@ function botShop(bot) {
 // === SHOOTING ===
 function tryShoot(attacker) {
     if (attacker.health <= 0) return;
+    if (attacker._passive) return; // Test dummy doesn't shoot
     if (attacker.shootCd > 0) return;
 
     // Use aimRot (from client mouse/weapon aim) if available, otherwise movement rot
     const aimDir = attacker.aimRot !== undefined ? attacker.aimRot : attacker.rot;
 
+    const isLog = TEST_MODE && !attacker.isBot; // Log human shots in test mode
+    if (isLog) console.log('[SHOOT] ' + attacker.username + ' at(' + attacker.x.toFixed(1) + ',' + attacker.z.toFixed(1) + ') aimRot=' + (aimDir * 180 / Math.PI).toFixed(1) + '°');
+
     let closest = null, closestDist = Infinity;
     players.forEach(function(p) {
         if (p === attacker || p.team === attacker.team || p.health <= 0) return;
-        if (p.windwalk) return;
-        if (p.spawnProt > 0) return;
-        if (p.godMode) return;
+        if (p.windwalk) { if (isLog) console.log('  → ' + p.username + ' SKIP windwalk'); return; }
+        if (p.spawnProt > 0) { if (isLog) console.log('  → ' + p.username + ' SKIP spawnProt'); return; }
+        if (p.godMode) { if (isLog) console.log('  → ' + p.username + ' SKIP godMode'); return; }
         // Must be within attacker's personal vision (same as client fog radius)
         var vdx = p.x - attacker.x, vdz = p.z - attacker.z;
-        if (vdx * vdx + vdz * vdz > 50 * 50) return;
+        var visionDist2 = vdx * vdx + vdz * vdz;
+        if (visionDist2 > 50 * 50) { if (isLog) console.log('  → ' + p.username + ' SKIP vision dist=' + Math.sqrt(visionDist2).toFixed(1)); return; }
         const d = dist(attacker, p);
-        if (d < closestDist && d <= attacker.shootRange) {
-            // FOV cone: 30° for everyone
-            const fovDeg = 30;
-            const dx = p.x - attacker.x, dz = p.z - attacker.z;
-            const angle = Math.atan2(dx, dz);
-            let diff = angle - aimDir;
-            while (diff > Math.PI) diff -= 2 * Math.PI;
-            while (diff < -Math.PI) diff += 2 * Math.PI;
-            if (Math.abs(diff) < (fovDeg * Math.PI / 180)) {
-                if (hasLineOfSight(attacker.x, attacker.z, p.x, p.z)) {
-                    closest = p;
-                    closestDist = d;
-                }
-            }
+        if (d > attacker.shootRange) { if (isLog) console.log('  → ' + p.username + ' SKIP range dist=' + d.toFixed(1) + ' range=' + attacker.shootRange); return; }
+        // FOV cone: 30° for everyone
+        const fovDeg = 30;
+        const dx = p.x - attacker.x, dz = p.z - attacker.z;
+        const angle = Math.atan2(dx, dz);
+        let diff = angle - aimDir;
+        while (diff > Math.PI) diff -= 2 * Math.PI;
+        while (diff < -Math.PI) diff += 2 * Math.PI;
+        const fovRad = fovDeg * Math.PI / 180;
+        if (Math.abs(diff) >= fovRad) {
+            if (isLog) console.log('  → ' + p.username + ' SKIP fov angle=' + (diff * 180 / Math.PI).toFixed(1) + '° (max ±' + fovDeg + '°) target(' + p.x.toFixed(1) + ',' + p.z.toFixed(1) + ')');
+            return;
+        }
+        const los = hasLineOfSight(attacker.x, attacker.z, p.x, p.z);
+        if (!los) {
+            if (isLog) console.log('  → ' + p.username + ' SKIP no LOS from(' + attacker.x.toFixed(1) + ',' + attacker.z.toFixed(1) + ') to(' + p.x.toFixed(1) + ',' + p.z.toFixed(1) + ')');
+            return;
+        }
+        if (isLog) console.log('  → ' + p.username + ' CANDIDATE dist=' + d.toFixed(1) + ' fov=' + (diff * 180 / Math.PI).toFixed(1) + '° LOS=✓');
+        if (d < closestDist) {
+            closest = p;
+            closestDist = d;
         }
     });
 
-    if (!closest) return;
+    if (!closest) { if (isLog) console.log('  → NO TARGET'); return; }
     if (matchOver) return;
+    if (isLog) console.log('  → KILL ' + closest.username + ' dist=' + closestDist.toFixed(1));
     attacker.shootCd = attacker.shootCooldownTime;
 
     // Shield blocks one hit
@@ -611,9 +677,47 @@ wss.on('connection', function(ws) {
         try {
             const msg = JSON.parse(data);
 
+            // Test mode: log all incoming messages (throttled for mv/rot)
+            if (TEST_MODE && msg.t !== 'rot') {
+                if (msg.t === 'mv') {
+                    if (!ws._lastMvLog || Date.now() - ws._lastMvLog > 1000) {
+                        ws._lastMvLog = Date.now();
+                        const p = players.get(ws.playerId);
+                        console.log('[TEST IN] mv x=' + (msg.x||0).toFixed(1) + ' z=' + (msg.z||0).toFixed(1) + ' server-pos(' + (p?p.x.toFixed(1):'?') + ',' + (p?p.z.toFixed(1):'?') + ')');
+                    }
+                } else {
+                    console.log('[TEST IN] ' + msg.t + ' ' + JSON.stringify(msg).slice(0, 100));
+                }
+            }
+
             if (msg.t === 'join') {
                 const name = (msg.n || 'Sniper').slice(0, 12);
                 let team = msg.m === 'blue' ? 'blue' : 'red';
+
+                if (TEST_MODE) {
+                    // Test mode: player always joins red, no bot removal needed
+                    team = 'red';
+                    const player = createPlayer(nextId++, name, team, false);
+                    player.godMode = true; // Can't die in test mode
+                    console.log('[TEST] ' + name + ' joined test mode (god mode ON)');
+
+                    // Skip normal bot removal / balance logic
+                    // Jump to player registration below
+                    players.set(player.id, player);
+                    ws.playerId = player.id;
+                    const roster = [];
+                    players.forEach(function(p) {
+                        roster.push({ id: p.id, n: p.username, m: p.team, b: p.isBot ? 1 : 0 });
+                    });
+                    const elapsed = Math.round((Date.now() - matchStartTime) / 1000);
+                    ws.send(JSON.stringify({
+                        t: 'j', id: player.id, roster: roster,
+                        rk: teamKills.red, bk: teamKills.blue,
+                        limit: KILL_LIMIT, timeLimit: TIME_LIMIT, elapsed: elapsed
+                    }));
+                    broadcast(JSON.stringify({ t: 'pj', n: name, m: team }));
+                    return;
+                }
 
                 // Count players per team
                 let redCount = 0, blueCount = 0;
@@ -684,7 +788,31 @@ wss.on('connection', function(ws) {
             }
             else if (msg.t === 'rot' && ws.playerId) {
                 const p = players.get(ws.playerId);
-                if (p) { p.aimRot = msg.r || 0; p.rot = msg.r || 0; p.lastInput = Date.now(); }
+                if (p) {
+                    p.aimRot = msg.r || 0; p.rot = msg.r || 0; p.lastInput = Date.now();
+                    // Throttled aim logging in test mode
+                    if (TEST_MODE && !p.isBot) {
+                        const now = Date.now();
+                        if (!p._lastAimLog || now - p._lastAimLog > 1000) {
+                            p._lastAimLog = now;
+                            // Find dummy bot and log relative info
+                            let dummyInfo = '';
+                            players.forEach(dp => {
+                                if (dp._passive) {
+                                    const d = dist(p, dp);
+                                    const dx = dp.x - p.x, dz = dp.z - p.z;
+                                    const angleToTarget = Math.atan2(dx, dz);
+                                    let fovDiff = angleToTarget - p.aimRot;
+                                    while (fovDiff > Math.PI) fovDiff -= 2 * Math.PI;
+                                    while (fovDiff < -Math.PI) fovDiff += 2 * Math.PI;
+                                    const los = hasLineOfSight(p.x, p.z, dp.x, dp.z);
+                                    dummyInfo = ' → dummy dist=' + d.toFixed(1) + ' fov=' + (fovDiff * 180 / Math.PI).toFixed(1) + '° LOS=' + los;
+                                }
+                            });
+                            console.log('[TEST] pos(' + p.x.toFixed(1) + ',' + p.z.toFixed(1) + ') aim=' + (p.aimRot * 180 / Math.PI).toFixed(1) + '°' + dummyInfo);
+                        }
+                    }
+                }
             }
             else if (msg.t === 'god' && ws.playerId) {
                 const p = players.get(ws.playerId);
@@ -735,6 +863,15 @@ wss.on('connection', function(ws) {
             const p = players.get(ws.playerId);
             if (p) {
                 const team = p.team;
+                players.delete(ws.playerId);
+
+                if (TEST_MODE) {
+                    // Test mode: just remove player, don't replace with bot
+                    console.log('[TEST] ' + p.username + ' disconnected');
+                    broadcast(JSON.stringify({ t: 'pl', n: p.username }));
+                    return;
+                }
+
                 // Save state for potential rejoin
                 disconnectedPlayers.set(p.username.toLowerCase(), {
                     username: p.username, team: p.team,
@@ -742,7 +879,6 @@ wss.on('connection', function(ws) {
                     gold: p.gold, streak: p.streak, inventory: { ...p.inventory },
                     savedAt: Date.now()
                 });
-                players.delete(ws.playerId);
                 // Replace with bot
                 // Pick a bot name not already in use
                 var usedNames = new Set();
