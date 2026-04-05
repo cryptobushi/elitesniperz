@@ -2170,6 +2170,7 @@ function dumpPrice() {
 // Flying candle animation — spawns center, flies to HUD chart
 let _activeCandle = null;
 let _candleHoldTimer = null;
+let _streakCandleActive = false; // Prevents green candle from overriding streak candles
 
 function spawnFlyingCandle(text, color, boost) {
     // If there's already a candle showing, send it flying immediately
@@ -2255,8 +2256,10 @@ function spawnFlyingCandle(text, color, boost) {
 function showGoldPopup(text) {
     const boost = parseFloat(text.replace(/[^0-9.]/g, '')) / 50 || 0.5;
     pumpPrice(boost);
-    // Green candle for every kill
-    spawnFlyingCandle(text, '#00ff44', boost * 8);
+    // Green candle for every kill — but skip if a streak candle is showing
+    if (!_streakCandleActive) {
+        spawnFlyingCandle(text, '#00ff44', boost * 8);
+    }
 }
 
 function drawDeathChart() {
@@ -2392,8 +2395,10 @@ function showStreakPopup(text, color) {
     document.body.appendChild(flash);
     setTimeout(() => flash.remove(), 400);
 
-    // Big flying candle for streaks
+    // Big flying candle for streaks — mark active so green candle doesn't override
+    _streakCandleActive = true;
     spawnFlyingCandle(text, color, boost * 5);
+    setTimeout(() => { _streakCandleActive = false; }, 1200);
 }
 
 function addKillFeed(killer, victim) {
@@ -2563,12 +2568,14 @@ function updateAbilityUI() {
 
 // Input Handlers
 document.addEventListener('keydown', (e) => {
-    gameState.keys[e.key.toLowerCase()] = true;
-
-    // Debug key presses
-    if (['w', 'a', 's', 'd'].includes(e.key.toLowerCase())) {
-        console.log('Key pressed:', e.key.toLowerCase());
+    // Skip game keybinds when typing in chat
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput && document.activeElement === chatInput) {
+        if (e.key === 'Escape') { chatInput.blur(); e.preventDefault(); }
+        return; // Let normal typing happen
     }
+
+    gameState.keys[e.key.toLowerCase()] = true;
 
     if (e.key === ' ' && gameState.player && gameState.player.health <= 0) {
         e.preventDefault();
@@ -2578,10 +2585,6 @@ document.addEventListener('keydown', (e) => {
     if (e.key.toLowerCase() === 'q') {
         e.preventDefault();
         useWindwalk();
-    }
-    if (e.key.toLowerCase() === 'w' && !gameState.keys['w']) {
-        // Only use farsight if W is for ability (not movement)
-        // Skip this for now - W is for movement
     }
     if (e.key.toLowerCase() === 'e') {
         e.preventDefault();
@@ -3150,10 +3153,18 @@ function animate() {
     updateScoreboard();
     updateMinimap();
 
-    // Update fog of war with all units (player + all bots)
+    // Update fog of war with all units (player + all bots + remote teammates)
     const allUnits = [...gameState.bots];
     if (gameState.player) {
         allUnits.push(gameState.player);
+    }
+    // In online mode, include remote teammates for shared vision
+    if (isOnlineMode) {
+        for (const [, remote] of _remotePlayers) {
+            if (remote.player.team === gameState.team && remote.player.health > 0) {
+                allUnits.push(remote.player);
+            }
+        }
     }
 
     const farsightPositions = [];
@@ -3907,6 +3918,9 @@ Player.prototype.buyItem = function(itemId) {
 // Override ability key handlers to also send to server
 document.addEventListener('keydown', (e) => {
     if (!isOnlineMode || !_ws || _ws.readyState !== 1) return;
+    // Allow typing in chat (except Enter which is handled below)
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput && document.activeElement === chatInput && e.key !== 'Enter') return;
     if (e.key.toLowerCase() === 'q') {
         _ws.send(JSON.stringify({ t: 'ab', a: 'ww' }));
     }

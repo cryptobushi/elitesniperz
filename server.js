@@ -50,6 +50,11 @@ const players = new Map(); // id -> state
 let nextId = 1;
 let firstBlood = false;
 
+// Track disconnected players for rejoin (username -> saved state)
+const disconnectedPlayers = new Map();
+const AFK_TIMEOUT = 120; // seconds before AFK player becomes bot-controlled
+const REJOIN_WINDOW = 300; // seconds to rejoin and recover state
+
 function createPlayer(id, name, team, isBot) {
     const pos = spawnPos(team);
     return {
@@ -66,7 +71,10 @@ function createPlayer(id, name, team, isBot) {
         moveTarget: null,
         // Bot AI
         botState: 'explore', botTarget: null, campTimer: 0, stuckFrames: 0,
-        lastX: pos.x, lastZ: pos.z
+        lastX: pos.x, lastZ: pos.z,
+        // AFK tracking (humans only)
+        lastInput: Date.now(),
+        afk: false
     };
 }
 
@@ -264,6 +272,15 @@ function updateBot(bot, dt) {
         }
     }
 
+    // Aim at closest visible enemy (so tryShoot's FOV cone works)
+    if (closestEnemy && closestDist <= bot.shootRange) {
+        const ax = closestEnemy.x - bot.x, az = closestEnemy.z - bot.z;
+        bot.aimRot = Math.atan2(ax, az);
+    } else {
+        // No enemy in range — aim in movement direction
+        bot.aimRot = bot.rot;
+    }
+
     // Bot auto-buy on gold accumulation
     if (bot.gold >= 100 && isNearSpawn(bot.x, bot.z, bot.team)) {
         botShop(bot);
@@ -423,8 +440,20 @@ setInterval(function() {
             }
         }
 
-        // Bot AI
-        if (p.isBot) {
+        // AFK detection for human players
+        if (!p.isBot) {
+            const idleTime = (Date.now() - p.lastInput) / 1000;
+            if (idleTime >= AFK_TIMEOUT && !p.afk) {
+                p.afk = true;
+                broadcast(JSON.stringify({ t: 'ch', n: 'Server', m: 'system', x: p.username + ' is now AFK' }));
+            } else if (idleTime < AFK_TIMEOUT && p.afk) {
+                p.afk = false;
+                broadcast(JSON.stringify({ t: 'ch', n: 'Server', m: 'system', x: p.username + ' is back' }));
+            }
+        }
+
+        // Bot AI (or AFK human auto-pilot)
+        if (p.isBot || p.afk) {
             updateBot(p, dt);
         } else if (p.moveTarget) {
             // Human player movement
@@ -487,6 +516,22 @@ wss.on('connection', function(ws) {
                 }
 
                 const player = createPlayer(nextId++, name, team, false);
+
+                // Check for rejoin — restore saved state
+                const saved = disconnectedPlayers.get(name.toLowerCase());
+                if (saved && (Date.now() - saved.savedAt) < REJOIN_WINDOW * 1000 && saved.team === team) {
+                    player.kills = saved.kills;
+                    player.deaths = saved.deaths;
+                    player.price = saved.price;
+                    player.gold = saved.gold;
+                    player.streak = saved.streak;
+                    player.inventory = saved.inventory;
+                    applyItems(player);
+                    disconnectedPlayers.delete(name.toLowerCase());
+                    console.log(name + ' rejoined — state restored');
+                    broadcast(JSON.stringify({ t: 'ch', n: 'Server', m: 'system', x: name + ' reconnected' }));
+                }
+
                 players.set(player.id, player);
                 ws.playerId = player.id;
 
@@ -502,16 +547,15 @@ wss.on('connection', function(ws) {
             else if (msg.t === 'mv' && ws.playerId) {
                 const p = players.get(ws.playerId);
                 if (p && p.health > 0) {
-                    // Validate coords are within map bounds
                     const mx = Math.max(-MAP_SIZE / 2, Math.min(MAP_SIZE / 2, msg.x || 0));
                     const mz = Math.max(-MAP_SIZE / 2, Math.min(MAP_SIZE / 2, msg.z || 0));
                     p.moveTarget = { x: mx, z: mz };
+                    p.lastInput = Date.now();
                 }
             }
             else if (msg.t === 'rot' && ws.playerId) {
-                // Weapon aim direction for FOV-based shooting
                 const p = players.get(ws.playerId);
-                if (p) { p.aimRot = msg.r || 0; p.rot = msg.r || 0; }
+                if (p) { p.aimRot = msg.r || 0; p.rot = msg.r || 0; p.lastInput = Date.now(); }
             }
             else if (msg.t === 'ab' && ws.playerId) {
                 const p = players.get(ws.playerId);
@@ -549,11 +593,22 @@ wss.on('connection', function(ws) {
         } catch (e) { /* ignore malformed messages */ }
     });
 
+    // Ping/pong for timeout detection
+    ws.isAlive = true;
+    ws.on('pong', () => { ws.isAlive = true; });
+
     ws.on('close', function() {
         if (ws.playerId) {
             const p = players.get(ws.playerId);
             if (p) {
                 const team = p.team;
+                // Save state for potential rejoin
+                disconnectedPlayers.set(p.username.toLowerCase(), {
+                    username: p.username, team: p.team,
+                    kills: p.kills, deaths: p.deaths, price: p.price,
+                    gold: p.gold, streak: p.streak, inventory: { ...p.inventory },
+                    savedAt: Date.now()
+                });
                 players.delete(ws.playerId);
                 // Replace with bot
                 const bot = createPlayer(
@@ -563,11 +618,25 @@ wss.on('connection', function(ws) {
                 );
                 players.set(bot.id, bot);
                 broadcast(JSON.stringify({ t: 'pl', n: p.username }));
-                console.log(p.username + ' left, bot added');
+                console.log(p.username + ' left (state saved for rejoin)');
             }
         }
     });
 });
+
+// Ping all clients every 30s — drop dead connections
+setInterval(function() {
+    wss.clients.forEach(function(ws) {
+        if (!ws.isAlive) { ws.terminate(); return; }
+        ws.isAlive = false;
+        ws.ping();
+    });
+    // Clean up expired rejoin states
+    const now = Date.now();
+    for (const [name, saved] of disconnectedPlayers) {
+        if (now - saved.savedAt > REJOIN_WINDOW * 1000) disconnectedPlayers.delete(name);
+    }
+}, 30000);
 
 const PORT = process.env.PORT || 3000;
 
