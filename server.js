@@ -34,7 +34,7 @@ const wss = new WebSocketServer({ server });
 // /debug needs wss defined
 app.get('/debug', (req, res) => {
     const list = [];
-    players.forEach((p, id) => list.push({ id, name: p.username, team: p.team, isBot: p.isBot, x: Math.round(p.x), z: Math.round(p.z), health: p.health }));
+    players.forEach((p, id) => list.push({ id, name: p.username, team: p.team, isBot: p.isBot, x: Math.round(p.x), z: Math.round(p.z), health: p.health, kills: p.kills, deaths: p.deaths }));
     res.json({ players: list, total: players.size, clients: wss.clients.size });
 });
 
@@ -195,18 +195,25 @@ function buyItem(p, itemId) {
 // === BOT AI ===
 
 function pickTarget(bot) {
-    var bias = bot.team === 'red' ? -0.2 : 0.2;
+    // 60% chance to patrol center area (where combat happens), 40% wider map
+    var centerBias = Math.random() < 0.6;
     for (var i = 0; i < 20; i++) {
-        var tx = (Math.random() - 0.5 + bias) * MAP_SIZE * 0.7;
-        var tz = (Math.random() - 0.5 + bias) * MAP_SIZE * 0.7;
+        var tx, tz;
+        if (centerBias) {
+            tx = (Math.random() - 0.5) * MAP_SIZE * 0.4; // center 40%
+            tz = (Math.random() - 0.5) * MAP_SIZE * 0.4;
+        } else {
+            var bias = bot.team === 'red' ? -0.15 : 0.15;
+            tx = (Math.random() - 0.5 + bias) * MAP_SIZE * 0.7;
+            tz = (Math.random() - 0.5 + bias) * MAP_SIZE * 0.7;
+        }
         var esx = bot.team === 'red' ? 70 : -70;
         if (Math.sqrt((tx-esx)*(tx-esx)+(tz-esx)*(tz-esx)) < 25) continue;
-        if (collidesWithWall(tx, tz, 1.5)) continue;
+        if (collidesWithWall(tx, tz, 1.0)) continue;
         return { x: tx, z: tz };
     }
-    // Fallback to spawn area (always clear)
-    var s = bot.team === 'red' ? -70 : 70;
-    return { x: s + Math.random() * 10 - 5, z: s + Math.random() * 10 - 5 };
+    // Fallback to center
+    return { x: (Math.random()-0.5) * 30, z: (Math.random()-0.5) * 30 };
 }
 
 // Try to move bot from current pos toward (nx, nz). Returns true if moved.
@@ -216,15 +223,15 @@ function tryMove(bot, nx, nz) {
     nz = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nz));
 
     // Direct move
-    if (!collidesWithWall(nx, nz, 1.2)) {
+    if (!collidesWithWall(nx, nz, 1.0)) {
         bot.x = nx; bot.z = nz; return true;
     }
     // Wall slide X
-    if (!collidesWithWall(nx, bot.z, 1.2)) {
+    if (!collidesWithWall(nx, bot.z, 1.0)) {
         bot.x = nx; return true;
     }
     // Wall slide Z
-    if (!collidesWithWall(bot.x, nz, 1.2)) {
+    if (!collidesWithWall(bot.x, nz, 1.0)) {
         bot.z = nz; return true;
     }
     return false;
@@ -233,15 +240,31 @@ function tryMove(bot, nx, nz) {
 function updateBot(bot, dt) {
     if (bot.health <= 0) return;
 
+    // Track actual movement — if position unchanged for too long, force unstuck
+    if (!bot._lastRealX) { bot._lastRealX = bot.x; bot._lastRealZ = bot.z; bot._idleTicks = 0; }
+    var moved = Math.abs(bot.x - bot._lastRealX) > 0.1 || Math.abs(bot.z - bot._lastRealZ) > 0.1;
+    if (moved) {
+        bot._lastRealX = bot.x; bot._lastRealZ = bot.z; bot._idleTicks = 0;
+    } else {
+        bot._idleTicks++;
+        if (bot._idleTicks > 128) { // ~2 seconds at 64hz — teleport to a clear spot
+            var target = pickTarget(bot);
+            bot.x = target.x; bot.z = target.z;
+            bot.y = terrainY(bot.x, bot.z) + 0.8;
+            bot.botTarget = null; bot.stuckFrames = 0; bot.chaseDetour = false;
+            bot._lastRealX = bot.x; bot._lastRealZ = bot.z; bot._idleTicks = 0;
+        }
+    }
+
     // If bot is inside a wall, nudge it out
-    if (collidesWithWall(bot.x, bot.z, 1.2)) {
+    if (collidesWithWall(bot.x, bot.z, 1.0)) {
         for (var a = 0; a < Math.PI * 2; a += Math.PI / 12) {
-            for (var r = 1; r <= 5; r++) {
+            for (var r = 1; r <= 8; r++) {
                 var ex = bot.x + Math.cos(a) * r;
                 var ez = bot.z + Math.sin(a) * r;
-                if (!collidesWithWall(ex, ez, 1.2)) {
+                if (!collidesWithWall(ex, ez, 1.0)) {
                     bot.x = ex; bot.z = ez;
-                    a = 999; break; // break both loops
+                    a = 999; break;
                 }
             }
         }
@@ -298,17 +321,18 @@ function updateBot(bot, dt) {
 
         if (!tryMove(bot, nx, nz)) {
             bot.stuckFrames++;
-            if (bot.stuckFrames > 8) {
+            // Try perpendicular nudge — pick a consistent side based on position
+            var angle = Math.atan2(dz, dx);
+            var side = ((bot.x * 7 + bot.z * 13) | 0) % 2 === 0 ? 1 : -1;
+            // Escalate: wider angles as stuck longer
+            var nudgeAngle = angle + side * (Math.PI / 3 + bot.stuckFrames * 0.15);
+            tryMove(bot, bot.x + Math.cos(nudgeAngle) * spd * 2, bot.z + Math.sin(nudgeAngle) * spd * 2);
+
+            if (bot.stuckFrames > 5) {
                 // Pick completely new target
                 bot.botTarget = pickTarget(bot);
                 bot.chaseDetour = false;
                 bot.stuckFrames = 0;
-            } else {
-                // Perpendicular nudge
-                var angle = Math.atan2(dz, dx);
-                var side = (bot.stuckFrames % 2 === 0) ? 1 : -1;
-                var nudgeAngle = angle + side * Math.PI / 2;
-                tryMove(bot, bot.x + Math.cos(nudgeAngle) * spd, bot.z + Math.sin(nudgeAngle) * spd);
             }
         } else {
             bot.stuckFrames = 0;
