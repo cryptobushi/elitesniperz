@@ -842,9 +842,8 @@ const createMap = () => {
                 vec3 mortarColor = vec3(0.25, 0.24, 0.22);
 
                 vec3 brickCol = mix(stoneDark, stoneBase, brickNoise);
-                // Fine grain within brick
-                float grain = hash(uv * 8.0) * 0.08;
-                brickCol += grain;
+                // Subtle per-brick warm/cool shift
+                brickCol += vec3(0.03, -0.01, -0.02) * (hash(brickID + 7.0) - 0.5);
 
                 vec3 col = mix(mortarColor, brickCol, mortar);
 
