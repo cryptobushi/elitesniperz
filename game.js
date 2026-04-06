@@ -3828,27 +3828,40 @@ if (isMobile) {
     applyMomentum();
 }
 
-if (!isMobile) {
-
-    // Ability buttons work via tap on the HTML elements (pointer-events: all)
-    document.querySelectorAll('.ability').forEach(btn => {
-        btn.addEventListener('touchstart', (e) => {
-            e.stopPropagation();
-            const ability = btn.dataset.ability;
-            if (ability === 'windwalk') {
-                gameState.keys['q'] = true; setTimeout(() => gameState.keys['q'] = false, 100);
-                if (_ws && _ws.readyState === 1) _ws.send(JSON.stringify({ t: 'ab', a: 'ww' }));
+// Ability buttons — works on both mobile and desktop via touch/click
+document.querySelectorAll('.ability').forEach(btn => {
+    btn.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+        const ability = btn.dataset.ability;
+        if (ability === 'windwalk') {
+            useWindwalk();
+            if (_ws && _ws.readyState === 1) _ws.send(JSON.stringify({ t: 'ab', a: 'ww' }));
+        }
+        if (ability === 'farsight') {
+            useFarsight();
+            if (_ws && _ws.readyState === 1 && gameState.player) {
+                const p = gameState.player.position;
+                _ws.send(JSON.stringify({ t: 'ab', a: 'fs', x: p.x, z: p.z }));
             }
-            if (ability === 'farsight') {
-                gameState.keys['e'] = true; setTimeout(() => gameState.keys['e'] = false, 100);
-                if (_ws && _ws.readyState === 1 && gameState.player) {
-                    // Send farsight at player position for mobile (no mouse cursor)
-                    const p = gameState.player.position;
-                    _ws.send(JSON.stringify({ t: 'ab', a: 'fs', x: p.x, z: p.z }));
-                }
+        }
+    }, { passive: false });
+    btn.addEventListener('click', (e) => {
+        const ability = btn.dataset.ability;
+        if (ability === 'windwalk') {
+            useWindwalk();
+            if (_ws && _ws.readyState === 1) _ws.send(JSON.stringify({ t: 'ab', a: 'ww' }));
+        }
+        if (ability === 'farsight') {
+            useFarsight();
+            if (_ws && _ws.readyState === 1 && gameState.player) {
+                const p = gameState.player.position;
+                _ws.send(JSON.stringify({ t: 'ab', a: 'fs', x: p.x, z: p.z }));
             }
-        }, { passive: false });
+        }
     });
+});
+
+if (!isMobile) {
 
     // Fullscreen on game start
     document.getElementById('startBtn')?.addEventListener('click', () => {
