@@ -975,13 +975,6 @@ const createMap = () => {
         forestIM.frustumCulled = false;
         scene.add(forestIM);
 
-        // Dark ground plane extending beyond map — the forest floor
-        const forestFloorGeo = new THREE.PlaneGeometry(MAP_SIZE * 3, MAP_SIZE * 3);
-        const forestFloorMat = new THREE.MeshBasicMaterial({ color: 0x050505 });
-        const forestFloor = new THREE.Mesh(forestFloorGeo, forestFloorMat);
-        forestFloor.rotation.x = -Math.PI / 2;
-        forestFloor.position.y = -1.5;
-        scene.add(forestFloor);
     }
 };
 
