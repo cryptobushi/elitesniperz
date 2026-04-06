@@ -572,23 +572,27 @@ const createMap = () => {
     // Terrain height helper
     const terrainY = (x, z) => Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2;
 
-    // ── PROCEDURAL GRASS (instanced) ─────────────────────────────────
+    // ── PROCEDURAL GRASS (instanced, full coverage, character disturbance) ──
     {
-        const GRASS_COUNT = 25000;
-        const GRASS_SPREAD = MAP_SIZE * 0.48; // Stay inside map bounds
+        const GRASS_COUNT = 80000;
+        const GRASS_SPREAD = MAP_SIZE * 0.49;
+        const MAX_DISTURBERS = 12; // Players + bots that disturb grass
 
-        // Thin blade geometry — triangle strip of 5 vertices (tapered blade)
         const bladeGeo = new THREE.BufferGeometry();
+        // 7-vertex blade for smoother curve
         const bladeVerts = new Float32Array([
-            -0.04, 0,   0,   // base left
-             0.04, 0,   0,   // base right
-            -0.025, 0.3, 0,  // mid left
-             0.025, 0.3, 0,  // mid right
-             0,    0.55, 0,  // tip
+            -0.05, 0,    0,   // 0 base left
+             0.05, 0,    0,   // 1 base right
+            -0.04, 0.15, 0,   // 2
+             0.04, 0.15, 0,   // 3
+            -0.025,0.35, 0,   // 4
+             0.025,0.35, 0,   // 5
+             0,    0.55, 0,   // 6 tip
         ]);
-        const bladeIdx = [0,1,2, 2,1,3, 2,3,4];
-        // Store Y position as UV for wind (0=base, 1=tip)
-        const bladeUvs = new Float32Array([0,0, 0,0, 0,0.55, 0,0.55, 0,1.0]);
+        const bladeIdx = [0,1,2, 2,1,3, 2,3,4, 4,3,5, 4,5,6];
+        const bladeUvs = new Float32Array([
+            0,0, 0,0, 0,0.27, 0,0.27, 0,0.64, 0,0.64, 0,1.0
+        ]);
         bladeGeo.setAttribute('position', new THREE.BufferAttribute(bladeVerts, 3));
         bladeGeo.setAttribute('uv', new THREE.BufferAttribute(bladeUvs, 2));
         bladeGeo.setIndex(bladeIdx);
@@ -599,13 +603,21 @@ const createMap = () => {
             depthWrite: true,
             uniforms: {
                 uTime: { value: 0 },
+                uDisturbCount: { value: 0 },
+                uDisturbers: { value: new Array(MAX_DISTURBERS).fill(null).map(() => new THREE.Vector4()) },
+                // x,z = position, w = radius, y = velocity magnitude
             },
             vertexShader: `
                 uniform float uTime;
+                uniform int uDisturbCount;
+                uniform vec4 uDisturbers[${MAX_DISTURBERS}]; // xz=pos, y=velocity, w=radius
+
                 attribute vec3 instanceOffset; // x, terrainY, z
                 attribute vec3 instanceData;   // scale, rotation, hue
+
                 varying float vHeight;
                 varying float vHue;
+                varying float vDisturb;
 
                 void main() {
                     vHeight = uv.y;
@@ -613,80 +625,122 @@ const createMap = () => {
                     float scale = instanceData.x;
                     float rot = instanceData.y;
 
-                    // Rotate blade around Y
+                    // Rotate blade
                     float c = cos(rot), s = sin(rot);
                     vec3 p = position * scale;
                     p = vec3(p.x * c - p.z * s, p.y, p.x * s + p.z * c);
 
-                    // Wind — stronger at tip, varies by position + time
-                    float windPhase = instanceOffset.x * 0.15 + instanceOffset.z * 0.1 + uTime * 2.5;
-                    float windStr = sin(windPhase) * 0.35 + sin(windPhase * 0.7 + 1.3) * 0.15;
-                    // Secondary gust
-                    float gust = sin(uTime * 0.8 + instanceOffset.x * 0.05) * 0.2;
-                    float sway = (windStr + gust) * vHeight * vHeight; // Quadratic — tip moves most
-                    p.x += sway;
-                    p.z += sway * 0.3;
+                    // Gentle ambient sway — very subtle, like real grass at rest
+                    float ambientPhase = instanceOffset.x * 0.08 + instanceOffset.z * 0.06 + uTime * 0.8;
+                    float ambient = sin(ambientPhase) * 0.04 + sin(ambientPhase * 2.3 + 1.7) * 0.02;
+                    p.x += ambient * vHeight;
 
-                    // Place in world
+                    // Character disturbance — grass pushes away from nearby players
+                    float totalDisturb = 0.0;
+                    vec2 pushDir = vec2(0.0);
+                    for (int i = 0; i < ${MAX_DISTURBERS}; i++) {
+                        if (i >= uDisturbCount) break;
+                        vec4 d = uDisturbers[i];
+                        vec2 toGrass = instanceOffset.xz - d.xz;
+                        float dist = length(toGrass);
+                        float radius = d.w; // disturbance radius
+
+                        if (dist < radius && dist > 0.1) {
+                            // Strength falls off with distance, stronger when moving fast
+                            float strength = (1.0 - dist / radius);
+                            strength = strength * strength; // Quadratic falloff
+                            float vel = d.y; // velocity
+                            strength *= 0.5 + vel * 0.8; // Moving = more push
+
+                            vec2 dir = toGrass / dist;
+                            pushDir += dir * strength;
+                            totalDisturb += strength;
+                        }
+                    }
+
+                    // Apply disturbance — bend the blade outward from characters
+                    float bendAmount = min(totalDisturb, 1.5) * vHeight * vHeight;
+                    p.x += pushDir.x * bendAmount * 0.6;
+                    p.z += pushDir.y * bendAmount * 0.6;
+                    // Flatten blade when heavily disturbed (pushed down)
+                    p.y *= 1.0 - min(totalDisturb, 1.0) * 0.35 * vHeight;
+
+                    vDisturb = min(totalDisturb, 1.0);
+
                     p += instanceOffset;
-
                     gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
                 }
             `,
             fragmentShader: `
                 varying float vHeight;
                 varying float vHue;
+                varying float vDisturb;
 
                 void main() {
-                    // Green gradient: dark at base, brighter at tip
-                    vec3 baseColor = vec3(0.12, 0.22, 0.05);
-                    vec3 tipColor = vec3(0.25, 0.45, 0.1);
-                    vec3 col = mix(baseColor, tipColor, vHeight);
+                    // Rich green gradient
+                    vec3 baseColor = vec3(0.08, 0.18, 0.03);
+                    vec3 midColor = vec3(0.15, 0.32, 0.06);
+                    vec3 tipColor = vec3(0.22, 0.42, 0.08);
+
+                    vec3 col = vHeight < 0.5
+                        ? mix(baseColor, midColor, vHeight * 2.0)
+                        : mix(midColor, tipColor, (vHeight - 0.5) * 2.0);
 
                     // Per-blade hue variation
-                    col += vec3(-0.02, 0.04, -0.02) * vHue;
+                    col += vec3(-0.015, 0.03, -0.01) * vHue;
 
-                    // Slight yellow at very tip
-                    col = mix(col, vec3(0.35, 0.42, 0.1), smoothstep(0.7, 1.0, vHeight) * 0.4);
+                    // Golden tips on some blades
+                    col = mix(col, vec3(0.3, 0.38, 0.08), smoothstep(0.75, 1.0, vHeight) * (0.2 + vHue * 0.15));
 
-                    // Fade out at base for soft ground blend
-                    float alpha = smoothstep(0.0, 0.08, vHeight);
+                    // Disturbed grass shows lighter underside
+                    col = mix(col, vec3(0.2, 0.35, 0.1), vDisturb * 0.4 * vHeight);
 
+                    // Simple directional light
+                    float light = 0.6 + 0.4 * vHeight;
+                    col *= light;
+
+                    float alpha = smoothstep(0.0, 0.06, vHeight);
                     gl_FragColor = vec4(col, alpha);
                 }
             `
         });
+        // Store ref for animate loop updates
+        grassMat._isGrass = true;
         _windMaterials.push(grassMat);
 
-        // Build instance data
+        // Place grass densely across entire map
         const offsets = new Float32Array(GRASS_COUNT * 3);
         const data = new Float32Array(GRASS_COUNT * 3);
+        const _gh = (n) => { let x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 
-        // Simple hash for placement
-        const _ghash = (n) => { let x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+        // Use collision check to skip walls/rocks
+        const { collidesWithWall } = require ? { collidesWithWall: null } : {};
 
         let placed = 0;
-        for (let i = 0; placed < GRASS_COUNT && i < GRASS_COUNT * 3; i++) {
-            const px = (_ghash(i * 2) - 0.5) * GRASS_SPREAD * 2;
-            const pz = (_ghash(i * 2 + 1) - 0.5) * GRASS_SPREAD * 2;
+        for (let i = 0; placed < GRASS_COUNT && i < GRASS_COUNT * 4; i++) {
+            // Blue noise-ish distribution: jittered grid
+            const gridSize = Math.ceil(Math.sqrt(GRASS_COUNT));
+            const gx = (i % gridSize) / gridSize;
+            const gz = Math.floor(i / gridSize) / gridSize;
+            const jitter = 1.0 / gridSize;
+            const px = (gx + _gh(i * 2) * jitter - 0.5) * GRASS_SPREAD * 2;
+            const pz = (gz + _gh(i * 2 + 1) * jitter - 0.5) * GRASS_SPREAD * 2;
 
-            // Skip if inside a wall/rock collision (very rough check — skip near center structure)
-            const ax = Math.abs(px), az = Math.abs(pz);
-            if (ax < 12 && az < 15) continue; // center structure
+            // Bounds check
+            if (Math.abs(px) > GRASS_SPREAD || Math.abs(pz) > GRASS_SPREAD) continue;
 
             const ty = terrainY(px, pz);
             offsets[placed * 3] = px;
             offsets[placed * 3 + 1] = ty + 0.6;
             offsets[placed * 3 + 2] = pz;
 
-            data[placed * 3] = 0.7 + _ghash(i * 3) * 0.8;    // scale 0.7-1.5
-            data[placed * 3 + 1] = _ghash(i * 3 + 1) * Math.PI; // rotation
-            data[placed * 3 + 2] = _ghash(i * 3 + 2) * 2.0 - 1.0; // hue offset -1 to 1
+            data[placed * 3] = 0.6 + _gh(i * 3) * 0.9;      // scale 0.6-1.5
+            data[placed * 3 + 1] = _gh(i * 3 + 1) * Math.PI * 2; // full rotation
+            data[placed * 3 + 2] = _gh(i * 3 + 2) * 2.0 - 1.0;   // hue -1 to 1
 
             placed++;
         }
 
-        // Create instanced geometry
         const grassInstanceGeo = new THREE.InstancedBufferGeometry().copy(bladeGeo);
         grassInstanceGeo.instanceCount = placed;
         grassInstanceGeo.setAttribute('instanceOffset',
@@ -3618,10 +3672,38 @@ function animate() {
 
     if (!gameState.gameStarted) return;
 
-    // Update tree wind sway
+    // Update wind/grass materials
     const windTime = currentTime * 0.001;
+    // Gather all character positions for grass disturbance
+    const _disturbers = [];
+    if (gameState.player && gameState.player.health > 0) {
+        const v = gameState.player.velocity || { x: 0, z: 0 };
+        const vel = Math.sqrt((v.x||0)*(v.x||0) + (v.z||0)*(v.z||0));
+        _disturbers.push({ x: gameState.player.position.x, z: gameState.player.position.z, vel: vel, r: 3.0 });
+    }
+    if (_remotePlayers) {
+        for (const [, remote] of _remotePlayers) {
+            if (remote.player.health > 0 && remote.player.mesh.visible) {
+                const v = remote.player.velocity || { x: 0, z: 0 };
+                const vel = Math.sqrt((v.x||0)*(v.x||0) + (v.z||0)*(v.z||0));
+                _disturbers.push({ x: remote.player.position.x, z: remote.player.position.z, vel: vel, r: 2.5 });
+            }
+        }
+    }
     for (let i = 0; i < _windMaterials.length; i++) {
-        _windMaterials[i].uniforms.uTime.value = windTime;
+        const mat = _windMaterials[i];
+        mat.uniforms.uTime.value = windTime;
+        // Feed disturber data to grass materials
+        if (mat._isGrass && mat.uniforms.uDisturbCount) {
+            const maxD = Math.min(_disturbers.length, 12);
+            mat.uniforms.uDisturbCount.value = maxD;
+            for (let d = 0; d < 12; d++) {
+                if (d < maxD) {
+                    const db = _disturbers[d];
+                    mat.uniforms.uDisturbers.value[d].set(db.x, db.vel, db.z, db.r);
+                }
+            }
+        }
     }
 
     // Shop proximity check
