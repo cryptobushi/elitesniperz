@@ -3835,8 +3835,18 @@ if (!isMobile) {
         btn.addEventListener('touchstart', (e) => {
             e.stopPropagation();
             const ability = btn.dataset.ability;
-            if (ability === 'windwalk') { gameState.keys['q'] = true; setTimeout(() => gameState.keys['q'] = false, 100); }
-            if (ability === 'farsight') { gameState.keys['e'] = true; setTimeout(() => gameState.keys['e'] = false, 100); }
+            if (ability === 'windwalk') {
+                gameState.keys['q'] = true; setTimeout(() => gameState.keys['q'] = false, 100);
+                if (_ws && _ws.readyState === 1) _ws.send(JSON.stringify({ t: 'ab', a: 'ww' }));
+            }
+            if (ability === 'farsight') {
+                gameState.keys['e'] = true; setTimeout(() => gameState.keys['e'] = false, 100);
+                if (_ws && _ws.readyState === 1 && gameState.player) {
+                    // Send farsight at player position for mobile (no mouse cursor)
+                    const p = gameState.player.position;
+                    _ws.send(JSON.stringify({ t: 'ab', a: 'fs', x: p.x, z: p.z }));
+                }
+            }
         }, { passive: false });
     });
 
