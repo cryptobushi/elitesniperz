@@ -4146,29 +4146,23 @@ function handleBinaryState(buf) {
                 remote.player.position.x = x;
                 remote.player.position.z = z;
                 remote.player.position.y = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.6;
-                remote._killedAt = 0; // Clear kill lock on respawn
             }
             remote.player._inFog = inFog;
 
-            // If recently killed by JSON message, don't let binary state re-show for 1s
-            if (remote._killedAt && performance.now() - remote._killedAt < 1000) {
+            // Dead = always hidden, no exceptions
+            if (!alive) {
                 remote.player.mesh.visible = false;
-                // Still update target position so respawn snap works
                 remote.targetX = x;
                 remote.targetZ = z;
                 remote.targetRot = rot;
                 continue;
             }
 
-            // Visibility: use CLIENT-SIDE fog check for enemies, not server flag
-            // Use server position (x,z) for fog check — player.position may lag behind
+            // Alive — visibility based on team/fog
             if (remote.player.team === gameState.team) {
-                // Teammates always visible
-                remote.player.mesh.visible = !!alive;
+                remote.player.mesh.visible = true;
             } else {
-                // Enemies: visible if alive AND client fog says their position is revealed
-                const clientVisible = alive && fogOfWar.isVisible(x, z);
-                remote.player.mesh.visible = clientVisible;
+                remote.player.mesh.visible = fogOfWar.isVisible(x, z);
             }
 
             // Windwalk visual
@@ -4252,7 +4246,6 @@ function handleJsonMessage(msg) {
                 if (remote) {
                     remote.player.health = 0;
                     remote.player.mesh.visible = false;
-                    remote._killedAt = performance.now(); // Prevent binary state from re-showing
                 }
             }
 
