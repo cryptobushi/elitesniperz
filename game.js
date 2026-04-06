@@ -572,176 +572,131 @@ const createMap = () => {
     // Terrain height helper
     const terrainY = (x, z) => Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2;
 
-    // ── PROCEDURAL GRASS — InstancedMesh + player collision push ────────
+    // ── PROCEDURAL GRASS (instanced) ─────────────────────────────────
     {
-        const GRASS_COUNT = 500000;
-        const GRASS_SPREAD = MAP_SIZE * 0.49;
-        const COLLIDER_RADIUS = 3.5;
+        const GRASS_COUNT = 25000;
+        const GRASS_SPREAD = MAP_SIZE * 0.48; // Stay inside map bounds
 
-        // Short stubby blade — 5 vertices, low to ground
+        // Thin blade geometry — triangle strip of 5 vertices (tapered blade)
         const bladeGeo = new THREE.BufferGeometry();
-        const v = new Float32Array([
-            -0.04, 0, 0,  0.04, 0, 0,        // base
-            -0.025, 0.1, 0,  0.025, 0.1, 0,  // mid
-            0, 0.2, 0                          // tip — short
+        const bladeVerts = new Float32Array([
+            -0.04, 0,   0,   // base left
+             0.04, 0,   0,   // base right
+            -0.025, 0.3, 0,  // mid left
+             0.025, 0.3, 0,  // mid right
+             0,    0.55, 0,  // tip
         ]);
-        bladeGeo.setAttribute('position', new THREE.BufferAttribute(v, 3));
-        bladeGeo.setIndex([0,1,2, 2,1,3, 2,3,4]);
+        const bladeIdx = [0,1,2, 2,1,3, 2,3,4];
+        // Store Y position as UV for wind (0=base, 1=tip)
+        const bladeUvs = new Float32Array([0,0, 0,0, 0,0.55, 0,0.55, 0,1.0]);
+        bladeGeo.setAttribute('position', new THREE.BufferAttribute(bladeVerts, 3));
+        bladeGeo.setAttribute('uv', new THREE.BufferAttribute(bladeUvs, 2));
+        bladeGeo.setIndex(bladeIdx);
 
-        // Use InstancedMesh for proper matrix instancing
         const grassMat = new THREE.ShaderMaterial({
             side: THREE.DoubleSide,
             transparent: true,
             depthWrite: true,
             uniforms: {
-                fTime: { value: 0 },
-                vPlayerPosition: { value: new THREE.Vector3(0, 0, 0) },
-                fPlayerColliderRadius: { value: COLLIDER_RADIUS },
+                uTime: { value: 0 },
             },
             vertexShader: `
-                uniform float fTime;
-                uniform vec3 vPlayerPosition;
-                uniform float fPlayerColliderRadius;
-
-                varying float fDistanceFromGround;
-                varying vec3 vInstanceColor;
-
-                // Simple noise
-                float rand(vec2 co) {
-                    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
-                }
-                float createNoise(vec2 p) {
-                    vec2 d = vec2(0.0, 1.0);
-                    vec2 b = floor(p), f = smoothstep(vec2(0.0), vec2(1.0), fract(p));
-                    return mix(
-                        mix(rand(b), rand(b + d.yx), f.x),
-                        mix(rand(b + d.xy), rand(b + d.yy), f.x),
-                        f.y
-                    );
-                }
+                uniform float uTime;
+                attribute vec3 instanceOffset; // x, terrainY, z
+                attribute vec3 instanceData;   // scale, rotation, hue
+                varying float vHeight;
+                varying float vHue;
 
                 void main() {
-                    fDistanceFromGround = max(0.0, position.y);
-                    vInstanceColor = instanceColor;
+                    vHeight = uv.y;
+                    vHue = instanceData.z;
+                    float scale = instanceData.x;
+                    float rot = instanceData.y;
 
-                    vec3 worldPosition = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
+                    // Rotate blade around Y
+                    float c = cos(rot), s = sin(rot);
+                    vec3 p = position * scale;
+                    p = vec3(p.x * c - p.z * s, p.y, p.x * s + p.z * c);
 
-                    // Noise for natural variation
-                    float noise = createNoise(worldPosition.xz * 0.5) * 0.6 + 0.4;
+                    // Wind — stronger at tip, varies by position + time
+                    float windPhase = instanceOffset.x * 0.15 + instanceOffset.z * 0.1 + uTime * 2.5;
+                    float windStr = sin(windPhase) * 0.35 + sin(windPhase * 0.7 + 1.3) * 0.15;
+                    // Secondary gust
+                    float gust = sin(uTime * 0.8 + instanceOffset.x * 0.05) * 0.2;
+                    float sway = (windStr + gust) * vHeight * vHeight; // Quadratic — tip moves most
+                    p.x += sway;
+                    p.z += sway * 0.3;
 
-                    float distanceFromPlayer = length(vPlayerPosition - worldPosition);
+                    // Place in world
+                    p += instanceOffset;
 
-                    // Gentle idle sway — noise-driven, not uniform wind
-                    vec3 sway = vec3(
-                        cos(fTime + worldPosition.x * 0.3) * noise * fDistanceFromGround * 0.1,
-                        0.0,
-                        sin(fTime * 0.7 + worldPosition.z * 0.2) * noise * fDistanceFromGround * 0.05
-                    );
-
-                    // Player collision — push grass away
-                    vec3 vNormal = normalize(worldPosition - vPlayerPosition);
-                    vNormal.y = abs(vNormal.y);
-                    float fOffset = fPlayerColliderRadius - distanceFromPlayer;
-                    vec3 vPlayerOffset = vNormal * max(0.0, fOffset) * fDistanceFromGround;
-
-                    // Mix: idle sway when far, player push when close
-                    float isNearPlayer = float(distanceFromPlayer < fPlayerColliderRadius);
-                    vec3 finalOffset = mix(
-                        sway * min(1.0, distanceFromPlayer / 4.0),
-                        vPlayerOffset,
-                        isNearPlayer
-                    );
-
-                    // Also flatten when stepped on
-                    float flatten = 1.0 - isNearPlayer * 0.3 * (1.0 - distanceFromPlayer / fPlayerColliderRadius);
-                    vec3 displaced = worldPosition + finalOffset;
-                    displaced.y = mix(worldPosition.y, worldPosition.y * flatten, fDistanceFromGround);
-
-                    gl_Position = projectionMatrix * viewMatrix * vec4(displaced, 1.0);
+                    gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
                 }
             `,
             fragmentShader: `
-                varying float fDistanceFromGround;
-                varying vec3 vInstanceColor;
+                varying float vHeight;
+                varying float vHue;
 
                 void main() {
-                    // Color gradient using instance color as base
-                    vec3 baseCol = vInstanceColor * 0.6;
-                    vec3 tipCol = vInstanceColor * 1.3;
-                    vec3 col = mix(baseCol, tipCol, fDistanceFromGround * 1.8);
+                    // Green gradient: dark at base, brighter at tip
+                    vec3 baseColor = vec3(0.12, 0.22, 0.05);
+                    vec3 tipColor = vec3(0.25, 0.45, 0.1);
+                    vec3 col = mix(baseColor, tipColor, vHeight);
 
-                    // Golden tips
-                    col = mix(col, vec3(0.35, 0.4, 0.1), smoothstep(0.4, 0.55, fDistanceFromGround) * 0.25);
+                    // Per-blade hue variation
+                    col += vec3(-0.02, 0.04, -0.02) * vHue;
 
-                    // Simple lighting
-                    col *= 0.65 + 0.35 * fDistanceFromGround;
+                    // Slight yellow at very tip
+                    col = mix(col, vec3(0.35, 0.42, 0.1), smoothstep(0.7, 1.0, vHeight) * 0.4);
 
-                    float alpha = smoothstep(0.0, 0.04, fDistanceFromGround);
+                    // Fade out at base for soft ground blend
+                    float alpha = smoothstep(0.0, 0.08, vHeight);
+
                     gl_FragColor = vec4(col, alpha);
                 }
             `
         });
-        grassMat._isGrass = true;
         _windMaterials.push(grassMat);
 
-        // Create InstancedMesh
-        const grassIM = new THREE.InstancedMesh(bladeGeo, grassMat, GRASS_COUNT);
-        grassIM.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+        // Build instance data
+        const offsets = new Float32Array(GRASS_COUNT * 3);
+        const data = new Float32Array(GRASS_COUNT * 3);
 
-        // Per-instance color
-        const _gh = (n) => { let x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
-        const dummy = new THREE.Object3D();
-        const color = new THREE.Color();
+        // Simple hash for placement
+        const _ghash = (n) => { let x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
         let placed = 0;
+        for (let i = 0; placed < GRASS_COUNT && i < GRASS_COUNT * 3; i++) {
+            const px = (_ghash(i * 2) - 0.5) * GRASS_SPREAD * 2;
+            const pz = (_ghash(i * 2 + 1) - 0.5) * GRASS_SPREAD * 2;
 
-        // Dense grid — 5 blades per cell
-        const BLADES_PER_CELL = 5;
-        const gridSize = Math.ceil(Math.sqrt(GRASS_COUNT / BLADES_PER_CELL * 1.2));
-        const cellSize = (GRASS_SPREAD * 2) / gridSize;
+            // Skip if inside a wall/rock collision (very rough check — skip near center structure)
+            const ax = Math.abs(px), az = Math.abs(pz);
+            if (ax < 12 && az < 15) continue; // center structure
 
-        for (let gi = 0; gi < gridSize * gridSize && placed < GRASS_COUNT; gi++) {
-            const gx = (gi % gridSize);
-            const gz = Math.floor(gi / gridSize);
-            const cellX = (gx / gridSize - 0.5) * GRASS_SPREAD * 2;
-            const cellZ = (gz / gridSize - 0.5) * GRASS_SPREAD * 2;
+            const ty = terrainY(px, pz);
+            offsets[placed * 3] = px;
+            offsets[placed * 3 + 1] = ty + 0.6;
+            offsets[placed * 3 + 2] = pz;
 
-            if (Math.abs(cellX) > GRASS_SPREAD || Math.abs(cellZ) > GRASS_SPREAD) continue;
+            data[placed * 3] = 0.7 + _ghash(i * 3) * 0.8;    // scale 0.7-1.5
+            data[placed * 3 + 1] = _ghash(i * 3 + 1) * Math.PI; // rotation
+            data[placed * 3 + 2] = _ghash(i * 3 + 2) * 2.0 - 1.0; // hue offset -1 to 1
 
-            // Place multiple blades per cell
-            for (let b = 0; b < BLADES_PER_CELL && placed < GRASS_COUNT; b++) {
-                const seed = gi * BLADES_PER_CELL + b;
-                const px = cellX + (_gh(seed * 7) - 0.5) * cellSize;
-                const pz = cellZ + (_gh(seed * 7 + 1) - 0.5) * cellSize;
-
-                const ty = terrainY(px, pz);
-                const scale = 0.4 + _gh(seed * 3) * 0.6;
-                const rotY = _gh(seed * 3 + 1) * Math.PI * 2;
-                const heightVar = 0.6 + _gh(seed * 5) * 0.8;
-
-                dummy.position.set(px, ty + 0.6, pz);
-                dummy.rotation.set(0, rotY, 0);
-                dummy.scale.set(scale, scale * heightVar, scale);
-                dummy.updateMatrix();
-                grassIM.setMatrixAt(placed, dummy.matrix);
-
-                // Rich color variation — mix of greens
-                const hue = _gh(seed * 3 + 2);
-                const dark = _gh(seed * 11) * 0.3;
-                color.setRGB(
-                    0.08 + hue * 0.1 - dark * 0.03,
-                    0.2 + hue * 0.2 - dark * 0.05,
-                    0.03 + hue * 0.05
-                );
-                grassIM.setColorAt(placed, color);
-                placed++;
-            }
+            placed++;
         }
 
-        grassIM.count = placed;
-        grassIM.instanceMatrix.needsUpdate = true;
-        grassIM.instanceColor.needsUpdate = true;
-        grassIM.frustumCulled = false;
-        scene.add(grassIM);
+        // Create instanced geometry
+        const grassInstanceGeo = new THREE.InstancedBufferGeometry().copy(bladeGeo);
+        grassInstanceGeo.instanceCount = placed;
+        grassInstanceGeo.setAttribute('instanceOffset',
+            new THREE.InstancedBufferAttribute(offsets.slice(0, placed * 3), 3));
+        grassInstanceGeo.setAttribute('instanceData',
+            new THREE.InstancedBufferAttribute(data.slice(0, placed * 3), 3));
+
+        const grassMesh = new THREE.Mesh(grassInstanceGeo, grassMat);
+        grassMesh.frustumCulled = false;
+        scene.add(grassMesh);
     }
 
     // ── TREES with layered foliage + wind sway ─────────────────────────
@@ -3663,19 +3618,10 @@ function animate() {
 
     if (!gameState.gameStarted) return;
 
-    // Update wind/grass materials
+    // Update tree wind sway
     const windTime = currentTime * 0.001;
-    const playerPos = gameState.player ? gameState.player.position : null;
     for (let i = 0; i < _windMaterials.length; i++) {
-        const mat = _windMaterials[i];
-        if (mat._isGrass) {
-            mat.uniforms.fTime.value = windTime;
-            if (playerPos) {
-                mat.uniforms.vPlayerPosition.value.set(playerPos.x, playerPos.y, playerPos.z);
-            }
-        } else {
-            mat.uniforms.uTime.value = windTime;
-        }
+        _windMaterials[i].uniforms.uTime.value = windTime;
     }
 
     // Shop proximity check
