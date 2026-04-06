@@ -1073,7 +1073,7 @@ class FogOfWar {
         });
         const mainMesh = new THREE.Mesh(new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE), mainMat);
         mainMesh.rotation.x = -Math.PI / 2;
-        mainMesh.position.y = 10;
+        mainMesh.position.y = 5;
         mainMesh.renderOrder = 10000;
         scene.add(mainMesh);
         this.fogLayers.push(mainMesh);
@@ -1090,7 +1090,7 @@ class FogOfWar {
         });
         const wispMesh = new THREE.Mesh(new THREE.PlaneGeometry(MAP_SIZE * 1.05, MAP_SIZE * 1.05), wispMat);
         wispMesh.rotation.x = -Math.PI / 2;
-        wispMesh.position.y = 4;
+        wispMesh.position.y = 2;
         wispMesh.renderOrder = 9999;
         scene.add(wispMesh);
         this.fogLayers.push(wispMesh);
