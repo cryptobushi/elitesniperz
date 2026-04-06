@@ -2,9 +2,9 @@
 // CommonJS module. Client loads via fetch() or inline.
 
 const MAP_SIZE = 200;
-const VISION_RADIUS = 35;
-const FARSIGHT_RADIUS = 55;
-const SHOOT_RANGE = 25; // Shorter than vision — must close distance to shoot
+const VISION_RADIUS = 25;
+const FARSIGHT_RADIUS = 45;
+const SHOOT_RANGE = 25; // Matches vision — if you see them, you can shoot them
 const SHOOT_COOLDOWN = 1.0;
 const SPAWN_PROTECTION = 1.5;
 const MAX_PLAYERS = 10;

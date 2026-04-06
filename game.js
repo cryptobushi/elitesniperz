@@ -909,8 +909,8 @@ const createMap = () => {
 
 // Fog of War — pure distance-based vision
 // Vision radius = shoot range. No canvas overlay tricks.
-const VISION_RADIUS = 35;
-const FARSIGHT_RADIUS = 55;
+const VISION_RADIUS = 25;
+const FARSIGHT_RADIUS = 45;
 
 class FogOfWar {
     constructor() {
@@ -4147,11 +4147,13 @@ function handleBinaryState(buf) {
                 continue;
             }
 
-            // Alive — visibility based on team/fog
+            // Alive — visibility based on team/server fog flag
             if (remote.player.team === gameState.team) {
                 remote.player.mesh.visible = true;
             } else {
-                remote.player.mesh.visible = fogOfWar.isVisible(x, z);
+                // Use server's inFog flag (authoritative) — NOT client distance check
+                // inFog means the server says this enemy is NOT visible to our team
+                remote.player.mesh.visible = !inFog;
             }
 
             // Windwalk visual
