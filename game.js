@@ -574,17 +574,17 @@ const createMap = () => {
 
     // ── PROCEDURAL GRASS — InstancedMesh + player collision push ────────
     {
-        const GRASS_COUNT = 50000;
+        const GRASS_COUNT = 150000;
         const GRASS_SPREAD = MAP_SIZE * 0.49;
         const COLLIDER_RADIUS = 3.5;
 
-        // 7-vertex curved blade
+        // 7-vertex curved blade — wider and taller for lush look
         const bladeGeo = new THREE.BufferGeometry();
         const v = new Float32Array([
-            -0.05, 0, 0,  0.05, 0, 0,       // base
-            -0.035, 0.18, 0,  0.035, 0.18, 0, // lower mid
-            -0.02, 0.36, 0,  0.02, 0.36, 0,   // upper mid
-            0, 0.55, 0                          // tip
+            -0.07, 0, 0,  0.07, 0, 0,         // base — wider
+            -0.05, 0.22, 0,  0.05, 0.22, 0,   // lower mid
+            -0.025, 0.45, 0,  0.025, 0.45, 0,  // upper mid
+            0, 0.65, 0                           // tip — taller
         ]);
         bladeGeo.setAttribute('position', new THREE.BufferAttribute(v, 3));
         bladeGeo.setIndex([0,1,2, 2,1,3, 2,3,4, 4,3,5, 4,5,6]);
@@ -695,37 +695,47 @@ const createMap = () => {
         const color = new THREE.Color();
         let placed = 0;
 
-        // Jittered grid for even coverage
-        const gridSize = Math.ceil(Math.sqrt(GRASS_COUNT * 1.3));
+        // Dense grid — 3 blades per cell for lush clumps
+        const BLADES_PER_CELL = 3;
+        const gridSize = Math.ceil(Math.sqrt(GRASS_COUNT / BLADES_PER_CELL * 1.2));
+        const cellSize = (GRASS_SPREAD * 2) / gridSize;
+
         for (let gi = 0; gi < gridSize * gridSize && placed < GRASS_COUNT; gi++) {
-            const gx = (gi % gridSize) / gridSize;
-            const gz = Math.floor(gi / gridSize) / gridSize;
-            const jitter = 1.0 / gridSize;
+            const gx = (gi % gridSize);
+            const gz = Math.floor(gi / gridSize);
+            const cellX = (gx / gridSize - 0.5) * GRASS_SPREAD * 2;
+            const cellZ = (gz / gridSize - 0.5) * GRASS_SPREAD * 2;
 
-            const px = (gx + _gh(gi * 2) * jitter - 0.5) * GRASS_SPREAD * 2;
-            const pz = (gz + _gh(gi * 2 + 1) * jitter - 0.5) * GRASS_SPREAD * 2;
+            if (Math.abs(cellX) > GRASS_SPREAD || Math.abs(cellZ) > GRASS_SPREAD) continue;
 
-            if (Math.abs(px) > GRASS_SPREAD || Math.abs(pz) > GRASS_SPREAD) continue;
+            // Place multiple blades per cell
+            for (let b = 0; b < BLADES_PER_CELL && placed < GRASS_COUNT; b++) {
+                const seed = gi * BLADES_PER_CELL + b;
+                const px = cellX + (_gh(seed * 7) - 0.5) * cellSize;
+                const pz = cellZ + (_gh(seed * 7 + 1) - 0.5) * cellSize;
 
-            const ty = terrainY(px, pz);
-            const scale = 0.6 + _gh(gi * 3) * 1.0;
-            const rotY = _gh(gi * 3 + 1) * Math.PI * 2;
+                const ty = terrainY(px, pz);
+                const scale = 0.5 + _gh(seed * 3) * 1.2;
+                const rotY = _gh(seed * 3 + 1) * Math.PI * 2;
+                const heightVar = 0.8 + _gh(seed * 5) * 0.6; // Height variation
 
-            dummy.position.set(px, ty + 0.6, pz);
-            dummy.rotation.set(0, rotY, 0);
-            dummy.scale.set(scale, scale + _gh(gi * 5) * 0.4, scale);
-            dummy.updateMatrix();
-            grassIM.setMatrixAt(placed, dummy.matrix);
+                dummy.position.set(px, ty + 0.6, pz);
+                dummy.rotation.set(0, rotY, 0);
+                dummy.scale.set(scale, scale * heightVar, scale);
+                dummy.updateMatrix();
+                grassIM.setMatrixAt(placed, dummy.matrix);
 
-            // Color variation — different greens
-            const hue = _gh(gi * 3 + 2);
-            color.setRGB(
-                0.1 + hue * 0.08,
-                0.25 + hue * 0.15,
-                0.04 + hue * 0.04
-            );
-            grassIM.setColorAt(placed, color);
-            placed++;
+                // Rich color variation — mix of greens
+                const hue = _gh(seed * 3 + 2);
+                const dark = _gh(seed * 11) * 0.3;
+                color.setRGB(
+                    0.08 + hue * 0.1 - dark * 0.03,
+                    0.2 + hue * 0.2 - dark * 0.05,
+                    0.03 + hue * 0.05
+                );
+                grassIM.setColorAt(placed, color);
+                placed++;
+            }
         }
 
         grassIM.count = placed;
