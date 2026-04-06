@@ -688,6 +688,7 @@
     </style>
 </head>
 <body>
+<div id="fpsCounter" style="position:fixed;top:4px;left:4px;color:#0f0;font-family:monospace;font-size:11px;z-index:99999;pointer-events:none;text-shadow:0 0 2px #000,0 0 4px #000;">FPS: --</div>
     <div id="fpsCounter" style="position:fixed;top:4px;left:4px;color:#0f0;font-family:monospace;font-size:11px;z-index:99999;pointer-events:none;text-shadow:0 0 2px #000,0 0 4px #000;">FPS: --</div>
     <!-- Force landscape overlay -->
     <div id="rotateOverlay">
@@ -772,25 +773,6 @@
         <div id="killFeed"></div>
         <div id="streakPopup"></div>
 
-        <div id="debugPanel" style="
-            position:absolute; top:50%; right:8px; transform:translateY(-50%);
-            background:rgba(0,0,0,0.85); border:1px solid #ff00ff66; border-radius:6px;
-            padding:8px 12px; font-size:0.65rem; color:#ff00ff; pointer-events:all;
-            display:none; z-index:800; min-width:120px;
-        ">
-            <div style="font-weight:bold; margin-bottom:6px; font-size:0.75rem;">DEBUG [~]</div>
-            <div id="debugFPS" style="color:#aaa; margin-bottom:4px;">FPS: --</div>
-            <label style="display:block; margin-bottom:4px; cursor:pointer;">
-                <input type="checkbox" id="dbgGodMode"> God Mode
-            </label>
-            <label style="display:block; margin-bottom:4px; cursor:pointer;">
-                <input type="checkbox" id="dbgShowFPS" checked> Show FPS
-            </label>
-            <button onclick="document.querySelectorAll('.kill-message').forEach(e=>e.remove())" style="
-                background:#ff00ff22; border:1px solid #ff00ff44; color:#ff00ff; padding:2px 8px;
-                font-size:0.6rem; cursor:pointer; border-radius:3px; margin-top:4px; width:100%;
-            ">Clear Kill Feed</button>
-        </div>
 
         <div id="deathPopup" class="hidden">
             <div id="deathOverlay"></div>

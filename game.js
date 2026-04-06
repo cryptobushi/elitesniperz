@@ -3032,19 +3032,7 @@ document.addEventListener('keydown', (e) => {
             if (!panel.classList.contains('hidden')) updateShopUI();
         }
     }
-    if (e.key === '`') {
-        const panel = document.getElementById('debugPanel');
-        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-    }
     if (e.shiftKey) gameState.attackWalk = true;
-});
-
-// Debug panel checkboxes
-document.getElementById('dbgGodMode').addEventListener('change', (e) => {
-    gameState.debug.godMode = e.target.checked;
-});
-document.getElementById('dbgShowFPS').addEventListener('change', (e) => {
-    gameState.debug.showFPS = e.target.checked;
 });
 
 // FPS counter
@@ -3053,8 +3041,13 @@ function updateDebugFPS() {
     _fpsFrames++;
     const now = performance.now();
     if (now - _fpsLast >= 1000) {
+        const fakeFps = 8008132 + Math.floor(Math.random() * 837);
+        const fpsText = 'FPS: ' + fakeFps.toLocaleString();
+        const fpsEl = document.getElementById('fpsCounter');
+        if (fpsEl) fpsEl.textContent = fpsText;
         if (gameState.debug.showFPS) {
-            document.getElementById('debugFPS').textContent = `FPS: ${_fpsFrames}`;
+            const dbgFps = document.getElementById('debugFPS');
+            if (dbgFps) dbgFps.textContent = fpsText;
         }
         _fpsFrames = 0;
         _fpsLast = now;
@@ -4075,12 +4068,19 @@ function handleBinaryState(buf) {
                     // Died (handled by kill event)
                 }
 
-                // Server-authoritative position — always use server position
-                // Client has no local collision, server handles all movement
+                // Server-authoritative position — interpolate toward server pos for smooth movement
                 if (alive) {
-                    gameState.player.position.x = x;
-                    gameState.player.position.z = z;
-                    gameState.player.position.y = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.6;
+                    const cdx = x - gameState.player.position.x;
+                    const cdz = z - gameState.player.position.z;
+                    const drift = Math.sqrt(cdx * cdx + cdz * cdz);
+                    if (drift > 10) {
+                        gameState.player.position.x = x;
+                        gameState.player.position.z = z;
+                    } else if (drift > 0.1) {
+                        gameState.player.position.x += cdx * 0.4;
+                        gameState.player.position.z += cdz * 0.4;
+                    }
+                    gameState.player.position.y = Math.sin(gameState.player.position.x * 0.1) * Math.cos(gameState.player.position.z * 0.1) * 2 + 0.6;
                 }
 
                 // Update HUD
