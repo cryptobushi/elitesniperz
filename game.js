@@ -905,6 +905,84 @@ const createMap = () => {
     blueSpawn.rotation.x = -Math.PI / 2;
     blueSpawn.position.set(70, 0.1, 70);
     scene.add(blueSpawn);
+
+    // ── SPOOKY FOREST BORDER — instanced dark trees surrounding the map ──
+    {
+        const TREE_COUNT = 800;
+        const BORDER_START = MAP_SIZE / 2 + 2;  // Just outside map walls
+        const BORDER_END = MAP_SIZE / 2 + 80;   // 80 units deep forest
+        const _fh = (n) => { let x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+        // Merged tree geometry: trunk cylinder + 3 foliage cones (single geo per instance)
+        const trunkGeo = new THREE.CylinderGeometry(0.2, 0.35, 5, 5);
+        const cone1 = new THREE.ConeGeometry(2.2, 4, 5);
+        const cone2 = new THREE.ConeGeometry(1.7, 3.5, 5);
+        const cone3 = new THREE.ConeGeometry(1.2, 3, 5);
+
+        // Merge into one geometry using BufferGeometryUtils or manual
+        // For simplicity, use separate InstancedMesh for trunks and canopy
+        // But for max performance: one dark material, simple cone shape
+        const treeGeo = new THREE.ConeGeometry(1.8, 10, 6);
+        const treeMat = new THREE.MeshBasicMaterial({ color: 0x0a0a0a }); // Near-black silhouettes
+
+        const forestIM = new THREE.InstancedMesh(treeGeo, treeMat, TREE_COUNT);
+        const dummy = new THREE.Object3D();
+        const treeColor = new THREE.Color();
+        let placed = 0;
+
+        for (let i = 0; i < TREE_COUNT * 2 && placed < TREE_COUNT; i++) {
+            // Place around all 4 sides of the map
+            let px, pz;
+            const side = i % 4;
+            const r1 = _fh(i * 7);
+            const r2 = _fh(i * 7 + 1);
+            const depth = BORDER_START + r2 * (BORDER_END - BORDER_START);
+
+            if (side === 0) {        // North
+                px = (r1 - 0.5) * (BORDER_END * 2.5);
+                pz = -depth;
+            } else if (side === 1) { // South
+                px = (r1 - 0.5) * (BORDER_END * 2.5);
+                pz = depth;
+            } else if (side === 2) { // East
+                px = depth;
+                pz = (r1 - 0.5) * (BORDER_END * 2.5);
+            } else {                 // West
+                px = -depth;
+                pz = (r1 - 0.5) * (BORDER_END * 2.5);
+            }
+
+            const scale = 0.8 + _fh(i * 3) * 1.5;  // Varying heights
+            const rotY = _fh(i * 3 + 1) * Math.PI * 2;
+            const ty = terrainY(px, pz);
+
+            dummy.position.set(px, ty + scale * 3.5, pz);
+            dummy.rotation.set(0, rotY, (_fh(i * 5) - 0.5) * 0.15); // Slight lean
+            dummy.scale.set(scale, scale * (0.8 + _fh(i * 9) * 0.5), scale);
+            dummy.updateMatrix();
+            forestIM.setMatrixAt(placed, dummy.matrix);
+
+            // Dark color variation — barely visible, silhouette trees
+            const darkness = 0.02 + _fh(i * 3 + 2) * 0.06;
+            treeColor.setRGB(darkness * 0.5, darkness, darkness * 0.3);
+            forestIM.setColorAt(placed, treeColor);
+            placed++;
+        }
+
+        forestIM.count = placed;
+        forestIM.instanceMatrix.needsUpdate = true;
+        forestIM.instanceColor.needsUpdate = true;
+        forestIM.frustumCulled = false;
+        scene.add(forestIM);
+
+        // Dark ground plane extending beyond map — the forest floor
+        const forestFloorGeo = new THREE.PlaneGeometry(MAP_SIZE * 3, MAP_SIZE * 3);
+        const forestFloorMat = new THREE.MeshBasicMaterial({ color: 0x050505 });
+        const forestFloor = new THREE.Mesh(forestFloorGeo, forestFloorMat);
+        forestFloor.rotation.x = -Math.PI / 2;
+        forestFloor.position.y = -0.1;
+        scene.add(forestFloor);
+    }
 };
 
 // Fog of War — pure distance-based vision
