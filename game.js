@@ -429,6 +429,11 @@ scene.add(dirLight);
 const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x3a4a2a, 0.6);
 scene.add(hemiLight);
 
+// Player vision light — follows player, illuminates revealed area
+const visionLight = new THREE.PointLight(0xffffff, 4.0, 100, 1.0);
+visionLight.position.set(0, 12, 0);
+scene.add(visionLight);
+
 // Add initial preview scene
 const previewGeometry = new THREE.PlaneGeometry(80, 80);
 const previewMaterial = new THREE.MeshStandardMaterial({
@@ -442,24 +447,122 @@ scene.add(previewGround);
 
 // Map Creation (inspired by StarCraft Snipers middle section)
 const MAP_SIZE = 200; // Much larger map!
+// Wind-animated foliage materials (updated in animate loop)
+const _windMaterials = [];
+
 const createMap = () => {
-    // Ground with texture variation
+    // ── GROUND with procedural shader ──────────────────────────────────
     const groundGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE, 50, 50);
 
-    // Add height variation to ground
+    // Add height variation to ground (same formula for collision match)
     const vertices = groundGeometry.attributes.position.array;
     for (let i = 0; i < vertices.length; i += 3) {
         const x = vertices[i];
         const z = vertices[i + 1];
-        // Create gentle hills using noise
         vertices[i + 2] = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2;
     }
     groundGeometry.computeVertexNormals();
 
-    const groundMaterial = new THREE.MeshStandardMaterial({
-        color: 0x3a4a2a,
-        roughness: 0.9,
-        metalness: 0.1
+    const groundMaterial = new THREE.ShaderMaterial({
+        lights: true,
+        uniforms: THREE.UniformsUtils.merge([
+            THREE.UniformsLib.lights,
+            THREE.UniformsLib.fog,
+            {
+                uMapSize: { value: MAP_SIZE }
+            }
+        ]),
+        vertexShader: `
+            varying vec3 vWorldPos;
+            varying vec3 vNormal;
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                vec4 worldPos = modelMatrix * vec4(position, 1.0);
+                vWorldPos = worldPos.xyz;
+                vNormal = normalize(normalMatrix * normal);
+                gl_Position = projectionMatrix * viewMatrix * worldPos;
+            }
+        `,
+        fragmentShader: `
+            uniform float uMapSize;
+            varying vec3 vWorldPos;
+            varying vec3 vNormal;
+            varying vec2 vUv;
+
+            // --- Three.js lighting uniforms ---
+            #include <common>
+            #include <lights_pars_begin>
+
+            // Simple hash-based noise
+            float hash(vec2 p) {
+                return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+            }
+            float noise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+                f = f * f * (3.0 - 2.0 * f);
+                float a = hash(i);
+                float b = hash(i + vec2(1.0, 0.0));
+                float c = hash(i + vec2(0.0, 1.0));
+                float d = hash(i + vec2(1.0, 1.0));
+                return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+            }
+            float fbm(vec2 p) {
+                float v = 0.0;
+                float a = 0.5;
+                for (int i = 0; i < 4; i++) {
+                    v += a * noise(p);
+                    p *= 2.0;
+                    a *= 0.5;
+                }
+                return v;
+            }
+
+            void main() {
+                // Height and slope
+                float height = vWorldPos.y;
+                float slope = 1.0 - dot(vNormal, vec3(0.0, 1.0, 0.0));
+
+                // Base colors
+                vec3 grassDark = vec3(0.18, 0.28, 0.12);
+                vec3 grassLight = vec3(0.28, 0.38, 0.18);
+                vec3 dirt = vec3(0.35, 0.25, 0.15);
+                vec3 rock = vec3(0.4, 0.38, 0.35);
+
+                // Procedural noise for variation
+                float n1 = fbm(vWorldPos.xz * 0.08);
+                float n2 = fbm(vWorldPos.xz * 0.25 + 50.0);
+                float n3 = fbm(vWorldPos.xz * 0.5 + 100.0);
+
+                // Grass blend (two tones)
+                vec3 grass = mix(grassDark, grassLight, n1);
+
+                // Mix in dirt patches
+                float dirtMask = smoothstep(0.45, 0.55, n2);
+                vec3 col = mix(grass, dirt, dirtMask * 0.4);
+
+                // Rock on slopes
+                float rockMask = smoothstep(0.3, 0.6, slope);
+                col = mix(col, rock, rockMask);
+
+                // Height-based tint (lower = darker/damper, higher = lighter)
+                float heightFactor = smoothstep(-2.0, 2.0, height);
+                col = mix(col * 0.85, col * 1.1, heightFactor);
+
+                // Fine grain detail
+                col *= 0.9 + 0.1 * n3;
+
+                // Simple directional light shading
+                vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3));
+                float diff = max(dot(vNormal, lightDir), 0.0);
+                vec3 ambient = vec3(0.25, 0.28, 0.22);
+                vec3 lightCol = vec3(1.0, 0.95, 0.85);
+                col = col * (ambient + lightCol * diff * 0.75);
+
+                gl_FragColor = vec4(col, 1.0);
+            }
+        `
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
@@ -469,23 +572,129 @@ const createMap = () => {
     // Terrain height helper
     const terrainY = (x, z) => Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2;
 
-    // Create trees
+    // ── TREES with layered foliage + wind sway ─────────────────────────
     const createTree = (x, z) => {
         const treeGroup = new THREE.Group();
 
-        const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 3, 8);
-        const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x4a3520 });
+        // Deterministic random from position
+        const seed = Math.abs(x * 137.3 + z * 259.7);
+        const rng = (offset) => fract(Math.sin(seed + offset) * 43758.5453);
+        function fract(v) { return v - Math.floor(v); }
+
+        const scaleFactor = 0.85 + rng(0) * 0.3; // 0.85 - 1.15
+        const rotY = rng(1) * Math.PI * 2;
+
+        // Trunk with bark variation shader
+        const trunkGeometry = new THREE.CylinderGeometry(0.25 * scaleFactor, 0.4 * scaleFactor, 3.2 * scaleFactor, 8);
+        const trunkMaterial = new THREE.ShaderMaterial({
+            vertexShader: `
+                varying vec3 vPos;
+                varying vec3 vNormal;
+                void main() {
+                    vPos = position;
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vPos;
+                varying vec3 vNormal;
+                float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+                void main() {
+                    vec3 darkBark = vec3(0.2, 0.13, 0.08);
+                    vec3 lightBark = vec3(0.32, 0.22, 0.14);
+                    float n = hash(vec2(vPos.y * 8.0, atan(vPos.x, vPos.z) * 3.0));
+                    vec3 col = mix(darkBark, lightBark, n);
+                    // Simple lighting
+                    float diff = max(dot(vNormal, normalize(vec3(0.5, 0.8, 0.3))), 0.0);
+                    col *= 0.4 + diff * 0.6;
+                    gl_FragColor = vec4(col, 1.0);
+                }
+            `
+        });
         const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-        trunk.position.y = 1.5;
+        trunk.position.y = 1.6 * scaleFactor;
         trunk.castShadow = true;
         treeGroup.add(trunk);
 
-        const foliageGeometry = new THREE.ConeGeometry(1.5, 3, 8);
-        const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x2d5016 });
-        const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
-        foliage.position.y = 4;
-        foliage.castShadow = true;
-        treeGroup.add(foliage);
+        // Multi-layer foliage with wind sway
+        const foliageLayers = [
+            { y: 3.2, radius: 1.8, height: 2.2, colorShift: 0.0 },
+            { y: 4.6, radius: 1.4, height: 1.8, colorShift: 0.05 },
+            { y: 5.6, radius: 0.9, height: 1.4, colorShift: 0.1 }
+        ];
+
+        foliageLayers.forEach((layer, li) => {
+            const r = layer.radius * scaleFactor * (0.9 + rng(li + 2) * 0.2);
+            const h = layer.height * scaleFactor;
+            const foliageGeometry = new THREE.ConeGeometry(r, h, 7);
+
+            // Per-vertex color variation
+            const colors = new Float32Array(foliageGeometry.attributes.position.count * 3);
+            const pos = foliageGeometry.attributes.position.array;
+            for (let i = 0; i < colors.length; i += 3) {
+                const vy = pos[i + 1];
+                const t = rng(li + i * 0.01) * 0.15;
+                // Green base with variation
+                colors[i] = 0.15 + layer.colorShift + t * 0.3;     // R
+                colors[i + 1] = 0.30 + layer.colorShift * 0.5 + t; // G
+                colors[i + 2] = 0.06 + t * 0.2;                    // B
+            }
+            foliageGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const worldX = x;
+            const worldZ = z;
+            const foliageMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0.0 },
+                    uWindStrength: { value: 0.015 },
+                    uTreePos: { value: new THREE.Vector2(worldX, worldZ) }
+                },
+                vertexShader: `
+                    attribute vec3 color;
+                    uniform float uTime;
+                    uniform float uWindStrength;
+                    uniform vec2 uTreePos;
+                    varying vec3 vColor;
+                    varying vec3 vNormal;
+                    varying float vHeight;
+                    void main() {
+                        vColor = color;
+                        vNormal = normalize(normalMatrix * normal);
+                        vHeight = position.y;
+                        vec3 pos = position;
+                        // Wind sway — stronger at top
+                        float heightFactor = max(0.0, position.y) / 2.0;
+                        float phase = uTreePos.x * 0.1 + uTreePos.y * 0.13;
+                        pos.x += sin(uTime * 1.5 + phase) * uWindStrength * heightFactor;
+                        pos.z += cos(uTime * 1.2 + phase + 1.5) * uWindStrength * heightFactor * 0.7;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vColor;
+                    varying vec3 vNormal;
+                    varying float vHeight;
+                    void main() {
+                        vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3));
+                        float diff = max(dot(vNormal, lightDir), 0.0);
+                        // Subsurface-ish effect: lighten from below too
+                        float wrap = max(dot(vNormal, vec3(0.0, -1.0, 0.0)) * 0.3, 0.0);
+                        vec3 col = vColor * (0.35 + diff * 0.55 + wrap * 0.15);
+                        // Darken interior (lower parts)
+                        col *= 0.85 + 0.15 * smoothstep(-0.5, 1.0, vHeight);
+                        gl_FragColor = vec4(col, 1.0);
+                    }
+                `
+            });
+            _windMaterials.push(foliageMaterial);
+
+            const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
+            foliage.position.y = layer.y * scaleFactor;
+            foliage.rotation.y = rotY + li * 0.4;
+            foliage.castShadow = true;
+            treeGroup.add(foliage);
+        });
 
         treeGroup.position.set(x, terrainY(x, z), z);
         treeGroup.userData.isWall = true;
@@ -497,14 +706,77 @@ const createMap = () => {
     const _staticTrees = [[-30,20],[25,-15],[-45,-30],[50,25],[-20,45],[35,-40],[-55,5],[15,50],[-10,-35],[60,-10],[-35,60],[40,45],[-50,-45],[20,-60],[-15,-50],[55,-35],[-40,25],[30,15],[-25,-15],[45,-5],[-60,40],[10,35],[-5,-55],[50,55],[-30,-60],[65,30],[-45,50],[20,-30],[-55,-15],[35,65],[-20,30],[55,-50],[-65,15],[40,-15],[-10,60],[25,-45],[-35,-25],[60,50],[-50,35],[15,-55],[-25,-45],[45,20],[-40,-10],[30,55],[-15,15],[50,-25],[-55,-50],[20,40],[-30,50],[65,-20],[-45,-5],[35,-55],[-60,55],[10,-40],[-5,25],[55,10]];
     _staticTrees.forEach(([x,z]) => createTree(x, z));
 
-    // Rocks/Boulders for cover
+    // ── ROCKS with moss + vertex color variation ───────────────────────
     const createRock = (x, z, size) => {
-        const rockGeometry = new THREE.DodecahedronGeometry(size, 0);
-        const rockMaterial = new THREE.MeshStandardMaterial({
-            color: 0x666666,
-            roughness: 0.95,
-            metalness: 0
+        // Higher subdivision for smoother rocks
+        const rockGeometry = new THREE.IcosahedronGeometry(size, 2);
+
+        // Displace vertices slightly for organic shape + add vertex colors
+        const rpos = rockGeometry.attributes.position.array;
+        const rnormals = rockGeometry.attributes.normal.array;
+        const rcolors = new Float32Array(rpos.length);
+        const seedR = Math.abs(x * 73.7 + z * 157.3 + size * 311.1);
+        for (let i = 0; i < rpos.length; i += 3) {
+            // Organic displacement
+            const nx = rpos[i], ny = rpos[i+1], nz = rpos[i+2];
+            const disp = (Math.sin(nx * 5.0 + seedR) * Math.cos(ny * 7.0) * Math.sin(nz * 6.0 + seedR * 0.5)) * size * 0.12;
+            rpos[i] += rnormals[i] * disp;
+            rpos[i+1] += rnormals[i+1] * disp;
+            rpos[i+2] += rnormals[i+2] * disp;
+
+            // Color: stone base with moss on upward-facing surfaces
+            const worldNy = rnormals[i+1]; // approximate
+            const mossAmount = Math.max(0, worldNy) * 0.6;
+            const stoneVariation = Math.sin(nx * 8.0 + seedR) * 0.08;
+
+            // Stone base
+            let r = 0.38 + stoneVariation;
+            let g = 0.36 + stoneVariation;
+            let b = 0.33 + stoneVariation * 0.5;
+
+            // Blend moss on top-facing
+            r = r * (1.0 - mossAmount) + 0.2 * mossAmount;
+            g = g * (1.0 - mossAmount) + 0.35 * mossAmount;
+            b = b * (1.0 - mossAmount) + 0.12 * mossAmount;
+
+            // Slight warm/cool random tint per vertex
+            const tint = (Math.sin(seedR + i * 0.37) * 0.5 + 0.5) * 0.06;
+            r += tint;
+            g += tint * 0.5;
+
+            rcolors[i] = r;
+            rcolors[i+1] = g;
+            rcolors[i+2] = b;
+        }
+        rockGeometry.attributes.position.needsUpdate = true;
+        rockGeometry.computeVertexNormals();
+        rockGeometry.setAttribute('color', new THREE.BufferAttribute(rcolors, 3));
+
+        const rockMaterial = new THREE.ShaderMaterial({
+            vertexShader: `
+                attribute vec3 color;
+                varying vec3 vColor;
+                varying vec3 vNormal;
+                void main() {
+                    vColor = color;
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vColor;
+                varying vec3 vNormal;
+                void main() {
+                    vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3));
+                    float diff = max(dot(vNormal, lightDir), 0.0);
+                    // Ambient occlusion approximation
+                    float ao = 0.5 + 0.5 * vNormal.y;
+                    vec3 col = vColor * (0.3 + diff * 0.6) * (0.7 + ao * 0.3);
+                    gl_FragColor = vec4(col, 1.0);
+                }
+            `
         });
+
         const rock = new THREE.Mesh(rockGeometry, rockMaterial);
         rock.position.set(x, terrainY(x, z) + size * 0.7, z);
         rock.rotation.set(x * 0.5, z * 0.3, size); // Deterministic rotation from position
@@ -519,10 +791,75 @@ const createMap = () => {
     const _staticRocks = [[-25,10,1.2],[30,-20,1.5],[-40,-35,0.9],[50,15,1.8],[-15,40,1.1],[35,-50,1.4],[-55,20,1.0],[20,55,1.6],[-10,-25,0.8],[60,-5,1.3],[-35,55,1.5],[45,35,1.0],[-50,-40,1.7],[15,-55,0.9],[-20,-50,1.2],[55,-30,1.1],[-45,15,1.4],[25,25,0.8],[-30,-10,1.6],[40,-40,1.3],[-60,45,1.0],[10,30,1.5],[-5,-45,1.2],[50,50,1.8],[-25,-55,0.9],[65,20,1.1],[-40,40,1.4],[20,-35,1.0],[-55,-20,1.3],[35,60,1.5]];
     _staticRocks.forEach(([x,z,s]) => createRock(x, z, s));
 
-    // Walls/Boundaries
-    const wallMaterial = new THREE.MeshStandardMaterial({
-        color: 0x3a3a3a,
-        roughness: 0.9
+    // ── WALLS with stone/brick shader ──────────────────────────────────
+    const wallMaterial = new THREE.ShaderMaterial({
+        vertexShader: `
+            varying vec3 vPos;
+            varying vec3 vNormal;
+            varying vec3 vWorldPos;
+            void main() {
+                vPos = position;
+                vNormal = normalize(normalMatrix * normal);
+                vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            varying vec3 vPos;
+            varying vec3 vNormal;
+            varying vec3 vWorldPos;
+
+            float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+            void main() {
+                // Brick pattern based on world position
+                vec2 uv = vWorldPos.xz;
+                // Use Y for vertical faces
+                float absNx = abs(vNormal.x);
+                float absNz = abs(vNormal.z);
+                if (absNx > 0.5) uv = vWorldPos.zy;
+                else if (absNz > 0.5) uv = vWorldPos.xy;
+
+                // Brick grid
+                float brickW = 1.5;
+                float brickH = 0.75;
+                float mortarW = 0.08;
+                vec2 brickUV = uv / vec2(brickW, brickH);
+                // Offset every other row
+                float row = floor(brickUV.y);
+                brickUV.x += mod(row, 2.0) * 0.5;
+                vec2 brickFract = fract(brickUV);
+
+                // Mortar lines
+                float mortar = step(mortarW, brickFract.x) * step(mortarW, brickFract.y);
+
+                // Per-brick color variation
+                vec2 brickID = floor(brickUV);
+                float brickNoise = hash(brickID);
+
+                vec3 stoneBase = vec3(0.32, 0.30, 0.28);
+                vec3 stoneDark = vec3(0.22, 0.20, 0.18);
+                vec3 mortarColor = vec3(0.25, 0.24, 0.22);
+
+                vec3 brickCol = mix(stoneDark, stoneBase, brickNoise);
+                // Fine grain within brick
+                float grain = hash(uv * 8.0) * 0.08;
+                brickCol += grain;
+
+                vec3 col = mix(mortarColor, brickCol, mortar);
+
+                // Lighting
+                vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3));
+                float diff = max(dot(vNormal, lightDir), 0.0);
+                col *= 0.35 + diff * 0.65;
+
+                // Darken near bottom for grounding
+                float bottomDark = smoothstep(-4.0, 0.0, vPos.y);
+                col *= 0.8 + 0.2 * bottomDark;
+
+                gl_FragColor = vec4(col, 1.0);
+            }
+        `
     });
 
     const createWall = (x, y, width, height) => {
@@ -573,160 +910,223 @@ const createMap = () => {
 
 // Fog of War — pure distance-based vision
 // Vision radius = shoot range. No canvas overlay tricks.
-const VISION_RADIUS = 50;
-const FARSIGHT_RADIUS = 70;
+const VISION_RADIUS = 35;
+const FARSIGHT_RADIUS = 55;
 
 class FogOfWar {
     constructor() {
         this.visionSources = [];
-        this.fogMesh = null;
-        this._maxSources = 12; // Max vision sources in shader
+        this.fogLayers = [];
+        this._maxSources = 12;
     }
 
     init() {
-        // Shader-based fog of war — GPU noise for organic edges
         const fogVert = `
-            varying vec2 vUv;
+            varying vec2 vWorldPos;
             void main() {
-                vUv = uv;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                vec4 wp = modelMatrix * vec4(position, 1.0);
+                vWorldPos = wp.xz;
+                gl_Position = projectionMatrix * viewMatrix * wp;
             }
         `;
 
-        const fogFrag = `
+        // Volumetric-style fog inspired by shadertoy.com/view/XtS3DD
+        // Colored fog with light scattering, density variation, warm edge glow
+        const mainFogFrag = `
             uniform float uTime;
-            uniform float uMapSize;
             uniform int uSourceCount;
-            uniform vec3 uSources[12]; // xy=position, z=radius
-            varying vec2 vUv;
+            uniform vec3 uSources[12];
+            varying vec2 vWorldPos;
 
-            // Hash-based noise
-            float hash(vec2 p) {
-                float h = dot(p, vec2(127.1, 311.7));
-                return fract(sin(h) * 43758.5453);
-            }
+            float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
-            // Value noise with smooth interpolation
             float noise(vec2 p) {
-                vec2 i = floor(p);
-                vec2 f = fract(p);
-                vec2 u = f * f * (3.0 - 2.0 * f);
-                return mix(
-                    mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
-                    mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
-                    u.y
-                );
+                vec2 i = floor(p), f = fract(p), u = f*f*(3.0-2.0*f);
+                return mix(mix(hash(i), hash(i+vec2(1,0)), u.x),
+                           mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y);
             }
 
-            // Fractal brownian motion — 4 octaves for rich detail
             float fbm(vec2 p) {
-                float v = 0.0;
-                float a = 0.5;
-                mat2 rot = mat2(0.8, 0.6, -0.6, 0.8); // Domain rotation to reduce axis artifacts
-                for (int i = 0; i < 4; i++) {
-                    v += a * noise(p);
-                    p = rot * p * 2.1;
-                    a *= 0.5;
+                float v = 0.0, a = 0.5;
+                mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+                for (int i = 0; i < 5; i++) { v += a * noise(p); p = rot * p * 2.0; a *= 0.5; }
+                return v;
+            }
+
+            // Domain-warped FBM — swirling volumetric density
+            float cloudDensity(vec2 p) {
+                vec2 q = vec2(fbm(p), fbm(p + vec2(5.2, 1.3)));
+                vec2 r = vec2(
+                    fbm(p + 3.0*q + vec2(1.7, 9.2) + uTime * 0.06),
+                    fbm(p + 3.0*q + vec2(8.3, 2.8) + uTime * 0.04)
+                );
+                return fbm(p + 3.5 * r);
+            }
+
+            void main() {
+                // Sample fog density at multiple scales
+                vec2 np = vWorldPos * 0.03;
+                float density = cloudDensity(np);
+                // Fine detail wisps
+                float detail = fbm(vWorldPos * 0.08 + uTime * vec2(0.03, -0.02));
+                density = density * 0.7 + detail * 0.3;
+
+                // Vision reveal
+                float reveal = 0.0;
+                float edgeGlow = 0.0;
+                for (int i = 0; i < 12; i++) {
+                    if (i >= uSourceCount) break;
+                    vec2 delta = vWorldPos - uSources[i].xy;
+                    float dist = length(delta);
+                    float r = uSources[i].z;
+                    float normDist = dist / r;
+
+                    if (normDist < 1.6) {
+                        // Wispy edge — use world-space noise to avoid atan seam
+                        vec2 edgePos = vWorldPos * 0.06 + uTime * vec2(0.02, 0.015);
+                        float edgeNoise = fbm(edgePos);
+
+                        // Threshold varies wildly — 0.3 to 1.2 of radius
+                        float threshold = 0.3 + (density * 0.5 + edgeNoise * 0.5) * 0.9;
+
+                        float innerClear = 1.0 - smoothstep(0.0, 0.4, normDist);
+                        float wispyClear = 1.0 - smoothstep(threshold - 0.15, threshold + 0.15, normDist);
+                        float localReveal = max(innerClear, wispyClear);
+                        reveal = max(reveal, localReveal);
+
+                        // Light scattering glow at fog boundary
+                        float glowZone = smoothstep(threshold + 0.15, threshold - 0.1, normDist)
+                                       * smoothstep(threshold - 0.3, threshold, normDist);
+                        edgeGlow = max(edgeGlow, glowZone * density);
+                    }
                 }
+
+                // Volumetric fog color — not flat black
+                // Deep blue-grey in thick fog, warm amber glow at vision edges
+                vec3 fogDeep = vec3(0.02, 0.03, 0.06); // Deep blue-black
+                vec3 fogMid = vec3(0.05, 0.05, 0.08);  // Slightly lighter
+                vec3 fogColor = mix(fogDeep, fogMid, density);
+
+                // Warm light scatter at the boundary (like light hitting fog)
+                vec3 scatterColor = vec3(0.15, 0.08, 0.03); // Warm amber
+                fogColor += scatterColor * edgeGlow * 1.5;
+
+                // Final alpha — thick fog is more opaque
+                float fogAlpha = (0.4 + density * 0.3) * (1.0 - reveal);
+
+                // Saturation boost like the shadertoy reference
+                fogColor = fogColor * 0.5 + 0.5 * fogColor * fogColor * (3.0 - 2.0 * fogColor);
+
+                gl_FragColor = vec4(fogColor, fogAlpha);
+            }
+        `;
+
+        // Low wispy tendrils — volumetric parallax layer
+        const wispFrag = `
+            uniform float uTime;
+            uniform int uSourceCount;
+            uniform vec3 uSources[12];
+            varying vec2 vWorldPos;
+
+            float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+            float noise(vec2 p) {
+                vec2 i = floor(p), f = fract(p), u = f*f*(3.0-2.0*f);
+                return mix(mix(hash(i), hash(i+vec2(1,0)), u.x),
+                           mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y);
+            }
+            float fbm(vec2 p) {
+                float v = 0.0, a = 0.5;
+                mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+                for (int i = 0; i < 5; i++) { v += a * noise(p); p = rot * p * 2.0; a *= 0.5; }
                 return v;
             }
 
             void main() {
-                // World position from UV
-                vec2 worldPos = (vUv - 0.5) * uMapSize;
+                // Domain-warped wisps for organic tendrils
+                vec2 np = vWorldPos * 0.02;
+                vec2 q = vec2(fbm(np + uTime * 0.03), fbm(np + vec2(3.1, 7.2) + uTime * 0.02));
+                float wisps = fbm(np + 2.5 * q + uTime * 0.01);
+                wisps = smoothstep(0.35, 0.7, wisps);
 
-                float maxVis = 0.0;
+                float reveal = 0.0;
                 for (int i = 0; i < 12; i++) {
                     if (i >= uSourceCount) break;
-                    vec2 srcPos = uSources[i].xy;
-                    float srcR = uSources[i].z;
-
-                    vec2 delta = worldPos - srcPos;
-                    float dist = length(delta);
-                    float normDist = dist / srcR;
-
-                    if (normDist < 1.3) {
-                        // Noise warp based on angle + distance + time for organic edges
-                        float angle = atan(delta.y, delta.x);
-                        vec2 noiseCoord = vec2(angle * 1.5, normDist * 3.0) + uTime * vec2(0.15, 0.08);
-                        float n = fbm(noiseCoord);
-
-                        // Strong warp — ±30% radius variation
-                        float warp = (n - 0.5) * 0.6;
-                        float warpedDist = normDist + warp;
-
-                        // Smooth falloff
-                        float vis;
-                        if (warpedDist < 0.55) {
-                            vis = 1.0;
-                        } else if (warpedDist < 1.0) {
-                            vis = 1.0 - smoothstep(0.55, 1.0, warpedDist);
-                        } else {
-                            vis = 0.0;
-                        }
-                        maxVis = max(maxVis, vis);
-                    }
+                    float d = length(vWorldPos - uSources[i].xy) / uSources[i].z;
+                    reveal = max(reveal, 1.0 - smoothstep(0.3, 0.85, d));
                 }
 
-                // Fog color with slight noise texture in the fog itself
-                float fogNoise = fbm(worldPos * 0.04 + uTime * 0.3) * 0.15;
-                float alpha = (1.0 - maxVis) * (0.6 + fogNoise);
-                gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
+                // Slight blue-grey color, not pure black
+                vec3 wispColor = vec3(0.03, 0.04, 0.07) * (1.0 + wisps * 0.5);
+                float alpha = wisps * 0.2 * (1.0 - reveal);
+                gl_FragColor = vec4(wispColor, alpha);
             }
         `;
 
-        const fogMaterial = new THREE.ShaderMaterial({
-            vertexShader: fogVert,
-            fragmentShader: fogFrag,
-            transparent: true,
-            depthWrite: false,
-            depthTest: false,
+        // Main fog layer
+        const mainMat = new THREE.ShaderMaterial({
+            vertexShader: fogVert, fragmentShader: mainFogFrag,
+            transparent: true, depthWrite: false, depthTest: false,
             uniforms: {
                 uTime: { value: 0 },
-                uMapSize: { value: MAP_SIZE },
                 uSourceCount: { value: 0 },
-                uSources: { value: new Array(this._maxSources).fill(null).map(() => new THREE.Vector3(0, 0, 0)) },
+                uSources: { value: new Array(this._maxSources).fill(null).map(() => new THREE.Vector3()) },
             }
         });
+        const mainMesh = new THREE.Mesh(new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE), mainMat);
+        mainMesh.rotation.x = -Math.PI / 2;
+        mainMesh.position.y = 10;
+        mainMesh.renderOrder = 10000;
+        scene.add(mainMesh);
+        this.fogLayers.push(mainMesh);
 
-        const fogGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE);
-        this.fogMesh = new THREE.Mesh(fogGeometry, fogMaterial);
-        this.fogMesh.rotation.x = -Math.PI / 2;
-        this.fogMesh.position.y = 10;
-        this.fogMesh.renderOrder = 10000;
-        scene.add(this.fogMesh);
+        // Wispy depth layer
+        const wispMat = new THREE.ShaderMaterial({
+            vertexShader: fogVert, fragmentShader: wispFrag,
+            transparent: true, depthWrite: false, depthTest: false,
+            uniforms: {
+                uTime: { value: 0 },
+                uSourceCount: { value: 0 },
+                uSources: { value: new Array(this._maxSources).fill(null).map(() => new THREE.Vector3()) },
+            }
+        });
+        const wispMesh = new THREE.Mesh(new THREE.PlaneGeometry(MAP_SIZE * 1.05, MAP_SIZE * 1.05), wispMat);
+        wispMesh.rotation.x = -Math.PI / 2;
+        wispMesh.position.y = 4;
+        wispMesh.renderOrder = 9999;
+        scene.add(wispMesh);
+        this.fogLayers.push(wispMesh);
+
+        this.fogMesh = mainMesh;
     }
 
     update(player, allUnits, farsightPositions = []) {
         this.visionSources = [];
-
         const visionR = VISION_RADIUS;
         if (player && player.health > 0) {
             this.visionSources.push({ x: player.position.x, z: player.position.z, r: visionR });
         }
-
-        // Teammate vision
         allUnits.forEach(unit => {
             if (unit.team === gameState.team && unit.health > 0 && unit !== player) {
                 this.visionSources.push({ x: unit.position.x, z: unit.position.z, r: visionR });
             }
         });
-
-        // Farsight vision
         farsightPositions.forEach(pos => {
             this.visionSources.push({ x: pos.x, z: pos.z, r: FARSIGHT_RADIUS });
         });
 
-        // Push to shader uniforms
-        const mat = this.fogMesh.material;
-        mat.uniforms.uTime.value = performance.now() * 0.001;
-        mat.uniforms.uSourceCount.value = Math.min(this.visionSources.length, this._maxSources);
-        for (let i = 0; i < this._maxSources; i++) {
-            if (i < this.visionSources.length) {
-                const src = this.visionSources[i];
-                mat.uniforms.uSources.value[i].set(src.x, src.z, src.r);
-            } else {
-                mat.uniforms.uSources.value[i].set(0, 0, 0);
+        const t = performance.now() * 0.001;
+        const srcCount = Math.min(this.visionSources.length, this._maxSources);
+        for (const layer of this.fogLayers) {
+            const u = layer.material.uniforms;
+            u.uTime.value = t;
+            u.uSourceCount.value = srcCount;
+            for (let i = 0; i < this._maxSources; i++) {
+                if (i < this.visionSources.length) {
+                    const src = this.visionSources[i];
+                    u.uSources.value[i].set(src.x, src.z, src.r);
+                } else {
+                    u.uSources.value[i].set(0, 0, 0);
+                }
             }
         }
     }
@@ -2931,9 +3331,10 @@ function startGame() {
     console.log('startGame() called');
     try {
 
-    // Remove preview ground (not fog mesh)
+    // Remove preview ground (not fog layers)
+    const fogLayers = new Set(fogOfWar.fogLayers || []);
     const toRemove = scene.children.filter(child =>
-        child.geometry && child.geometry.type === 'PlaneGeometry' && child !== fogOfWar.fogMesh
+        child.geometry && child.geometry.type === 'PlaneGeometry' && !fogLayers.has(child)
     );
     toRemove.forEach(child => scene.remove(child));
 
@@ -3088,6 +3489,12 @@ function animate() {
 
     if (!gameState.gameStarted) return;
 
+    // Update tree wind sway
+    const windTime = currentTime * 0.001;
+    for (let i = 0; i < _windMaterials.length; i++) {
+        _windMaterials[i].uniforms.uTime.value = windTime;
+    }
+
     // Shop proximity check
     checkShopProximity();
 
@@ -3216,6 +3623,11 @@ function animate() {
     }
 
     fogOfWar.update(gameState.player, allUnits, farsightPositions);
+
+    // Vision light follows player
+    if (gameState.player) {
+        visionLight.position.set(gameState.player.position.x, 12, gameState.player.position.z);
+    }
 
     // Hide enemy units — instant hide when leaving vision, no linger
     gameState.bots.forEach(bot => {

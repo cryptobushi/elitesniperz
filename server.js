@@ -161,7 +161,7 @@ function encodeState(viewerTeam) {
         if (p.team === viewerTeam || p.health <= 0) return;
         if (p.windwalk) return;
         // Hysteresis: 50 units to enter vision, 53 to leave (small buffer)
-        var enterRange = 50, exitRange = 53;
+        var enterRange = SHOOT_RANGE, exitRange = SHOOT_RANGE + 3;
         var wasVisible = prevVisible.has(p.id);
         var vr = wasVisible ? exitRange : enterRange;
         players.forEach(function(ally) {
@@ -463,7 +463,7 @@ function tryShoot(attacker) {
         // Must be within attacker's personal vision (same as client fog radius)
         var vdx = p.x - attacker.x, vdz = p.z - attacker.z;
         var visionDist2 = vdx * vdx + vdz * vdz;
-        if (visionDist2 > 50 * 50) { if (isLog) console.log('  → ' + p.username + ' SKIP vision dist=' + Math.sqrt(visionDist2).toFixed(1)); return; }
+        if (visionDist2 > SHOOT_RANGE * SHOOT_RANGE) { if (isLog) console.log('  → ' + p.username + ' SKIP vision dist=' + Math.sqrt(visionDist2).toFixed(1)); return; }
         const d = dist(attacker, p);
         if (d > attacker.shootRange) { if (isLog) console.log('  → ' + p.username + ' SKIP range dist=' + d.toFixed(1) + ' range=' + attacker.shootRange); return; }
         // FOV cone: 30° for everyone
