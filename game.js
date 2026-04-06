@@ -713,9 +713,6 @@ const createMap = () => {
         const data = new Float32Array(GRASS_COUNT * 3);
         const _gh = (n) => { let x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 
-        // Use collision check to skip walls/rocks
-        const { collidesWithWall } = require ? { collidesWithWall: null } : {};
-
         let placed = 0;
         for (let i = 0; placed < GRASS_COUNT && i < GRASS_COUNT * 4; i++) {
             // Blue noise-ish distribution: jittered grid
