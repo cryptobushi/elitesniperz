@@ -572,6 +572,133 @@ const createMap = () => {
     // Terrain height helper
     const terrainY = (x, z) => Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2;
 
+    // ── PROCEDURAL GRASS (instanced) ─────────────────────────────────
+    {
+        const GRASS_COUNT = 25000;
+        const GRASS_SPREAD = MAP_SIZE * 0.48; // Stay inside map bounds
+
+        // Thin blade geometry — triangle strip of 5 vertices (tapered blade)
+        const bladeGeo = new THREE.BufferGeometry();
+        const bladeVerts = new Float32Array([
+            -0.04, 0,   0,   // base left
+             0.04, 0,   0,   // base right
+            -0.025, 0.3, 0,  // mid left
+             0.025, 0.3, 0,  // mid right
+             0,    0.55, 0,  // tip
+        ]);
+        const bladeIdx = [0,1,2, 2,1,3, 2,3,4];
+        // Store Y position as UV for wind (0=base, 1=tip)
+        const bladeUvs = new Float32Array([0,0, 0,0, 0,0.55, 0,0.55, 0,1.0]);
+        bladeGeo.setAttribute('position', new THREE.BufferAttribute(bladeVerts, 3));
+        bladeGeo.setAttribute('uv', new THREE.BufferAttribute(bladeUvs, 2));
+        bladeGeo.setIndex(bladeIdx);
+
+        const grassMat = new THREE.ShaderMaterial({
+            side: THREE.DoubleSide,
+            transparent: true,
+            depthWrite: true,
+            uniforms: {
+                uTime: { value: 0 },
+            },
+            vertexShader: `
+                uniform float uTime;
+                attribute vec3 instanceOffset; // x, terrainY, z
+                attribute vec3 instanceData;   // scale, rotation, hue
+                varying float vHeight;
+                varying float vHue;
+
+                void main() {
+                    vHeight = uv.y;
+                    vHue = instanceData.z;
+                    float scale = instanceData.x;
+                    float rot = instanceData.y;
+
+                    // Rotate blade around Y
+                    float c = cos(rot), s = sin(rot);
+                    vec3 p = position * scale;
+                    p = vec3(p.x * c - p.z * s, p.y, p.x * s + p.z * c);
+
+                    // Wind — stronger at tip, varies by position + time
+                    float windPhase = instanceOffset.x * 0.15 + instanceOffset.z * 0.1 + uTime * 2.5;
+                    float windStr = sin(windPhase) * 0.35 + sin(windPhase * 0.7 + 1.3) * 0.15;
+                    // Secondary gust
+                    float gust = sin(uTime * 0.8 + instanceOffset.x * 0.05) * 0.2;
+                    float sway = (windStr + gust) * vHeight * vHeight; // Quadratic — tip moves most
+                    p.x += sway;
+                    p.z += sway * 0.3;
+
+                    // Place in world
+                    p += instanceOffset;
+
+                    gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+                }
+            `,
+            fragmentShader: `
+                varying float vHeight;
+                varying float vHue;
+
+                void main() {
+                    // Green gradient: dark at base, brighter at tip
+                    vec3 baseColor = vec3(0.12, 0.22, 0.05);
+                    vec3 tipColor = vec3(0.25, 0.45, 0.1);
+                    vec3 col = mix(baseColor, tipColor, vHeight);
+
+                    // Per-blade hue variation
+                    col += vec3(-0.02, 0.04, -0.02) * vHue;
+
+                    // Slight yellow at very tip
+                    col = mix(col, vec3(0.35, 0.42, 0.1), smoothstep(0.7, 1.0, vHeight) * 0.4);
+
+                    // Fade out at base for soft ground blend
+                    float alpha = smoothstep(0.0, 0.08, vHeight);
+
+                    gl_FragColor = vec4(col, alpha);
+                }
+            `
+        });
+        _windMaterials.push(grassMat);
+
+        // Build instance data
+        const offsets = new Float32Array(GRASS_COUNT * 3);
+        const data = new Float32Array(GRASS_COUNT * 3);
+
+        // Simple hash for placement
+        const _ghash = (n) => { let x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+        let placed = 0;
+        for (let i = 0; placed < GRASS_COUNT && i < GRASS_COUNT * 3; i++) {
+            const px = (_ghash(i * 2) - 0.5) * GRASS_SPREAD * 2;
+            const pz = (_ghash(i * 2 + 1) - 0.5) * GRASS_SPREAD * 2;
+
+            // Skip if inside a wall/rock collision (very rough check — skip near center structure)
+            const ax = Math.abs(px), az = Math.abs(pz);
+            if (ax < 12 && az < 15) continue; // center structure
+
+            const ty = terrainY(px, pz);
+            offsets[placed * 3] = px;
+            offsets[placed * 3 + 1] = ty + 0.6;
+            offsets[placed * 3 + 2] = pz;
+
+            data[placed * 3] = 0.7 + _ghash(i * 3) * 0.8;    // scale 0.7-1.5
+            data[placed * 3 + 1] = _ghash(i * 3 + 1) * Math.PI; // rotation
+            data[placed * 3 + 2] = _ghash(i * 3 + 2) * 2.0 - 1.0; // hue offset -1 to 1
+
+            placed++;
+        }
+
+        // Create instanced geometry
+        const grassInstanceGeo = new THREE.InstancedBufferGeometry().copy(bladeGeo);
+        grassInstanceGeo.instanceCount = placed;
+        grassInstanceGeo.setAttribute('instanceOffset',
+            new THREE.InstancedBufferAttribute(offsets.slice(0, placed * 3), 3));
+        grassInstanceGeo.setAttribute('instanceData',
+            new THREE.InstancedBufferAttribute(data.slice(0, placed * 3), 3));
+
+        const grassMesh = new THREE.Mesh(grassInstanceGeo, grassMat);
+        grassMesh.frustumCulled = false;
+        scene.add(grassMesh);
+    }
+
     // ── TREES with layered foliage + wind sway ─────────────────────────
     const createTree = (x, z) => {
         const treeGroup = new THREE.Group();
@@ -3053,8 +3180,11 @@ function updateDebugFPS() {
     _fpsFrames++;
     const now = performance.now();
     if (now - _fpsLast >= 1000) {
+        const fpsText = 'FPS: ' + _fpsFrames;
+        const fpsEl = document.getElementById('fpsCounter');
+        if (fpsEl) fpsEl.textContent = fpsText;
         if (gameState.debug.showFPS) {
-            document.getElementById('debugFPS').textContent = `FPS: ${_fpsFrames}`;
+            document.getElementById('debugFPS').textContent = fpsText;
         }
         _fpsFrames = 0;
         _fpsLast = now;
