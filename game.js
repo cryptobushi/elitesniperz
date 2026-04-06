@@ -4075,23 +4075,12 @@ function handleBinaryState(buf) {
                     // Died (handled by kill event)
                 }
 
-                // Server-authoritative position reconciliation
-                // Correct client position toward server position to prevent drift
+                // Server-authoritative position — always use server position
+                // Client has no local collision, server handles all movement
                 if (alive) {
-                    const cdx = x - gameState.player.position.x;
-                    const cdz = z - gameState.player.position.z;
-                    const drift = Math.sqrt(cdx * cdx + cdz * cdz);
-                    if (drift > 15) {
-                        // Major desync — snap to server position
-                        gameState.player.position.x = x;
-                        gameState.player.position.z = z;
-                        gameState.player.position.y = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.6;
-                    } else if (drift > 2) {
-                        // Moderate drift — lerp toward server position
-                        gameState.player.position.x += cdx * 0.15;
-                        gameState.player.position.z += cdz * 0.15;
-                        gameState.player.position.y = Math.sin(gameState.player.position.x * 0.1) * Math.cos(gameState.player.position.z * 0.1) * 2 + 0.6;
-                    }
+                    gameState.player.position.x = x;
+                    gameState.player.position.z = z;
+                    gameState.player.position.y = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.6;
                 }
 
                 // Update HUD

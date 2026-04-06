@@ -275,21 +275,22 @@ function pickTarget(bot) {
 }
 
 // Try to move bot from current pos toward (nx, nz). Returns true if moved.
+var BOT_RADIUS = 0.8; // Slightly smaller than 1.0 so bots fit through gaps
 function tryMove(bot, nx, nz) {
     // Clamp to map
     nx = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nx));
     nz = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nz));
 
     // Direct move
-    if (!collidesWithWall(nx, nz, 1.0)) {
+    if (!collidesWithWall(nx, nz, BOT_RADIUS)) {
         bot.x = nx; bot.z = nz; return true;
     }
     // Wall slide X
-    if (!collidesWithWall(nx, bot.z, 1.0)) {
+    if (!collidesWithWall(nx, bot.z, BOT_RADIUS)) {
         bot.x = nx; return true;
     }
     // Wall slide Z
-    if (!collidesWithWall(bot.x, nz, 1.0)) {
+    if (!collidesWithWall(bot.x, nz, BOT_RADIUS)) {
         bot.z = nz; return true;
     }
     return false;
@@ -299,27 +300,28 @@ function updateBot(bot, dt) {
     if (bot.health <= 0) return;
     if (bot._passive) return; // Test mode dummy — don't move or shoot
 
-    // Track actual movement — if stuck too long, pick new target (no teleport)
+    // Track actual movement — if stuck for 2+ seconds, pick new target
     if (!bot._lastRealX) { bot._lastRealX = bot.x; bot._lastRealZ = bot.z; bot._idleTicks = 0; }
-    var moved = Math.abs(bot.x - bot._lastRealX) > 0.1 || Math.abs(bot.z - bot._lastRealZ) > 0.1;
+    var moved = Math.abs(bot.x - bot._lastRealX) > 0.3 || Math.abs(bot.z - bot._lastRealZ) > 0.3;
     if (moved) {
         bot._lastRealX = bot.x; bot._lastRealZ = bot.z; bot._idleTicks = 0;
     } else {
         bot._idleTicks++;
-        if (bot._idleTicks > 128) {
+        if (bot._idleTicks > 64 * 2) { // ~2 seconds at 64hz
             bot.botTarget = pickTarget(bot);
             bot.stuckFrames = 0; bot.chaseDetour = false;
             bot._idleTicks = 0;
+            bot._nudgeSide = Math.random() < 0.5 ? 1 : -1; // Fresh random side
         }
     }
 
-    // If bot is inside a wall, push it out gradually (no teleport)
-    if (collidesWithWall(bot.x, bot.z, 1.0)) {
-        var pushSpd = bot.speed * dt * 2; // push out at 2x speed
-        for (var a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+    // If bot is inside a wall, push it out gradually
+    if (collidesWithWall(bot.x, bot.z, BOT_RADIUS)) {
+        var pushSpd = bot.speed * dt * 3;
+        for (var a = 0; a < Math.PI * 2; a += Math.PI / 12) {
             var px = bot.x + Math.cos(a) * pushSpd;
             var pz = bot.z + Math.sin(a) * pushSpd;
-            if (!collidesWithWall(px, pz, 1.0)) {
+            if (!collidesWithWall(px, pz, BOT_RADIUS)) {
                 bot.x = px; bot.z = pz;
                 break;
             }
@@ -335,28 +337,36 @@ function updateBot(bot, dt) {
         }
     });
 
-    // Chase enemy in vision — but only set direct target if we have LOS
-    if (closestEnemy && closestDist < 50) {
+    // Chase enemy in vision range
+    if (closestEnemy && closestDist < SHOOT_RANGE * 1.5) {
         if (hasLineOfSight(bot.x, bot.z, closestEnemy.x, closestEnemy.z)) {
             // Clear path — go straight at them
             bot.botTarget = { x: closestEnemy.x, z: closestEnemy.z };
             bot.chaseDetour = false;
             bot.stuckFrames = 0;
-        } else if (!bot.chaseDetour) {
-            // Wall between us — pick a perpendicular waypoint to go around
+        } else if (!bot.chaseDetour || bot.stuckFrames > 20) {
+            // Wall between us — pick a waypoint to go around
             var angle = Math.atan2(closestEnemy.z - bot.z, closestEnemy.x - bot.x);
-            var side = (Math.random() < 0.5) ? 1 : -1;
-            var detourAngle = angle + side * (Math.PI / 2 + Math.random() * 0.5);
-            var detourDist = 15 + Math.random() * 15;
+            if (!bot._nudgeSide) bot._nudgeSide = Math.random() < 0.5 ? 1 : -1;
+            var detourAngle = angle + bot._nudgeSide * (Math.PI / 3 + Math.random() * 0.4);
+            var detourDist = 8 + Math.random() * 10;
             var wx = bot.x + Math.cos(detourAngle) * detourDist;
             var wz = bot.z + Math.sin(detourAngle) * detourDist;
             wx = Math.max(-MAP_SIZE/2+5, Math.min(MAP_SIZE/2-5, wx));
             wz = Math.max(-MAP_SIZE/2+5, Math.min(MAP_SIZE/2-5, wz));
-            bot.botTarget = { x: wx, z: wz };
+            if (!collidesWithWall(wx, wz, BOT_RADIUS)) {
+                bot.botTarget = { x: wx, z: wz };
+            } else {
+                // Try other side
+                bot._nudgeSide *= -1;
+                detourAngle = angle + bot._nudgeSide * (Math.PI / 3 + Math.random() * 0.4);
+                wx = bot.x + Math.cos(detourAngle) * detourDist;
+                wz = bot.z + Math.sin(detourAngle) * detourDist;
+                bot.botTarget = { x: wx, z: wz };
+            }
             bot.chaseDetour = true;
             bot.stuckFrames = 0;
         }
-        // If already detouring, keep current waypoint until reached
     }
 
     // Pick new target when needed
@@ -377,18 +387,22 @@ function updateBot(bot, dt) {
 
         if (!tryMove(bot, nx, nz)) {
             bot.stuckFrames++;
-            // Try perpendicular nudge — pick a consistent side based on position
-            var angle = Math.atan2(dz, dx);
-            var side = ((bot.x * 7 + bot.z * 13) | 0) % 2 === 0 ? 1 : -1;
-            // Escalate: wider angles as stuck longer
-            var nudgeAngle = angle + side * (Math.PI / 3 + bot.stuckFrames * 0.15);
-            tryMove(bot, bot.x + Math.cos(nudgeAngle) * spd * 2, bot.z + Math.sin(nudgeAngle) * spd * 2);
+            // Wall slide with consistent side — try 3 angles
+            if (!bot._nudgeSide) bot._nudgeSide = Math.random() < 0.5 ? 1 : -1;
+            var moveAngle = Math.atan2(dz, dx);
+            var nudged = false;
+            // Try 45°, 90°, then 135° to the consistent side
+            for (var ni = 1; ni <= 3 && !nudged; ni++) {
+                var na = moveAngle + bot._nudgeSide * (ni * Math.PI / 4);
+                nudged = tryMove(bot, bot.x + Math.cos(na) * spd * 1.5, bot.z + Math.sin(na) * spd * 1.5);
+            }
 
-            if (bot.stuckFrames > 5) {
-                // Pick completely new target
+            if (bot.stuckFrames > 15) {
+                // Stuck too long — new target, flip side
                 bot.botTarget = pickTarget(bot);
                 bot.chaseDetour = false;
                 bot.stuckFrames = 0;
+                bot._nudgeSide *= -1;
             }
         } else {
             bot.stuckFrames = 0;
@@ -630,7 +644,7 @@ setInterval(function() {
         if (p.isBot || p.afk) {
             updateBot(p, dt);
         } else if (p.moveTarget) {
-            // Human player movement
+            // Human player movement — smaller radius for smoother wall sliding
             const dx = p.moveTarget.x - p.x;
             const dz = p.moveTarget.z - p.z;
             const d = Math.sqrt(dx * dx + dz * dz);
@@ -640,12 +654,12 @@ setInterval(function() {
                 const spd = (p.windwalk ? p.windwalkSpeed : p.speed) * dt;
                 const nx = p.x + dx / d * spd;
                 const nz = p.z + dz / d * spd;
-                if (!collidesWithWall(nx, nz, 1.0)) {
+                if (!collidesWithWall(nx, nz, 0.8)) {
                     p.x = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nx));
                     p.z = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nz));
-                } else if (!collidesWithWall(nx, p.z, 1.0)) {
+                } else if (!collidesWithWall(nx, p.z, 0.8)) {
                     p.x = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nx));
-                } else if (!collidesWithWall(p.x, nz, 1.0)) {
+                } else if (!collidesWithWall(p.x, nz, 0.8)) {
                     p.z = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nz));
                 }
                 p.y = terrainY(p.x, p.z) + 0.6;
