@@ -3927,14 +3927,8 @@ const BYTES_PER_PLAYER = 28;
 const INTERP_SPEED = 12; // units/sec for interpolation
 
 function _netDebug(text) {
-    let el = document.getElementById('_netdbg');
-    if (!el) {
-        el = document.createElement('div');
-        el.id = '_netdbg';
-        el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.8);color:#0f0;font:11px monospace;padding:4px 8px;z-index:99999;pointer-events:none;max-height:100px;overflow:hidden;';
-        document.body.appendChild(el);
-    }
-    el.textContent = text;
+    // Console only — no on-screen debug
+    console.log('[NET]', text);
 }
 
 function connectToServer() {
