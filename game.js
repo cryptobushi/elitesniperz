@@ -980,7 +980,7 @@ const createMap = () => {
         const forestFloorMat = new THREE.MeshBasicMaterial({ color: 0x050505 });
         const forestFloor = new THREE.Mesh(forestFloorGeo, forestFloorMat);
         forestFloor.rotation.x = -Math.PI / 2;
-        forestFloor.position.y = -0.1;
+        forestFloor.position.y = -1.5;
         scene.add(forestFloor);
     }
 };
