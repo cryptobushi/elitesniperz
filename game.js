@@ -574,20 +574,19 @@ const createMap = () => {
 
     // ── PROCEDURAL GRASS — InstancedMesh + player collision push ────────
     {
-        const GRASS_COUNT = 150000;
+        const GRASS_COUNT = 500000;
         const GRASS_SPREAD = MAP_SIZE * 0.49;
         const COLLIDER_RADIUS = 3.5;
 
-        // 7-vertex curved blade — wider and taller for lush look
+        // Short stubby blade — 5 vertices, low to ground
         const bladeGeo = new THREE.BufferGeometry();
         const v = new Float32Array([
-            -0.07, 0, 0,  0.07, 0, 0,         // base — wider
-            -0.05, 0.22, 0,  0.05, 0.22, 0,   // lower mid
-            -0.025, 0.45, 0,  0.025, 0.45, 0,  // upper mid
-            0, 0.65, 0                           // tip — taller
+            -0.04, 0, 0,  0.04, 0, 0,        // base
+            -0.025, 0.1, 0,  0.025, 0.1, 0,  // mid
+            0, 0.2, 0                          // tip — short
         ]);
         bladeGeo.setAttribute('position', new THREE.BufferAttribute(v, 3));
-        bladeGeo.setIndex([0,1,2, 2,1,3, 2,3,4, 4,3,5, 4,5,6]);
+        bladeGeo.setIndex([0,1,2, 2,1,3, 2,3,4]);
 
         // Use InstancedMesh for proper matrix instancing
         const grassMat = new THREE.ShaderMaterial({
@@ -695,8 +694,8 @@ const createMap = () => {
         const color = new THREE.Color();
         let placed = 0;
 
-        // Dense grid — 3 blades per cell for lush clumps
-        const BLADES_PER_CELL = 3;
+        // Dense grid — 5 blades per cell
+        const BLADES_PER_CELL = 5;
         const gridSize = Math.ceil(Math.sqrt(GRASS_COUNT / BLADES_PER_CELL * 1.2));
         const cellSize = (GRASS_SPREAD * 2) / gridSize;
 
@@ -715,9 +714,9 @@ const createMap = () => {
                 const pz = cellZ + (_gh(seed * 7 + 1) - 0.5) * cellSize;
 
                 const ty = terrainY(px, pz);
-                const scale = 0.5 + _gh(seed * 3) * 1.2;
+                const scale = 0.4 + _gh(seed * 3) * 0.6;
                 const rotY = _gh(seed * 3 + 1) * Math.PI * 2;
-                const heightVar = 0.8 + _gh(seed * 5) * 0.6; // Height variation
+                const heightVar = 0.6 + _gh(seed * 5) * 0.8;
 
                 dummy.position.set(px, ty + 0.6, pz);
                 dummy.rotation.set(0, rotY, 0);
