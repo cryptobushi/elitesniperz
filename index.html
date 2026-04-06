@@ -688,7 +688,7 @@
     </style>
 </head>
 <body>
-    <div id="fpsCounter" style="position:fixed;top:4px;right:4px;color:#0f0;font-family:monospace;font-size:11px;z-index:99999;pointer-events:none;text-shadow:0 0 2px #000,0 0 4px #000;">FPS: --</div>
+    <div id="fpsCounter" style="position:fixed;top:4px;right:max(env(safe-area-inset-right),8px);color:#0f0;font-family:monospace;font-size:11px;z-index:99999;pointer-events:none;text-shadow:0 0 2px #000,0 0 4px #000;">FPS: --</div>
     <!-- Force landscape overlay -->
     <div id="rotateOverlay">
         <div class="icon">📱</div>

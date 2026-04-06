@@ -3041,8 +3041,9 @@ function updateDebugFPS() {
     _fpsFrames++;
     const now = performance.now();
     if (now - _fpsLast >= 1000) {
-        const fakeFps = 8008132 + Math.floor(Math.random() * 837);
-        const fpsText = 'FPS: ' + fakeFps.toLocaleString();
+        // Mostly shows 8008132, occasionally the last digit flickers
+        const lastDigit = Math.random() < 0.15 ? Math.floor(Math.random() * 4) : 2;
+        const fpsText = 'FPS: 800813' + lastDigit;
         const fpsEl = document.getElementById('fpsCounter');
         if (fpsEl) fpsEl.textContent = fpsText;
         if (gameState.debug.showFPS) {
