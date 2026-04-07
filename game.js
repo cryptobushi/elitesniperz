@@ -4371,59 +4371,79 @@ function showMatchEnd(msg) {
     const isWin = msg.win === gameState.team;
     const isDraw = msg.win === 'draw';
 
-    // Set class for styling
     el.className = isDraw ? 'draw' : (isWin ? 'win' : 'lose');
 
     // Title
     document.getElementById('matchEndTitle').textContent =
         isDraw ? 'DRAW' : (isWin ? 'VICTORY' : 'DEFEAT');
 
-    // Score
+    // Score — big and bold
     document.getElementById('matchEndScore').innerHTML =
-        '<span style="color:#ff4444">' + msg.rk + '</span>' +
-        ' <span style="color:#555">—</span> ' +
-        '<span style="color:#4488ff">' + msg.bk + '</span>';
+        '<span style="color:#ff5555">' + msg.rk + '</span>' +
+        ' <span style="color:#555;font-size:0.6em;">vs</span> ' +
+        '<span style="color:#55aaff">' + msg.bk + '</span>';
 
-    // MVP (top killer)
-    const mvp = msg.stats && msg.stats[0];
-    if (mvp) {
-        const mvpColor = mvp.m === 'red' ? '#ff4444' : '#4488ff';
-        document.getElementById('matchEndMVP').innerHTML =
-            'MVP: <span style="color:' + mvpColor + '">' + mvp.n + '</span> — ' +
-            mvp.k + ' kills / ' + mvp.d + ' deaths';
+    // Your stats boxes
+    const me = msg.stats && msg.stats.find(s => s.n === gameState.username);
+    const yourStats = document.getElementById('matchEndYourStats');
+    if (me) {
+        const kd = me.d > 0 ? (me.k / me.d).toFixed(1) : me.k.toFixed(1);
+        yourStats.innerHTML =
+            '<div class="stat-box"><div class="stat-val">' + me.k + '</div><div class="stat-label">Kills</div></div>' +
+            '<div class="stat-box"><div class="stat-val">' + me.d + '</div><div class="stat-label">Deaths</div></div>' +
+            '<div class="stat-box"><div class="stat-val">' + kd + '</div><div class="stat-label">K/D</div></div>' +
+            '<div class="stat-box"><div class="stat-val">$' + me.p.toFixed(1) + '</div><div class="stat-label">Price</div></div>';
+    } else {
+        yourStats.innerHTML = '';
     }
 
-    // Stats table
+    // MVP
+    const mvp = msg.stats && msg.stats[0];
+    if (mvp) {
+        const mvpColor = mvp.m === 'red' ? '#ff5555' : '#55aaff';
+        document.getElementById('matchEndMVP').innerHTML =
+            'MVP <span style="color:' + mvpColor + ';font-weight:bold;">' + mvp.n + '</span> — ' +
+            mvp.k + ' kills';
+    }
+
+    // Full stats table
     if (msg.stats) {
         let html = '';
         msg.stats.forEach(function(s) {
             const isMe = s.n === gameState.username;
             const teamClass = s.m === 'red' ? 'me-red' : 'me-blue';
-            html += '<div class="me-row ' + teamClass + '"' + (isMe ? ' style="color:#fff;font-weight:bold;"' : '') + '>' +
-                s.n + (s.b ? ' [BOT]' : '') + '  ' + s.k + '/' + s.d + '  $' + s.p.toFixed(2) +
+            const style = isMe ? 'color:#fff;font-weight:bold;background:rgba(255,255,255,0.05);padding:1px 4px;border-radius:3px;' : '';
+            html += '<div class="me-row ' + teamClass + '" style="' + style + '">' +
+                s.n + (s.b ? ' [BOT]' : '') + '  ' + s.k + '/' + s.d +
                 '</div>';
         });
         document.getElementById('matchEndStats').innerHTML = html;
     }
 
-    // Format match time
     const mins = Math.floor(msg.time / 60);
     const secs = msg.time % 60;
     const timeStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
 
     el.classList.remove('hidden');
 
-    // Countdown to next match
+    // Exit button
+    document.getElementById('matchEndExit').onclick = function() {
+        el.classList.add('hidden');
+        if (_matchEndCountdown) { clearInterval(_matchEndCountdown); _matchEndCountdown = null; }
+    };
+
+    // Countdown
     let remaining = 12;
     const timerEl = document.getElementById('matchEndTimer');
-    timerEl.textContent = 'Match time: ' + timeStr + '  •  Next match in ' + remaining + 's';
+    timerEl.textContent = timeStr + '  •  Next match in ' + remaining + 's';
     _matchEndCountdown = setInterval(function() {
         remaining--;
         if (remaining <= 0) {
             clearInterval(_matchEndCountdown);
             timerEl.textContent = 'Starting...';
+            setTimeout(() => el.classList.add('hidden'), 1000);
         } else {
-            timerEl.textContent = 'Match time: ' + timeStr + '  •  Next match in ' + remaining + 's';
+            timerEl.textContent = timeStr + '  •  Next match in ' + remaining + 's';
         }
     }, 1000);
 }
