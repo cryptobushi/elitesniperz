@@ -31,13 +31,21 @@ function terrainY(x, z) {
 }
 
 function spawnPos(team) {
-    const s = team === 'red' ? -70 : 70;
-    return { x: s + Math.random() * 10 - 5, z: s + Math.random() * 10 - 5 };
+    if (team === 'red') {
+        // T Spawn — bottom center
+        return { x: 0 + Math.random() * 10 - 5, z: -85 + Math.random() * 10 - 5 };
+    } else {
+        // CT Spawn — top-right
+        return { x: 50 + Math.random() * 10 - 5, z: 70 + Math.random() * 10 - 5 };
+    }
 }
 
 function isNearSpawn(x, z, team) {
-    const s = team === 'red' ? -70 : 70;
-    return Math.sqrt((x - s) * (x - s) + (z - s) * (z - s)) < 15;
+    if (team === 'red') {
+        return Math.sqrt(x * x + (z + 85) * (z + 85)) < 15;
+    } else {
+        return Math.sqrt((x - 50) * (x - 50) + (z - 70) * (z - 70)) < 15;
+    }
 }
 
 if (typeof module !== 'undefined' && module.exports) {
