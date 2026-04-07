@@ -3246,6 +3246,15 @@ document.querySelectorAll('.teamBtn').forEach(btn => {
     });
 });
 
+// Retro visitor counter
+{
+    const vc = document.getElementById('visitorNum');
+    if (vc) {
+        const n = 4831 + Math.floor(Math.random() * 200);
+        vc.textContent = String(n).padStart(6, '0').replace(/(\d)(?=(\d{3})+$)/g, '$1,');
+    }
+}
+
 document.getElementById('startBtn').addEventListener('click', () => {
     audioManager.init().then(() => {
         soundtrack.start(audioManager.ctx);

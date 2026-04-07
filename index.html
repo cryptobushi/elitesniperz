@@ -69,80 +69,141 @@
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.95);
-            border: 2px solid #00ff00;
+            background: linear-gradient(180deg, #1a1a3a 0%, #0a0a1a 50%, #1a1a3a 100%);
+            border: 3px outset #4444aa;
+            box-shadow: 0 0 0 1px #000, 0 0 0 3px #222266, inset 0 0 30px rgba(0,0,80,0.3);
             padding: 1.5rem;
             text-align: center;
             pointer-events: all;
             z-index: 1000;
-            width: min(90%, 400px);
-            border-radius: 8px;
+            width: min(92%, 420px);
+            border-radius: 2px;
         }
 
         #usernameModal h1 {
-            color: #00ff00;
-            margin-bottom: 0.5rem;
-            font-size: clamp(1.2rem, 5vw, 2rem);
-            text-shadow: 0 0 10px #00ff00;
+            color: #ffcc00;
+            margin-bottom: 0.1rem;
+            font-size: clamp(1.4rem, 6vw, 2.2rem);
+            font-family: 'Impact', 'Arial Black', sans-serif;
+            text-shadow: 2px 2px 0 #000, -1px -1px 0 #885500, 0 0 20px rgba(255,200,0,0.4);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
-        #usernameModal p {
-            color: #888;
-            margin-bottom: 1rem;
-            font-size: clamp(0.7rem, 2.5vw, 0.9rem);
+        #usernameModal .subtitle {
+            color: #8888cc;
+            margin-bottom: 0.6rem;
+            font-size: clamp(0.55rem, 2vw, 0.75rem);
+            font-family: 'Comic Sans MS', 'Chalkboard SE', cursive;
+            font-style: italic;
+        }
+
+        #usernameModal .separator {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #4444aa, #8888ff, #4444aa, transparent);
+            margin: 0.5rem 0;
+        }
+
+        #usernameModal .visitor-count {
+            color: #44ff44;
+            font-family: 'Courier New', monospace;
+            font-size: 0.6rem;
+            margin-bottom: 0.6rem;
+        }
+        #usernameModal .visitor-count span {
+            background: #000;
+            border: 1px inset #444;
+            padding: 1px 3px;
+            color: #00ff00;
+            font-weight: bold;
+            letter-spacing: 0.15em;
+        }
+
+        #usernameModal .nav-links {
+            display: flex; justify-content: center; gap: 0.4rem;
+            margin-bottom: 0.6rem; flex-wrap: wrap;
+        }
+        #usernameModal .nav-links a {
+            color: #6688ff; font-size: 0.6rem; font-family: 'Verdana', sans-serif;
+            text-decoration: underline; cursor: default;
         }
 
         #usernameInput {
-            background: #111;
-            border: 2px solid #00ff00;
-            color: #00ff00;
-            padding: 0.75rem 1rem;
-            font-size: 1rem;
-            font-family: 'Courier New', monospace;
-            margin-bottom: 1rem;
+            background: #000;
+            border: 2px inset #555;
+            color: #fff;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.9rem;
+            font-family: 'Verdana', sans-serif;
+            margin-bottom: 0.8rem;
             width: 100%;
-            border-radius: 4px;
+            border-radius: 0;
             -webkit-appearance: none;
         }
+        #usernameInput::placeholder { color: #666; font-style: italic; }
 
         #teamSelect {
             display: flex;
             gap: 0.5rem;
-            margin-bottom: 1rem;
+            margin-bottom: 0.8rem;
             justify-content: center;
         }
 
         .teamBtn {
-            background: #111;
-            border: 2px solid #00ff00;
-            color: #00ff00;
-            padding: 0.75rem 1.5rem;
-            font-size: 0.9rem;
-            font-family: 'Courier New', monospace;
+            background: linear-gradient(180deg, #333 0%, #1a1a1a 100%);
+            border: 2px outset #666;
+            color: #ccc;
+            padding: 0.6rem 1.2rem;
+            font-size: 0.8rem;
+            font-family: 'Verdana', sans-serif;
+            font-weight: bold;
             cursor: pointer;
             flex: 1;
-            border-radius: 4px;
+            border-radius: 0;
+            text-transform: uppercase;
             -webkit-tap-highlight-color: transparent;
         }
-        .teamBtn.red { border-color: #ff0000; color: #ff0000; }
-        .teamBtn.blue { border-color: #0088ff; color: #0088ff; }
-        .teamBtn:active, .teamBtn.red:active { background: #ff000033; }
-        .teamBtn.blue:active { background: #0088ff33; }
+        .teamBtn.red {
+            border-color: #cc0000;
+            color: #ff4444;
+            background: linear-gradient(180deg, #441111 0%, #220000 100%);
+        }
+        .teamBtn.blue {
+            border-color: #0044cc;
+            color: #4488ff;
+            background: linear-gradient(180deg, #111144 0%, #000022 100%);
+        }
+        .teamBtn:active, .teamBtn.red:active { border-style: inset; }
+        .teamBtn.blue:active { border-style: inset; }
 
         #startBtn {
-            background: #00ff00;
-            border: none;
+            background: linear-gradient(180deg, #ffdd44 0%, #cc8800 50%, #ffdd44 100%);
+            border: 2px outset #ffcc00;
             color: #000;
-            padding: 0.75rem;
+            padding: 0.7rem;
             font-size: 1rem;
             font-weight: bold;
-            font-family: 'Courier New', monospace;
+            font-family: 'Impact', 'Arial Black', sans-serif;
             cursor: pointer;
             width: 100%;
-            border-radius: 4px;
+            border-radius: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            text-shadow: 1px 1px 0 rgba(255,255,255,0.3);
             -webkit-tap-highlight-color: transparent;
         }
-        #startBtn:active { opacity: 0.8; }
+        #startBtn:active { border-style: inset; opacity: 0.9; }
+
+        #usernameModal .footer-text {
+            color: #555;
+            font-size: 0.5rem;
+            font-family: 'Verdana', sans-serif;
+            margin-top: 0.6rem;
+        }
+        #usernameModal .footer-text a { color: #6688ff; text-decoration: underline; cursor: default; }
+
+        @keyframes blink2k { 0%,49%{opacity:1}50%,100%{opacity:0} }
+        #usernameModal .blink { animation: blink2k 1s step-end infinite; }
 
         /* === HUD — mobile-first compact === */
         #hud {
@@ -570,19 +631,25 @@
             justify-content: center;
         }
         .modeBtn {
-            background: #111;
-            border: 2px solid #00ff00;
-            color: #00ff00;
-            padding: 0.5rem 1rem;
-            font-size: 0.8rem;
-            font-family: 'Courier New', monospace;
+            background: linear-gradient(180deg, #333 0%, #1a1a1a 100%);
+            border: 2px outset #666;
+            color: #aaa;
+            padding: 0.45rem 0.8rem;
+            font-size: 0.75rem;
+            font-family: 'Verdana', sans-serif;
+            font-weight: bold;
             cursor: pointer;
             flex: 1;
-            border-radius: 4px;
+            border-radius: 0;
+            text-transform: uppercase;
             -webkit-tap-highlight-color: transparent;
         }
-        .modeBtn:active { background: #00ff0033; }
-        .modeBtn.selected { background: #00ff00; color: #000; }
+        .modeBtn:active { border-style: inset; }
+        .modeBtn.selected {
+            background: linear-gradient(180deg, #225522 0%, #113311 100%);
+            border-color: #44aa44;
+            color: #44ff44;
+        }
 
         /* === CHAT BOX === */
         #chatBox {
@@ -710,10 +777,14 @@
             .shop-desc { font-size: 0.5rem; }
 
             /* Start screen */
-            #usernameModal { padding: 1rem; }
-            #usernameModal h1 { font-size: clamp(1rem, 4vw, 1.5rem); }
-            .modeBtn { padding: 0.4rem 0.5rem; font-size: 0.7rem; }
-            .teamBtn { padding: 0.5rem 0.8rem; font-size: 0.8rem; }
+            #usernameModal { padding: 0.8rem; }
+            #usernameModal h1 { font-size: clamp(1rem, 5vw, 1.6rem); }
+            #usernameModal .subtitle { font-size: 0.5rem; }
+            #usernameModal .nav-links { font-size: 0.5rem; gap: 0.2rem; }
+            #usernameModal .visitor-count { font-size: 0.5rem; }
+            #usernameModal .footer-text { font-size: 0.4rem; }
+            .modeBtn { padding: 0.35rem 0.5rem; font-size: 0.65rem; }
+            .teamBtn { padding: 0.4rem 0.8rem; font-size: 0.7rem; }
 
             /* Chat */
             #chatBox { width: min(200px, 35vw); bottom: 90px; }
@@ -737,18 +808,28 @@
 
     <div id="ui">
         <div id="usernameModal">
-            <h1>ELITE SNIPERS</h1>
-            <p>A tribute to the legendary Warcraft III custom game</p>
+            <div class="nav-links">
+                <a>Home</a> | <a>About</a> | <a>Downloads</a> | <a>Forums</a> | <a>Contact</a>
+            </div>
+            <div class="separator"></div>
+            <h1>~ Elite Snipers ~</h1>
+            <div class="subtitle">:: A tribute to the legendary Warcraft III custom game ::</div>
+            <div class="separator"></div>
+            <div class="visitor-count">You are visitor #<span id="visitorNum">004,831</span> <span class="blink">|</span></div>
             <input type="text" id="usernameInput" placeholder="Enter your name..." maxlength="12">
             <div id="modeSelect">
                 <button class="modeBtn selected" data-mode="offline">OFFLINE</button>
                 <button class="modeBtn" data-mode="online">ONLINE</button>
             </div>
             <div id="teamSelect">
-                <button class="teamBtn red" data-team="red">RED</button>
-                <button class="teamBtn blue" data-team="blue">BLUE</button>
+                <button class="teamBtn red" data-team="red">RED TEAM</button>
+                <button class="teamBtn blue" data-team="blue">BLUE TEAM</button>
             </div>
-            <button id="startBtn">START GAME</button>
+            <button id="startBtn">>> ENTER GAME <<</button>
+            <div class="footer-text">
+                Best viewed in 1024x768 &bull; <a>Netscape 4.0+</a> &bull; &copy; 2003 EliteSnipers.net<br>
+                <a>Sign our Guestbook!</a> &bull; <a>Link to us</a> &bull; Made with Notepad
+            </div>
         </div>
 
         <div id="hud" class="hidden">
