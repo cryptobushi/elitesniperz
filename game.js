@@ -36,6 +36,11 @@ const gameState = {
     firstBlood: false,
     // Gold + Shop
     gold: 0,
+    // FPS mode
+    fpsMode: false,
+    fpsYaw: 0,
+    fpsPitch: 0,
+    fpsTransition: 0, // 0=top-down, 1=FPS, lerps smoothly
     // Debug
     debug: {
         godMode: false,
@@ -635,6 +640,10 @@ const createMap = () => {
 // Vision radius = shoot range. No canvas overlay tricks.
 const VISION_RADIUS = 35;
 const FARSIGHT_RADIUS = 55;
+const FPS_EYE_HEIGHT = 1.4;
+const FPS_SENSITIVITY = 0.002;
+const FPS_FOV = 75;
+const TOPDOWN_FOV = 60;
 
 class FogOfWar {
     constructor() {
@@ -2735,6 +2744,22 @@ document.addEventListener('keydown', (e) => {
         document.getElementById('respawnBtn')?.click();
         return;
     }
+    if (e.key.toLowerCase() === 'v' && gameState.player && gameState.player.health > 0) {
+        e.preventDefault();
+        gameState.fpsMode = !gameState.fpsMode;
+        if (gameState.fpsMode) {
+            gameState.fpsYaw = gameState.player.mesh.rotation.y || 0;
+            gameState.fpsPitch = 0;
+            const canvas = document.getElementById('gameCanvas');
+            canvas.requestPointerLock?.();
+        } else {
+            document.exitPointerLock?.();
+        }
+        // Tell server
+        if (_ws && _ws.readyState === 1) {
+            _ws.send(JSON.stringify({ t: 'vmode', fps: gameState.fpsMode ? 1 : 0 }));
+        }
+    }
     if (e.key.toLowerCase() === 'q') {
         e.preventDefault();
         useWindwalk();
@@ -2790,6 +2815,11 @@ document.addEventListener('keyup', (e) => {
 });
 
 document.addEventListener('mousemove', (e) => {
+    if (gameState.fpsMode) {
+        gameState.fpsYaw -= e.movementX * FPS_SENSITIVITY;
+        gameState.fpsPitch = Math.max(-Math.PI/3, Math.min(Math.PI/3, gameState.fpsPitch - e.movementY * FPS_SENSITIVITY));
+        return;
+    }
     gameState.mousePos.x = (e.clientX / window.innerWidth) * 2 - 1;
     gameState.mousePos.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
@@ -2818,6 +2848,24 @@ document.addEventListener('mousedown', (e) => {
 
     // Left click
     if (e.button === 0 && gameState.player) {
+        if (gameState.fpsMode) {
+            // FPS manual shoot
+            if (_ws && _ws.readyState === 1 && gameState.player && gameState.player.health > 0) {
+                _ws.send(JSON.stringify({ t: 'fps_shoot', yaw: gameState.fpsYaw }));
+                // Local shooting effect
+                if (gameState.player.createShootingEffect) {
+                    const lookDir = new THREE.Vector3(
+                        Math.sin(gameState.fpsYaw),
+                        0,
+                        Math.cos(gameState.fpsYaw)
+                    );
+                    const target = gameState.player.position.clone().add(lookDir.multiplyScalar(25));
+                    gameState.player.createShootingEffect(target);
+                }
+                audioManager.play('sniperFire');
+            }
+            return; // Don't do click-to-move
+        }
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(gameState.mousePos, camera);
 
@@ -3253,11 +3301,28 @@ function animate() {
     }
 
     // WASD camera movement (alternative to edge scroll)
-    const camSpeed = 15;
-    if (gameState.keys['w'] && !gameState.keys['s']) gameState.cameraTarget.z -= camSpeed * deltaTime;
-    if (gameState.keys['s'] && !gameState.keys['w']) gameState.cameraTarget.z += camSpeed * deltaTime;
-    if (gameState.keys['a'] && !gameState.keys['d']) gameState.cameraTarget.x -= camSpeed * deltaTime;
-    if (gameState.keys['d'] && !gameState.keys['a']) gameState.cameraTarget.x += camSpeed * deltaTime;
+    if (gameState.fpsMode && gameState.player && gameState.player.health > 0) {
+        // WASD moves player in FPS
+        let mx = 0, mz = 0;
+        if (gameState.keys['w']) { mx += Math.sin(gameState.fpsYaw); mz += Math.cos(gameState.fpsYaw); }
+        if (gameState.keys['s']) { mx -= Math.sin(gameState.fpsYaw); mz -= Math.cos(gameState.fpsYaw); }
+        if (gameState.keys['a']) { mx += Math.sin(gameState.fpsYaw - Math.PI/2); mz += Math.cos(gameState.fpsYaw - Math.PI/2); }
+        if (gameState.keys['d']) { mx += Math.sin(gameState.fpsYaw + Math.PI/2); mz += Math.cos(gameState.fpsYaw + Math.PI/2); }
+        if (mx !== 0 || mz !== 0) {
+            const len = Math.sqrt(mx*mx + mz*mz);
+            mx /= len; mz /= len;
+            const ahead = 3;
+            const tx = gameState.player.position.x + mx * ahead;
+            const tz = gameState.player.position.z + mz * ahead;
+            gameState.moveTarget = { x: tx, y: 0, z: tz };
+        }
+    } else {
+        const camSpeed = 15;
+        if (gameState.keys['w'] && !gameState.keys['s']) gameState.cameraTarget.z -= camSpeed * deltaTime;
+        if (gameState.keys['s'] && !gameState.keys['w']) gameState.cameraTarget.z += camSpeed * deltaTime;
+        if (gameState.keys['a'] && !gameState.keys['d']) gameState.cameraTarget.x -= camSpeed * deltaTime;
+        if (gameState.keys['d'] && !gameState.keys['a']) gameState.cameraTarget.x += camSpeed * deltaTime;
+    }
 
     // Spacebar to center on player
     if (gameState.keys[' '] && gameState.player) {
@@ -3272,11 +3337,93 @@ function animate() {
     gameState.cameraTarget.x = THREE.MathUtils.clamp(gameState.cameraTarget.x, -mapBound, mapBound);
     gameState.cameraTarget.z = THREE.MathUtils.clamp(gameState.cameraTarget.z, -mapBound, mapBound);
 
-    // Smooth camera movement
-    camera.position.x = THREE.MathUtils.lerp(camera.position.x, gameState.cameraTarget.x + gameState.cameraOffset.x, 0.06);
-    camera.position.y = gameState.cameraOffset.y;
-    camera.position.z = THREE.MathUtils.lerp(camera.position.z, gameState.cameraTarget.z + gameState.cameraOffset.z, 0.06);
-    camera.lookAt(gameState.cameraTarget);
+    // Smooth FPS transition
+    if (gameState.fpsMode && gameState.fpsTransition < 1) {
+        gameState.fpsTransition = Math.min(1, gameState.fpsTransition + deltaTime * 4);
+    } else if (!gameState.fpsMode && gameState.fpsTransition > 0) {
+        gameState.fpsTransition = Math.max(0, gameState.fpsTransition - deltaTime * 4);
+    }
+    const fpst = gameState.fpsTransition;
+
+    if (fpst < 0.01) {
+        // Pure top-down
+        camera.position.x = THREE.MathUtils.lerp(camera.position.x, gameState.cameraTarget.x + gameState.cameraOffset.x, 0.06);
+        camera.position.y = gameState.cameraOffset.y;
+        camera.position.z = THREE.MathUtils.lerp(camera.position.z, gameState.cameraTarget.z + gameState.cameraOffset.z, 0.06);
+        camera.lookAt(gameState.cameraTarget.x, 0, gameState.cameraTarget.z);
+        camera.fov = TOPDOWN_FOV;
+    } else if (fpst > 0.99) {
+        // Pure FPS
+        const p = gameState.player;
+        if (p) {
+            const ey = p.position.y + FPS_EYE_HEIGHT;
+            camera.position.set(p.position.x, ey, p.position.z);
+            // Look direction from yaw + pitch
+            const lookX = Math.sin(gameState.fpsYaw) * Math.cos(gameState.fpsPitch);
+            const lookY = Math.sin(gameState.fpsPitch);
+            const lookZ = Math.cos(gameState.fpsYaw) * Math.cos(gameState.fpsPitch);
+            camera.lookAt(p.position.x + lookX * 10, ey + lookY * 10, p.position.z + lookZ * 10);
+        }
+        camera.fov = FPS_FOV;
+    } else {
+        // Transition — lerp between top-down and FPS
+        const p = gameState.player;
+        if (p) {
+            const tdX = gameState.cameraTarget.x + gameState.cameraOffset.x;
+            const tdY = gameState.cameraOffset.y;
+            const tdZ = gameState.cameraTarget.z + gameState.cameraOffset.z;
+            const fpsX = p.position.x;
+            const fpsY = p.position.y + FPS_EYE_HEIGHT;
+            const fpsZ = p.position.z;
+            camera.position.x = THREE.MathUtils.lerp(tdX, fpsX, fpst);
+            camera.position.y = THREE.MathUtils.lerp(tdY, fpsY, fpst);
+            camera.position.z = THREE.MathUtils.lerp(tdZ, fpsZ, fpst);
+            // Lerp look target
+            const lookX = Math.sin(gameState.fpsYaw) * Math.cos(gameState.fpsPitch);
+            const lookY = Math.sin(gameState.fpsPitch);
+            const lookZ = Math.cos(gameState.fpsYaw) * Math.cos(gameState.fpsPitch);
+            const tdLookX = gameState.cameraTarget.x;
+            const tdLookZ = gameState.cameraTarget.z;
+            const lx = THREE.MathUtils.lerp(tdLookX, fpsX + lookX * 10, fpst);
+            const ly = THREE.MathUtils.lerp(0, fpsY + lookY * 10, fpst);
+            const lz = THREE.MathUtils.lerp(tdLookZ, fpsZ + lookZ * 10, fpst);
+            camera.lookAt(lx, ly, lz);
+        }
+        camera.fov = THREE.MathUtils.lerp(TOPDOWN_FOV, FPS_FOV, fpst);
+    }
+    camera.updateProjectionMatrix();
+
+    // FPS: hide own mesh, show crosshair
+    if (gameState.player) {
+        gameState.player.mesh.visible = gameState.fpsTransition < 0.5 && gameState.player.health > 0;
+    }
+    let crosshair = document.getElementById('fpsCrosshair');
+    if (!crosshair) {
+        crosshair = document.createElement('div');
+        crosshair.id = 'fpsCrosshair';
+        crosshair.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:9995;display:none;';
+        crosshair.innerHTML = '<div style="width:2px;height:16px;background:#fff;opacity:0.7;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);"></div><div style="width:16px;height:2px;background:#fff;opacity:0.7;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);"></div>';
+        document.body.appendChild(crosshair);
+    }
+    crosshair.style.display = gameState.fpsTransition > 0.5 ? 'block' : 'none';
+    if (!document.getElementById('fpsToggleBtn')) {
+        const btn = document.createElement('button');
+        btn.id = 'fpsToggleBtn';
+        btn.textContent = 'FPS';
+        btn.style.cssText = 'position:fixed;top:50px;right:max(env(safe-area-inset-right),8px);z-index:9996;background:rgba(0,0,0,0.6);border:1px solid #fff4;color:#fff;font-family:monospace;font-size:0.7rem;padding:6px 12px;border-radius:4px;pointer-events:all;';
+        btn.addEventListener('click', () => {
+            if (!gameState.player || gameState.player.health <= 0) return;
+            gameState.fpsMode = !gameState.fpsMode;
+            if (gameState.fpsMode) {
+                gameState.fpsYaw = gameState.player.mesh.rotation.y || 0;
+                gameState.fpsPitch = 0;
+            }
+            if (_ws && _ws.readyState === 1) {
+                _ws.send(JSON.stringify({ t: 'vmode', fps: gameState.fpsMode ? 1 : 0 }));
+            }
+        });
+        document.body.appendChild(btn);
+    }
 
     // Update player movement (click to move)
     if (gameState.player && gameState.player.health > 0) {
@@ -3345,6 +3492,13 @@ function animate() {
     }
 
     fogOfWar.update(gameState.player, allUnits, farsightPositions);
+
+    // Hide fog planes in FPS mode (camera is below them)
+    if (fogOfWar.fogLayers) {
+        fogOfWar.fogLayers.forEach(layer => {
+            layer.visible = gameState.fpsTransition < 0.5;
+        });
+    }
 
     // Vision light follows player
     if (gameState.player) {
@@ -4112,6 +4266,15 @@ function handleJsonMessage(msg) {
             handleNewMatch(msg);
             break;
         }
+        case 'miss': {
+            // FPS shot missed — play fire sound, show tracer
+            if (msg.id === _myServerId) {
+                // Already played locally
+            } else {
+                audioManager.play('sniperFire');
+            }
+            break;
+        }
     }
 }
 
@@ -4379,7 +4542,9 @@ function updateRemotePlayers(dt) {
         const now2 = performance.now();
         if (now2 - _lastSendTime > 33) { // 30hz rotation updates
             let rot;
-            if (_isMobileDevice) {
+            if (gameState.fpsMode) {
+                rot = gameState.fpsYaw;
+            } else if (_isMobileDevice) {
                 // Mobile: aim toward move target (positioning is the skill)
                 if (gameState.moveTarget) {
                     const dx = gameState.moveTarget.x - gameState.player.position.x;

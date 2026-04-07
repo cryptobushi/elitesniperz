@@ -6,6 +6,7 @@ const VISION_RADIUS = 35;
 const FARSIGHT_RADIUS = 55;
 const SHOOT_RANGE = 25; // Shorter than vision — must close distance to shoot
 const SHOOT_COOLDOWN = 1.0;
+const FPS_SHOOT_FOV = 8; // Degrees — tight cone for manual FPS aiming
 const SPAWN_PROTECTION = 1.5;
 const MAX_PLAYERS = 10;
 const TICK_RATE = 64;
@@ -42,7 +43,7 @@ function isNearSpawn(x, z, team) {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        MAP_SIZE, VISION_RADIUS, FARSIGHT_RADIUS, SHOOT_RANGE, SHOOT_COOLDOWN,
+        MAP_SIZE, VISION_RADIUS, FARSIGHT_RADIUS, SHOOT_RANGE, SHOOT_COOLDOWN, FPS_SHOOT_FOV,
         SPAWN_PROTECTION, MAX_PLAYERS, TICK_RATE, SEND_RATE,
         SHOP_ITEMS, BOT_NAMES, terrainY, spawnPos, isNearSpawn
     };

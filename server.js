@@ -5,7 +5,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const {
-    MAP_SIZE, SHOOT_RANGE, SHOOT_COOLDOWN, SPAWN_PROTECTION,
+    MAP_SIZE, SHOOT_RANGE, SHOOT_COOLDOWN, FPS_SHOOT_FOV, SPAWN_PROTECTION,
     MAX_PLAYERS, TICK_RATE, SEND_RATE, BOT_NAMES, SHOP_ITEMS,
     terrainY, spawnPos, isNearSpawn
 } = require('./shared/constants');
@@ -124,7 +124,7 @@ function createPlayer(id, name, team, isBot) {
         price: 1.0, gold: 0, streak: 0,
         spawnProt: SPAWN_PROTECTION, windwalk: false, windwalkTimer: 0,
         farsight: false, farsightX: 0, farsightZ: 0, farsightTimer: 0,
-        shootCd: 0, shootRange: SHOOT_RANGE, shootCooldownTime: SHOOT_COOLDOWN, aimRot: 0,
+        shootCd: 0, shootRange: SHOOT_RANGE, shootCooldownTime: SHOOT_COOLDOWN, aimRot: 0, fpsMode: false,
         speed: 8, normalSpeed: 8, windwalkSpeed: 14,
         hasShield: false, goldMultiplier: 1.0,
         inventory: {},
@@ -595,6 +595,103 @@ function tryShoot(attacker) {
     }, 5000);
 }
 
+// FPS manual shooting — tighter FOV, client sends aim direction
+function tryFpsShoot(attacker, yaw) {
+    if (attacker.health <= 0) return;
+    if (attacker.shootCd > 0) return;
+
+    const fovRad = FPS_SHOOT_FOV * Math.PI / 180;
+    let closest = null, closestDist = Infinity;
+
+    players.forEach(function(p) {
+        if (p === attacker || p.team === attacker.team || p.health <= 0) return;
+        if (p.windwalk) return;
+        if (p.spawnProt > 0) return;
+        if (p.godMode) return;
+        var vdx = p.x - attacker.x, vdz = p.z - attacker.z;
+        if (vdx * vdx + vdz * vdz > SHOOT_RANGE * SHOOT_RANGE) return;
+        const d = dist(attacker, p);
+        if (d > attacker.shootRange) return;
+        // Tight FOV check using client-provided yaw
+        const dx = p.x - attacker.x, dz = p.z - attacker.z;
+        const angle = Math.atan2(dx, dz);
+        let diff = angle - yaw;
+        while (diff > Math.PI) diff -= 2 * Math.PI;
+        while (diff < -Math.PI) diff += 2 * Math.PI;
+        if (Math.abs(diff) >= fovRad) return;
+        if (!hasLineOfSight(attacker.x, attacker.z, p.x, p.z)) return;
+        if (d < closestDist) { closest = p; closestDist = d; }
+    });
+
+    // Always consume cooldown on FPS shot (even miss)
+    attacker.shootCd = attacker.shootCooldownTime;
+
+    if (!closest) {
+        // Miss — broadcast tracer for visual feedback
+        broadcast(JSON.stringify({ t: 'miss', id: attacker.id, yaw: yaw, x: attacker.x, z: attacker.z }));
+        return;
+    }
+    if (matchOver) return;
+
+    // Same kill logic as tryShoot
+    if (closest.hasShield) {
+        closest.hasShield = false;
+        delete closest.inventory['shield'];
+        applyItems(closest);
+        broadcast(JSON.stringify({ t: 'shld', vi: closest.id }));
+        return;
+    }
+
+    closest.health = 0;
+    closest.deaths++;
+    closest.price = Math.max(0.1, closest.price * 0.5);
+    closest.streak = 0;
+    closest.inventory = {};
+    applyItems(closest);
+
+    attacker.kills++;
+    attacker.streak++;
+    attacker.price += 0.5 + closest.price * 0.3;
+    const baseGold = 50;
+    const streakBonus = attacker.streak * 10;
+    const victimBonus = Math.round(closest.price * 10);
+    const gold = Math.round((baseGold + streakBonus + victimBonus) * attacker.goldMultiplier);
+    attacker.gold += gold;
+
+    const fb = !firstBlood;
+    if (fb) firstBlood = true;
+    teamKills[attacker.team]++;
+
+    broadcast(JSON.stringify({
+        t: 'k',
+        ki: attacker.id, kn: attacker.username,
+        vi: closest.id, vn: closest.username,
+        g: gold, p: attacker.price, s: attacker.streak,
+        fb: fb ? 1 : 0,
+        kx: attacker.x, kz: attacker.z,
+        vx: closest.x, vz: closest.z,
+        kt: attacker.team, vt: closest.team,
+        rk: teamKills.red, bk: teamKills.blue
+    }));
+
+    if (teamKills[attacker.team] >= KILL_LIMIT) {
+        endMatch(attacker.team, 'kill_limit');
+    }
+
+    const deadId = closest.id;
+    setTimeout(function() {
+        const p = players.get(deadId);
+        if (!p) return;
+        const pos = spawnPos(p.team);
+        p.health = 100;
+        p.x = pos.x; p.z = pos.z; p.y = terrainY(pos.x, pos.z) + 0.6;
+        p.spawnProt = SPAWN_PROTECTION;
+        p.streak = 0; p.moveTarget = null; p.botTarget = null; p.botState = 'explore';
+        if (p.isBot) botShop(p);
+        broadcast(JSON.stringify({ t: 'r', id: p.id, x: pos.x, z: pos.z }));
+    }, 5000);
+}
+
 function broadcast(data) {
     wss.clients.forEach(function(ws) {
         if (ws.readyState === 1) ws.send(data);
@@ -684,8 +781,8 @@ setInterval(function() {
             }
         }
 
-        // Auto-shoot
-        if (p.shootCd <= 0) tryShoot(p);
+        // Auto-shoot — disabled for FPS mode players (they shoot manually)
+        if (p.shootCd <= 0 && !p.fpsMode) tryShoot(p);
     });
 
     // Send state snapshots at lower rate
@@ -848,6 +945,16 @@ wss.on('connection', function(ws) {
             else if (msg.t === 'god' && ws.playerId) {
                 const p = players.get(ws.playerId);
                 if (p) { p.godMode = !p.godMode; console.log(p.username + ' god mode: ' + p.godMode); }
+            }
+            else if (msg.t === 'vmode' && ws.playerId) {
+                const p = players.get(ws.playerId);
+                if (p) { p.fpsMode = !!msg.fps; p.lastInput = Date.now(); }
+            }
+            else if (msg.t === 'fps_shoot' && ws.playerId) {
+                const p = players.get(ws.playerId);
+                if (p && p.fpsMode && p.health > 0) {
+                    tryFpsShoot(p, msg.yaw || 0);
+                }
             }
             else if (msg.t === 'ab' && ws.playerId) {
                 const p = players.get(ws.playerId);
