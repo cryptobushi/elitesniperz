@@ -411,7 +411,11 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 // ── CRT POST-PROCESSING — WC3 on an old monitor ─────────────────────
-const _crtRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+const _crtScale = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? 0.65 : 1.0;
+const _crtRT = new THREE.WebGLRenderTarget(
+    Math.floor(window.innerWidth * _crtScale),
+    Math.floor(window.innerHeight * _crtScale)
+);
 const _crtScene = new THREE.Scene();
 const _crtCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 const _crtMaterial = new THREE.ShaderMaterial({
@@ -431,40 +435,29 @@ const _crtMaterial = new THREE.ShaderMaterial({
         varying vec2 vUv;
 
         void main() {
-            // Subtle barrel distortion — CRT curvature
             vec2 uv = vUv;
             vec2 dc = uv - 0.5;
             float d = dot(dc, dc);
-            uv = uv + dc * d * 0.06;
 
-            vec3 col = texture2D(tDiffuse, uv).rgb;
+            // Subtle barrel distortion
+            uv += dc * d * 0.04;
 
-            // Scanlines — every other pixel row is darker
-            float scanline = sin(uv.y * uResolution.y * 1.5) * 0.5 + 0.5;
-            scanline = pow(scanline, 1.5) * 0.12 + 0.88;
-            col *= scanline;
+            // Chromatic aberration + base color in one go
+            vec3 col;
+            col.r = texture2D(tDiffuse, uv + vec2(0.0006, 0.0)).r;
+            col.g = texture2D(tDiffuse, uv).g;
+            col.b = texture2D(tDiffuse, uv - vec2(0.0006, 0.0)).b;
 
-            // Subtle RGB offset — chromatic aberration
-            float r = texture2D(tDiffuse, uv + vec2(0.0008, 0.0)).r;
-            float b = texture2D(tDiffuse, uv - vec2(0.0008, 0.0)).b;
-            col.r = mix(col.r, r, 0.5);
-            col.b = mix(col.b, b, 0.5);
+            // Scanlines — cheap step function
+            col *= 0.92 + 0.08 * step(0.5, fract(uv.y * uResolution.y * 0.5));
 
-            // Phosphor glow — slightly warm, slightly bloomed
-            col = pow(col, vec3(0.95, 0.98, 1.02));
+            // Vignette
+            col *= 1.0 - d * 0.8;
 
-            // Vignette — darker corners like CRT
-            float vig = 1.0 - d * 1.2;
-            vig = clamp(vig, 0.0, 1.0);
-            vig = pow(vig, 0.5);
-            col *= vig;
-
-            // Very subtle flicker
-            col *= 0.985 + 0.015 * sin(uTime * 8.0);
-
-            // Slight desaturation for that old-monitor feel
-            float lum = dot(col, vec3(0.299, 0.587, 0.114));
-            col = mix(vec3(lum), col, 0.85);
+            // Warm phosphor tint + slight desaturation
+            float lum = dot(col, vec3(0.3, 0.59, 0.11));
+            col = mix(vec3(lum), col, 0.88);
+            col *= vec3(1.04, 1.0, 0.94);
 
             gl_FragColor = vec4(col, 1.0);
         }
@@ -484,7 +477,7 @@ function renderWithCRT() {
 }
 
 function resizeCRT(w, h) {
-    _crtRT.setSize(w, h);
+    _crtRT.setSize(Math.floor(w * _crtScale), Math.floor(h * _crtScale));
     _crtMaterial.uniforms.uResolution.value.set(w, h);
 }
 
