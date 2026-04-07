@@ -410,24 +410,6 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-// ── CRT EFFECT — scanlines + vignette only ───────────────────────────
-{
-    const crt = document.createElement('div');
-    crt.id = 'crtOverlay';
-    crt.style.cssText = `
-        position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9990;
-        background:
-            repeating-linear-gradient(
-                0deg,
-                rgba(0,0,0,0.06) 0px,
-                rgba(0,0,0,0.06) 1px,
-                transparent 1px,
-                transparent 3px
-            );
-        box-shadow: inset 0 0 120px rgba(0,0,0,0.5), inset 0 0 40px rgba(0,0,0,0.3);
-    `;
-    document.body.appendChild(crt);
-}
 function updateCRT() {}
 
 // Lighting - Much brighter!
@@ -545,33 +527,25 @@ const createMap = () => {
                 float slope = 1.0 - dot(vNormal, vec3(0.0, 1.0, 0.0));
 
                 // Base colors
-                vec3 grassDark = vec3(0.15, 0.45, 0.10);
-                vec3 grassLight = vec3(0.30, 0.60, 0.15);
-                vec3 dirt = vec3(0.45, 0.30, 0.15);
-                vec3 rock = vec3(0.50, 0.45, 0.38);
+                vec3 grassDark = vec3(0.18, 0.48, 0.12);
+                vec3 grassMid = vec3(0.25, 0.55, 0.14);
+                vec3 grassLight = vec3(0.32, 0.62, 0.16);
 
-                // Procedural noise for variation
-                float n1 = fbm(vWorldPos.xz * 0.08);
-                float n2 = fbm(vWorldPos.xz * 0.25 + 50.0);
-                float n3 = fbm(vWorldPos.xz * 0.5 + 100.0);
+                // Smooth noise for gentle color variation
+                float n1 = fbm(vWorldPos.xz * 0.05);
+                float n3 = fbm(vWorldPos.xz * 0.3 + 100.0);
 
-                // Grass blend (two tones)
-                vec3 grass = mix(grassDark, grassLight, n1);
+                // Three-tone grass blend — smooth, no dirt patches
+                vec3 col = n1 < 0.4
+                    ? mix(grassDark, grassMid, n1 / 0.4)
+                    : mix(grassMid, grassLight, (n1 - 0.4) / 0.6);
 
-                // Mix in dirt patches
-                float dirtMask = smoothstep(0.45, 0.55, n2);
-                vec3 col = mix(grass, dirt, dirtMask * 0.4);
-
-                // Rock on slopes
-                float rockMask = smoothstep(0.3, 0.6, slope);
-                col = mix(col, rock, rockMask);
-
-                // Height-based tint (lower = darker/damper, higher = lighter)
+                // Very subtle height tint
                 float heightFactor = smoothstep(-2.0, 2.0, height);
-                col = mix(col * 0.85, col * 1.1, heightFactor);
+                col = mix(col * 0.92, col * 1.06, heightFactor);
 
-                // Fine grain detail
-                col *= 0.9 + 0.1 * n3;
+                // Fine grain detail — subtle
+                col *= 0.95 + 0.05 * n3;
 
                 // Simple directional light shading
                 vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3));
