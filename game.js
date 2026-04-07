@@ -395,8 +395,8 @@ const soundtrack = new MedievalSoundtrack();
 
 // Three.js Setup
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1a1510);
-scene.fog = new THREE.Fog(0x8B7355, 100, 300);
+scene.background = new THREE.Color(0x000000);
+scene.fog = new THREE.Fog(0x2a2a30, 100, 300);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
 camera.position.set(0, 20, 20);
@@ -431,10 +431,10 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 function updateCRT() {}
 
 // Lighting - Much brighter!
-const ambientLight = new THREE.AmbientLight(0x887766, 1.5); // Warm desert ambient
+const ambientLight = new THREE.AmbientLight(0x666688, 1.5); // Cool ambient reaches forest
 scene.add(ambientLight);
 
-const dirLight = new THREE.DirectionalLight(0xfff0d0, 1.8); // Hot desert sun
+const dirLight = new THREE.DirectionalLight(0xffffee, 1.5); // Brighter sun-like light
 dirLight.position.set(50, 100, 50);
 dirLight.castShadow = true;
 dirLight.shadow.camera.left = -150;
@@ -446,7 +446,7 @@ dirLight.shadow.mapSize.height = 2048;
 scene.add(dirLight);
 
 // Add a hemisphere light for better overall illumination
-const hemiLight = new THREE.HemisphereLight(0xc4b898, 0x8B7355, 0.6);
+const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x3a4a2a, 0.6);
 scene.add(hemiLight);
 
 // Player vision light — follows player, illuminates revealed area
@@ -457,7 +457,7 @@ scene.add(visionLight);
 // Add initial preview scene
 const previewGeometry = new THREE.PlaneGeometry(80, 80);
 const previewMaterial = new THREE.MeshStandardMaterial({
-    color: 0x8B7355,
+    color: 0x2a3a2a,
     roughness: 0.8
 });
 const previewGround = new THREE.Mesh(previewGeometry, previewMaterial);
@@ -544,23 +544,23 @@ const createMap = () => {
                 float height = vWorldPos.y;
                 float slope = 1.0 - dot(vNormal, vec3(0.0, 1.0, 0.0));
 
-                // Base colors — desert sand theme
-                vec3 sandDark = vec3(0.45, 0.38, 0.28);
-                vec3 sandLight = vec3(0.58, 0.50, 0.38);
-                vec3 dirt = vec3(0.50, 0.40, 0.30);
-                vec3 rock = vec3(0.55, 0.48, 0.40);
+                // Base colors
+                vec3 grassDark = vec3(0.18, 0.28, 0.12);
+                vec3 grassLight = vec3(0.28, 0.38, 0.18);
+                vec3 dirt = vec3(0.35, 0.25, 0.15);
+                vec3 rock = vec3(0.4, 0.38, 0.35);
 
                 // Procedural noise for variation
                 float n1 = fbm(vWorldPos.xz * 0.08);
                 float n2 = fbm(vWorldPos.xz * 0.25 + 50.0);
                 float n3 = fbm(vWorldPos.xz * 0.5 + 100.0);
 
-                // Sand blend (two tones)
-                vec3 sand = mix(sandDark, sandLight, n1);
+                // Grass blend (two tones)
+                vec3 grass = mix(grassDark, grassLight, n1);
 
                 // Mix in dirt patches
                 float dirtMask = smoothstep(0.45, 0.55, n2);
-                vec3 col = mix(sand, dirt, dirtMask * 0.4);
+                vec3 col = mix(grass, dirt, dirtMask * 0.4);
 
                 // Rock on slopes
                 float rockMask = smoothstep(0.3, 0.6, slope);
@@ -576,8 +576,8 @@ const createMap = () => {
                 // Simple directional light shading
                 vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3));
                 float diff = max(dot(vNormal, lightDir), 0.0);
-                vec3 ambient = vec3(0.30, 0.27, 0.22);
-                vec3 lightCol = vec3(1.0, 0.92, 0.78);
+                vec3 ambient = vec3(0.25, 0.28, 0.22);
+                vec3 lightCol = vec3(1.0, 0.95, 0.85);
                 col = col * (ambient + lightCol * diff * 0.75);
 
                 gl_FragColor = vec4(col, 1.0);
@@ -621,8 +621,8 @@ const createMap = () => {
                 varying vec3 vNormal;
                 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
                 void main() {
-                    vec3 darkBark = vec3(0.30, 0.25, 0.18);
-                    vec3 lightBark = vec3(0.45, 0.38, 0.28);
+                    vec3 darkBark = vec3(0.2, 0.13, 0.08);
+                    vec3 lightBark = vec3(0.32, 0.22, 0.14);
                     float n = hash(vec2(vPos.y * 8.0, atan(vPos.x, vPos.z) * 3.0));
                     vec3 col = mix(darkBark, lightBark, n);
                     // Simple lighting
@@ -655,10 +655,10 @@ const createMap = () => {
             for (let i = 0; i < colors.length; i += 3) {
                 const vy = pos[i + 1];
                 const t = rng(li + i * 0.01) * 0.15;
-                // Dusty olive/brown (crate-like for desert theme)
-                colors[i] = 0.35 + layer.colorShift + t * 0.3;     // R
-                colors[i + 1] = 0.30 + layer.colorShift * 0.3 + t * 0.5; // G
-                colors[i + 2] = 0.18 + t * 0.2;                    // B
+                // Green base with variation
+                colors[i] = 0.15 + layer.colorShift + t * 0.3;     // R
+                colors[i + 1] = 0.30 + layer.colorShift * 0.5 + t; // G
+                colors[i + 2] = 0.06 + t * 0.2;                    // B
             }
             foliageGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
@@ -723,7 +723,7 @@ const createMap = () => {
     };
 
     // Static trees from map-data.json (matches server collision)
-    const _staticTrees = [[55,50],[65,55],[40,55],[25,50],[35,65],[45,42],[-50,62],[-60,68],[-45,72],[-55,55],[-40,65],[-65,62],[-3,-18],[3,-14],[-30,16],[-38,10],[80,-40],[80,-35],[60,10],[55,-5],[-60,-15],[-65,-25],[30,-65],[-30,-65],[0,-80],[10,-78],[-10,-78]];
+    const _staticTrees = [[-30,20],[25,-15],[-45,-30],[50,25],[-20,45],[35,-40],[-55,5],[15,50],[-10,-35],[60,-10],[-35,60],[40,45],[-50,-45],[20,-60],[-15,-50],[55,-35],[-40,25],[30,15],[-25,-15],[45,-5],[-60,40],[10,35],[-5,-55],[50,55],[-30,-60],[65,30],[-45,50],[20,-30],[-55,-15],[35,65],[-20,30],[55,-50],[-65,15],[40,-15],[-10,60],[25,-45],[-35,-25],[60,50],[-50,35],[15,-55],[-25,-45],[45,20],[-40,-10],[30,55],[-15,15],[50,-25],[-55,-50],[20,40],[-30,50],[65,-20],[-45,-5],[35,-55],[-60,55],[10,-40],[-5,25],[55,10]];
     _staticTrees.forEach(([x,z]) => createTree(x, z));
 
     // ── ROCKS with moss + vertex color variation ───────────────────────
@@ -744,20 +744,20 @@ const createMap = () => {
             rpos[i+1] += rnormals[i+1] * disp;
             rpos[i+2] += rnormals[i+2] * disp;
 
-            // Color: sandy stone base with dust on upward-facing surfaces
+            // Color: stone base with moss on upward-facing surfaces
             const worldNy = rnormals[i+1]; // approximate
-            const dustAmount = Math.max(0, worldNy) * 0.4;
+            const mossAmount = Math.max(0, worldNy) * 0.6;
             const stoneVariation = Math.sin(nx * 8.0 + seedR) * 0.08;
 
-            // Sandy stone base
-            let r = 0.50 + stoneVariation;
-            let g = 0.44 + stoneVariation;
-            let b = 0.35 + stoneVariation * 0.5;
+            // Stone base
+            let r = 0.38 + stoneVariation;
+            let g = 0.36 + stoneVariation;
+            let b = 0.33 + stoneVariation * 0.5;
 
-            // Blend dust on top-facing
-            r = r * (1.0 - dustAmount) + 0.55 * dustAmount;
-            g = g * (1.0 - dustAmount) + 0.48 * dustAmount;
-            b = b * (1.0 - dustAmount) + 0.35 * dustAmount;
+            // Blend moss on top-facing
+            r = r * (1.0 - mossAmount) + 0.2 * mossAmount;
+            g = g * (1.0 - mossAmount) + 0.35 * mossAmount;
+            b = b * (1.0 - mossAmount) + 0.12 * mossAmount;
 
             // Slight warm/cool random tint per vertex
             const tint = (Math.sin(seedR + i * 0.37) * 0.5 + 0.5) * 0.06;
@@ -808,7 +808,7 @@ const createMap = () => {
     };
 
     // Static rocks from map-data.json (matches server collision)
-    const _staticRocks = [[50,48,1.5],[60,52,1.2],[35,58,1.0],[20,55,1.3],[45,65,1.1],[-48,58,1.4],[-58,65,1.0],[-42,70,1.2],[-62,55,1.5],[-52,72,0.9],[0,-15,1.3],[-5,-20,1.0],[78,-42,1.2],[82,-38,1.0],[-62,-20,1.1],[-58,-10,1.3],[40,-55,1.0],[-40,-55,1.0],[5,-82,1.2],[-5,-82,1.1]];
+    const _staticRocks = [[-25,10,1.2],[30,-20,1.5],[-40,-35,0.9],[50,15,1.8],[-15,40,1.1],[35,-50,1.4],[-55,20,1.0],[20,55,1.6],[-10,-25,0.8],[60,-5,1.3],[-35,55,1.5],[45,35,1.0],[-50,-40,1.7],[15,-55,0.9],[-20,-50,1.2],[55,-30,1.1],[-45,15,1.4],[25,25,0.8],[-30,-10,1.6],[40,-40,1.3],[-60,45,1.0],[10,30,1.5],[-5,-45,1.2],[50,50,1.8],[-25,-55,0.9],[65,20,1.1],[-40,40,1.4],[20,-35,1.0],[-55,-20,1.3],[35,60,1.5]];
     _staticRocks.forEach(([x,z,s]) => createRock(x, z, s));
 
     // ── WALLS with stone/brick shader ──────────────────────────────────
@@ -857,9 +857,9 @@ const createMap = () => {
                 vec2 brickID = floor(brickUV);
                 float brickNoise = hash(brickID);
 
-                vec3 stoneBase = vec3(0.52, 0.46, 0.38);
-                vec3 stoneDark = vec3(0.40, 0.35, 0.28);
-                vec3 mortarColor = vec3(0.42, 0.38, 0.30);
+                vec3 stoneBase = vec3(0.32, 0.30, 0.28);
+                vec3 stoneDark = vec3(0.22, 0.20, 0.18);
+                vec3 mortarColor = vec3(0.25, 0.24, 0.22);
 
                 vec3 brickCol = mix(stoneDark, stoneBase, brickNoise);
                 // Subtle per-brick warm/cool shift
@@ -898,8 +898,17 @@ const createMap = () => {
     createWall(MAP_SIZE/2, 0, 2, MAP_SIZE);
     createWall(-MAP_SIZE/2, 0, 2, MAP_SIZE);
 
-    // dust2 layout walls (matches server collision in map-data.json)
-    const _staticWalls = [[-30,-85,40,3],[30,-85,40,3],[-50,-70,3,30],[50,-70,3,30],[-50,-50,30,3],[-35,-40,3,20],[50,-50,30,3],[35,-40,3,20],[-8,-55,3,25],[8,-55,3,25],[-8,-30,3,20],[8,-30,3,20],[-4,-16,5,3],[4,-16,5,3],[-8,-5,3,22],[8,-5,3,22],[-8,15,3,18],[8,15,3,18],[-25,6,30,3],[-25,25,30,3],[-40,16,3,18],[-55,-30,30,3],[-70,-15,3,30],[-55,0,30,3],[-55,25,27,3],[-70,38,3,25],[-55,50,30,3],[-35,38,3,25],[-52,60,36,3],[-52,75,36,3],[-70,68,3,15],[-34,68,3,15],[30,6,40,3],[50,-15,3,30],[70,-40,3,20],[85,-50,27,3],[85,-30,27,3],[70,0,3,28],[85,14,27,3],[30,30,40,3],[50,42,3,24],[10,45,3,30],[30,60,36,3],[48,60,3,20],[12,60,3,20],[70,30,3,30],[85,45,27,3],[85,60,27,3],[70,53,3,15],[-8,30,3,12],[0,36,16,3],[-20,50,26,3],[-20,38,3,24],[30,80,50,3],[70,80,30,3],[55,90,3,20]];
+    // Center structure (inspired by WC3 map)
+    createWall(0, 0, 15, 3);
+    createWall(0, 10, 3, 10);
+    createWall(0, -10, 3, 10);
+    createWall(15, 8, 12, 3);
+    createWall(-15, 8, 12, 3);
+    createWall(15, -8, 12, 3);
+    createWall(-15, -8, 12, 3);
+
+    // Static scattered walls from map-data.json (matches server collision)
+    const _staticWalls = [[-45,35,6,4],[30,-50,5,7],[-60,-20,4,5],[55,40,7,3],[-25,55,5,6],[40,-25,3,8],[-50,-55,6,4],[60,15,4,5],[-35,-40,5,3],[25,60,7,4],[-55,10,4,6],[45,-60,5,5],[-20,-65,6,3],[35,30,3,7],[-40,65,5,4]];
     _staticWalls.forEach(([x,z,w,h]) => createWall(x, z, w, h));
 
     // Team spawn markers
@@ -907,14 +916,14 @@ const createMap = () => {
     const redSpawnMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.3 });
     const redSpawn = new THREE.Mesh(redSpawnGeometry, redSpawnMaterial);
     redSpawn.rotation.x = -Math.PI / 2;
-    redSpawn.position.set(0, 0.1, -85);
+    redSpawn.position.set(-70, 0.1, -70);
     scene.add(redSpawn);
 
     const blueSpawnGeometry = new THREE.CircleGeometry(5, 32);
     const blueSpawnMaterial = new THREE.MeshBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0.3 });
     const blueSpawn = new THREE.Mesh(blueSpawnGeometry, blueSpawnMaterial);
     blueSpawn.rotation.x = -Math.PI / 2;
-    blueSpawn.position.set(50, 0.1, 70);
+    blueSpawn.position.set(70, 0.1, 70);
     scene.add(blueSpawn);
 
     // ── SPOOKY FOREST BORDER — instanced dark trees surrounding the map ──
@@ -934,7 +943,7 @@ const createMap = () => {
         // For simplicity, use separate InstancedMesh for trunks and canopy
         // But for max performance: one dark material, simple cone shape
         const treeGeo = new THREE.ConeGeometry(1.8, 10, 6);
-        const treeMat = new THREE.MeshStandardMaterial({ color: 0x3a3020, roughness: 1.0, metalness: 0 });
+        const treeMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 1.0, metalness: 0 });
 
         const forestIM = new THREE.InstancedMesh(treeGeo, treeMat, TREE_COUNT);
         const dummy = new THREE.Object3D();
