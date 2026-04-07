@@ -3991,12 +3991,14 @@ function handleJsonMessage(msg) {
                 audioManager.play('headshot');
 
                 // First blood
+                let hasSpecial = false;
                 if (msg.fb) {
                     audioManager.play('firstBlood');
                     showStreakPopup('FIRST BLOOD', '#ff4444');
+                    hasSpecial = true;
                 }
 
-                // Streak sounds
+                // Kill streak sounds (consecutive kills without dying)
                 const streakMap = {
                     5: ['killingSpree', 'KILLING SPREE', '#ff8800'],
                     10: ['rampage', 'RAMPAGE', '#ff4400'],
@@ -4006,7 +4008,35 @@ function handleJsonMessage(msg) {
                 };
                 if (streakMap[msg.s]) {
                     audioManager.play(streakMap[msg.s][0]);
-                    showStreakPopup(streakMap[msg.s][1], streakMap[msg.s][2]);
+                    if (!hasSpecial) showStreakPopup(streakMap[msg.s][1], streakMap[msg.s][2]);
+                    hasSpecial = true;
+                }
+
+                // Multi-kill tracking (rapid kills within 4 seconds)
+                if (!gameState._multiKillTimer) gameState._multiKillTimer = 0;
+                if (!gameState._multiKillCount) gameState._multiKillCount = 0;
+                const now = Date.now();
+                if (now - gameState._multiKillTimer < 4000) {
+                    gameState._multiKillCount++;
+                } else {
+                    gameState._multiKillCount = 1;
+                }
+                gameState._multiKillTimer = now;
+
+                const mk = gameState._multiKillCount;
+                const multiMap = {
+                    2: ['doubleKill', 'DOUBLE KILL', '#44ffaa'],
+                    3: ['multiKill', 'MULTI KILL', '#44ddff'],
+                    4: ['megaKill', 'MEGA KILL', '#4488ff'],
+                    5: ['ultraKill', 'ULTRA KILL', '#aa44ff'],
+                    6: ['monsterKill', 'MONSTER KILL', '#ff44aa'],
+                };
+                if (mk >= 7) {
+                    audioManager.play('ludicrousKill');
+                    if (!hasSpecial) showStreakPopup('LUDICROUS KILL', '#ff0000');
+                } else if (multiMap[mk]) {
+                    audioManager.play(multiMap[mk][0]);
+                    if (!hasSpecial) showStreakPopup(multiMap[mk][1], multiMap[mk][2]);
                 }
 
                 showGoldPopup('+' + msg.g + 'c');
