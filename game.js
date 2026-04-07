@@ -425,12 +425,16 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                 transparent 3px
             );
         box-shadow:
-            inset 0 0 80px rgba(0,0,0,0.4),
-            inset 0 0 20px rgba(0,0,0,0.2),
-            inset 3px 0 12px rgba(255,0,0,0.06),
-            inset -3px 0 12px rgba(0,0,255,0.06),
-            inset 6px 0 40px rgba(255,0,0,0.03),
-            inset -6px 0 40px rgba(0,0,255,0.03);
+            inset 0 0 120px rgba(0,0,0,0.5),
+            inset 0 0 40px rgba(0,0,0,0.3),
+            inset 5px 0 15px rgba(255,0,0,0.12),
+            inset -5px 0 15px rgba(0,0,255,0.12),
+            inset 10px 0 50px rgba(255,0,0,0.08),
+            inset -10px 0 50px rgba(0,0,255,0.08),
+            inset 20px 0 100px rgba(255,0,0,0.05),
+            inset -20px 0 100px rgba(0,0,255,0.05),
+            inset 0 3px 15px rgba(255,0,50,0.06),
+            inset 0 -3px 15px rgba(0,50,255,0.06);
     `;
     document.body.appendChild(crt);
 }
