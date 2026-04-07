@@ -469,6 +469,7 @@ scene.add(previewGround);
 const MAP_SIZE = 200; // Much larger map!
 // Wind-animated foliage materials (updated in animate loop)
 const _windMaterials = [];
+const _cows = [];
 
 const createMap = () => {
     // ── GROUND with procedural shader ──────────────────────────────────
@@ -910,6 +911,298 @@ const createMap = () => {
     // Static scattered walls from map-data.json (matches server collision)
     const _staticWalls = [[-45,35,6,4],[30,-50,5,7],[-60,-20,4,5],[55,40,7,3],[-25,55,5,6],[40,-25,3,8],[-50,-55,6,4],[60,15,4,5],[-35,-40,5,3],[25,60,7,4],[-55,10,4,6],[45,-60,5,5],[-20,-65,6,3],[35,30,3,7],[-40,65,5,4]];
     _staticWalls.forEach(([x,z,w,h]) => createWall(x, z, w, h));
+
+    // ── CORNER DECORATIONS (purely visual, no collision) ──────────────
+
+    // ── 1. COW PASTURE (Top-Left: x=-100 to -60, z=60 to 100) ──────
+    {
+        const fenceMat = new THREE.MeshStandardMaterial({ color: 0x6B4226 });
+        const postGeo = new THREE.BoxGeometry(0.15, 1.5, 0.15);
+        const railGeo = new THREE.BoxGeometry(0.08, 0.08, 1.8);
+
+        // Fence along perimeter edges
+        const fencePositions = [];
+        // Bottom edge (z=60)
+        for (let x = -100; x <= -60; x += 2) fencePositions.push([x, 60, false]);
+        // Top edge (z=100)
+        for (let x = -100; x <= -60; x += 2) fencePositions.push([x, 100, false]);
+        // Left edge (x=-100)
+        for (let z = 60; z <= 100; z += 2) fencePositions.push([-100, z, true]);
+        // Right edge (x=-60)
+        for (let z = 60; z <= 100; z += 2) fencePositions.push([-60, z, true]);
+
+        for (const [fx, fz, rotated] of fencePositions) {
+            const post = new THREE.Mesh(postGeo, fenceMat);
+            post.position.set(fx, terrainY(fx, fz) + 0.75, fz);
+            scene.add(post);
+            const rail = new THREE.Mesh(railGeo, fenceMat);
+            rail.position.set(fx + (rotated ? 0 : 1), terrainY(fx, fz) + 1.0, fz + (rotated ? 1 : 0));
+            if (rotated) rail.rotation.y = Math.PI / 2;
+            scene.add(rail);
+        }
+
+        // Hay bales
+        const hayMat = new THREE.MeshStandardMaterial({ color: 0xC8A84E });
+        const hayGeo = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 8);
+        const hayPositions = [[-85, 75], [-72, 90], [-90, 65], [-68, 78], [-95, 88], [-78, 68]];
+        for (const [hx, hz] of hayPositions) {
+            const hay = new THREE.Mesh(hayGeo, hayMat);
+            hay.rotation.z = Math.PI / 2;
+            hay.position.set(hx, terrainY(hx, hz) + 0.8, hz);
+            scene.add(hay);
+        }
+
+        // Cows
+        const cowBodyMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0 });
+        const cowHeadMat = new THREE.MeshStandardMaterial({ color: 0x3A3A3A });
+        const cowLegMat = new THREE.MeshStandardMaterial({ color: 0x2A2A2A });
+        const cowBodyGeo = new THREE.BoxGeometry(1.5, 1, 0.8);
+        const cowHeadGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+        const cowLegGeo = new THREE.BoxGeometry(0.15, 0.5, 0.15);
+
+        const cowSpawns = [[-80, 80], [-90, 70], [-70, 95], [-95, 85], [-75, 72]];
+        for (const [cx, cz] of cowSpawns) {
+            const cowGroup = new THREE.Group();
+            const body = new THREE.Mesh(cowBodyGeo, cowBodyMat);
+            body.position.y = 0.75;
+            cowGroup.add(body);
+            const head = new THREE.Mesh(cowHeadGeo, cowHeadMat);
+            head.position.set(0.9, 0.9, 0);
+            cowGroup.add(head);
+            const legOffsets = [[-0.5, 0, -0.25], [-0.5, 0, 0.25], [0.5, 0, -0.25], [0.5, 0, 0.25]];
+            for (const [lx, ly, lz] of legOffsets) {
+                const leg = new THREE.Mesh(cowLegGeo, cowLegMat);
+                leg.position.set(lx, ly + 0.25, lz);
+                cowGroup.add(leg);
+            }
+            cowGroup.position.set(cx, terrainY(cx, cz), cz);
+            cowGroup._centerX = cx;
+            cowGroup._centerZ = cz;
+            cowGroup._radius = 2 + Math.random() * 2;
+            cowGroup._phase = Math.random() * Math.PI * 2;
+            scene.add(cowGroup);
+            _cows.push(cowGroup);
+        }
+    }
+
+    // ── 2. SMALL CITY (Top-Right: x=60 to 100, z=60 to 100) ────────
+    {
+        const buildingConfigs = [
+            { x: 70, z: 75, w: 6, h: 10, d: 6, color: 0x8B8B83 },
+            { x: 82, z: 70, w: 5, h: 7, d: 5, color: 0x7B6B5B },
+            { x: 92, z: 80, w: 7, h: 12, d: 6, color: 0x6B7B6B },
+            { x: 75, z: 90, w: 4, h: 5, d: 4, color: 0x8B8B83 },
+            { x: 88, z: 95, w: 6, h: 8, d: 5, color: 0x7B6B5B },
+            { x: 65, z: 85, w: 5, h: 6, d: 5, color: 0x6B7B6B },
+            { x: 95, z: 65, w: 4, h: 9, d: 4, color: 0x8B7B73 },
+        ];
+        const windowMat = new THREE.MeshBasicMaterial({ color: 0xFFDD88 });
+        const windowGeo = new THREE.BoxGeometry(0.3, 0.4, 0.05);
+
+        for (const b of buildingConfigs) {
+            const bMat = new THREE.MeshStandardMaterial({ color: b.color });
+            const bGeo = new THREE.BoxGeometry(b.w, b.h, b.d);
+            const building = new THREE.Mesh(bGeo, bMat);
+            const by = terrainY(b.x, b.z) + b.h / 2;
+            building.position.set(b.x, by, b.z);
+            scene.add(building);
+
+            // Windows on two faces
+            for (let wy = 2; wy < b.h - 1; wy += 2.5) {
+                for (let wx = -b.w / 3; wx <= b.w / 3; wx += b.w / 3) {
+                    // Front face
+                    const wf = new THREE.Mesh(windowGeo, windowMat);
+                    wf.position.set(b.x + wx, terrainY(b.x, b.z) + wy, b.z + b.d / 2 + 0.03);
+                    scene.add(wf);
+                    // Side face
+                    const ws = new THREE.Mesh(windowGeo, windowMat);
+                    ws.rotation.y = Math.PI / 2;
+                    ws.position.set(b.x + b.w / 2 + 0.03, terrainY(b.x, b.z) + wy, b.z + wx);
+                    scene.add(ws);
+                }
+            }
+        }
+
+        // Street lamps
+        const lampPoleMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const lampPoleGeo = new THREE.CylinderGeometry(0.08, 0.08, 4, 6);
+        const lampBulbMat = new THREE.MeshBasicMaterial({ color: 0xFFEE88 });
+        const lampBulbGeo = new THREE.SphereGeometry(0.3, 6, 6);
+        const lampPositions = [[68, 68], [78, 82], [90, 88], [85, 72]];
+        for (const [lx, lz] of lampPositions) {
+            const pole = new THREE.Mesh(lampPoleGeo, lampPoleMat);
+            pole.position.set(lx, terrainY(lx, lz) + 2, lz);
+            scene.add(pole);
+            const bulb = new THREE.Mesh(lampBulbGeo, lampBulbMat);
+            bulb.position.set(lx, terrainY(lx, lz) + 4.2, lz);
+            scene.add(bulb);
+            const light = new THREE.PointLight(0xFFDD66, 0.5, 8);
+            light.position.set(lx, terrainY(lx, lz) + 4.2, lz);
+            scene.add(light);
+        }
+
+        // Parked cars
+        const carConfigs = [
+            { x: 73, z: 68, color: 0xCC2222, rot: 0.3 },
+            { x: 88, z: 78, color: 0x2244AA, rot: -0.5 },
+        ];
+        for (const c of carConfigs) {
+            const carBodyMat = new THREE.MeshStandardMaterial({ color: c.color });
+            const carBody = new THREE.Mesh(new THREE.BoxGeometry(2, 0.6, 1), carBodyMat);
+            carBody.position.set(c.x, terrainY(c.x, c.z) + 0.3, c.z);
+            carBody.rotation.y = c.rot;
+            scene.add(carBody);
+            const carRoofMat = new THREE.MeshStandardMaterial({ color: c.color });
+            carRoofMat.color.multiplyScalar(0.7);
+            const carRoof = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 0.9), carRoofMat);
+            carRoof.position.set(c.x, terrainY(c.x, c.z) + 0.8, c.z);
+            carRoof.rotation.y = c.rot;
+            scene.add(carRoof);
+        }
+    }
+
+    // ── 3. CAMPGROUND (Bottom-Left: x=-100 to -60, z=-100 to -60) ───
+    {
+        // Tents
+        const tentColors = [0xCC4444, 0x4488CC, 0x44CC44, 0xCCCC44];
+        const tentPositions = [[-85, -85], [-72, -78], [-90, -70], [-68, -92]];
+        const tentGeo = new THREE.ConeGeometry(1.5, 2, 4);
+        for (let i = 0; i < tentPositions.length; i++) {
+            const [tx, tz] = tentPositions[i];
+            const tentMat = new THREE.MeshStandardMaterial({ color: tentColors[i] });
+            const tent = new THREE.Mesh(tentGeo, tentMat);
+            tent.position.set(tx, terrainY(tx, tz) + 1, tz);
+            tent.rotation.y = Math.random() * 0.5;
+            scene.add(tent);
+        }
+
+        // Campfire at center (~-80, -80)
+        const fireX = -80, fireZ = -80;
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x666666 });
+        const rockGeo = new THREE.SphereGeometry(0.2, 4, 4);
+        for (let r = 0; r < 8; r++) {
+            const angle = (r / 8) * Math.PI * 2;
+            const rock = new THREE.Mesh(rockGeo, rockMat);
+            rock.position.set(fireX + Math.cos(angle) * 0.8, terrainY(fireX, fireZ) + 0.1, fireZ + Math.sin(angle) * 0.8);
+            scene.add(rock);
+        }
+        const flameMat = new THREE.MeshBasicMaterial({ color: 0xFF4400 });
+        const flameGeo = new THREE.ConeGeometry(0.3, 0.8, 4);
+        const flame = new THREE.Mesh(flameGeo, flameMat);
+        flame.position.set(fireX, terrainY(fireX, fireZ) + 0.4, fireZ);
+        scene.add(flame);
+        const fireLight = new THREE.PointLight(0xFF6600, 2, 15);
+        fireLight.position.set(fireX, terrainY(fireX, fireZ) + 1, fireZ);
+        scene.add(fireLight);
+
+        // Log seats around the fire
+        const logMat = new THREE.MeshStandardMaterial({ color: 0x5C3A1E });
+        const logGeo = new THREE.CylinderGeometry(0.3, 0.3, 2, 6);
+        const logPositions = [[-78, -78, 0.4], [-82, -78, 1.2], [-80, -82.5, 0], [-77, -81, 2.0]];
+        for (const [lx, lz, rot] of logPositions) {
+            const log = new THREE.Mesh(logGeo, logMat);
+            log.rotation.z = Math.PI / 2;
+            log.rotation.y = rot;
+            log.position.set(lx, terrainY(lx, lz) + 0.3, lz);
+            scene.add(log);
+        }
+
+        // Sleeping bags near tents
+        const bagColors = [0x2255AA, 0xAA2222, 0x22AA55];
+        const bagGeo = new THREE.BoxGeometry(0.6, 0.1, 1.5);
+        const bagPositions = [[-83, -84], [-70, -77], [-88, -69]];
+        for (let i = 0; i < bagPositions.length; i++) {
+            const [bx, bz] = bagPositions[i];
+            const bagMat = new THREE.MeshStandardMaterial({ color: bagColors[i] });
+            const bag = new THREE.Mesh(bagGeo, bagMat);
+            bag.position.set(bx, terrainY(bx, bz) + 0.05, bz);
+            bag.rotation.y = Math.random() * Math.PI;
+            scene.add(bag);
+        }
+    }
+
+    // ── 4. GRAVEYARD (Bottom-Right: x=60 to 100, z=-100 to -60) ────
+    {
+        // Tombstones using InstancedMesh
+        const tombGeo = new THREE.BoxGeometry(0.6, 1.2, 0.15);
+        const tombMat = new THREE.MeshStandardMaterial({ color: 0x666666 });
+        const tombCount = 15;
+        const tombMesh = new THREE.InstancedMesh(tombGeo, tombMat, tombCount);
+        const tombDummy = new THREE.Object3D();
+        const tombPositions = [
+            [65, -70], [68, -75], [72, -70], [75, -75], [78, -70],
+            [65, -80], [68, -85], [72, -80], [75, -85], [78, -80],
+            [82, -72], [85, -78], [88, -72], [92, -78], [95, -85],
+        ];
+        for (let i = 0; i < tombCount; i++) {
+            const [tx, tz] = tombPositions[i];
+            tombDummy.position.set(tx, terrainY(tx, tz) + 0.6, tz);
+            tombDummy.rotation.y = (Math.random() - 0.5) * 0.3;
+            tombDummy.rotation.z = (Math.random() - 0.5) * 0.08;
+            tombDummy.updateMatrix();
+            tombMesh.setMatrixAt(i, tombDummy.matrix);
+        }
+        tombMesh.instanceMatrix.needsUpdate = true;
+        scene.add(tombMesh);
+
+        // Dead trees (bare, no foliage)
+        const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x2A1A0A });
+        const treePositions = [[70, -65], [85, -90], [95, -68], [78, -95]];
+        for (const [dtx, dtz] of treePositions) {
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 4, 5), treeTrunkMat);
+            trunk.position.set(dtx, terrainY(dtx, dtz) + 2, dtz);
+            scene.add(trunk);
+            // Branches
+            const branchGeo = new THREE.CylinderGeometry(0.05, 0.08, 1.5, 4);
+            for (let b = 0; b < 3; b++) {
+                const branch = new THREE.Mesh(branchGeo, treeTrunkMat);
+                const bAngle = (b / 3) * Math.PI * 2 + Math.random() * 0.5;
+                branch.position.set(
+                    dtx + Math.cos(bAngle) * 0.6,
+                    terrainY(dtx, dtz) + 2.5 + b * 0.6,
+                    dtz + Math.sin(bAngle) * 0.6
+                );
+                branch.rotation.z = Math.cos(bAngle) * 0.8;
+                branch.rotation.x = Math.sin(bAngle) * 0.8;
+                scene.add(branch);
+            }
+        }
+
+        // Iron fence along two edges (south z=-100, west x=60)
+        const ironMat = new THREE.MeshStandardMaterial({ color: 0x1A1A1A });
+        const ironPostGeo = new THREE.BoxGeometry(0.1, 1.5, 0.1);
+        // South edge (z = -100)
+        for (let fx = 60; fx <= 100; fx += 1.5) {
+            const post = new THREE.Mesh(ironPostGeo, ironMat);
+            post.position.set(fx, terrainY(fx, -100) + 0.75, -100);
+            scene.add(post);
+        }
+        const southRail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 40), ironMat);
+        southRail.position.set(80, terrainY(80, -100) + 1.2, -100);
+        southRail.rotation.y = Math.PI / 2;
+        scene.add(southRail);
+        const southRail2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 40), ironMat);
+        southRail2.position.set(80, terrainY(80, -100) + 0.5, -100);
+        southRail2.rotation.y = Math.PI / 2;
+        scene.add(southRail2);
+        // West edge (x = 60)
+        for (let fz = -100; fz <= -60; fz += 1.5) {
+            const post = new THREE.Mesh(ironPostGeo, ironMat);
+            post.position.set(60, terrainY(60, fz) + 0.75, fz);
+            scene.add(post);
+        }
+        const westRail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 40), ironMat);
+        westRail.position.set(60, terrainY(60, -80) + 1.2, -80);
+        scene.add(westRail);
+        const westRail2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 40), ironMat);
+        westRail2.position.set(60, terrainY(60, -80) + 0.5, -80);
+        scene.add(westRail2);
+
+        // Eerie blue light
+        const eerieLight = new THREE.PointLight(0x4466FF, 0.8, 12);
+        eerieLight.position.set(80, terrainY(80, -80) + 3, -80);
+        scene.add(eerieLight);
+    }
 
     // Team spawn markers
     const redSpawnGeometry = new THREE.CircleGeometry(5, 32);
@@ -3575,6 +3868,14 @@ function animate() {
     const windTime = currentTime * 0.001;
     for (let i = 0; i < _windMaterials.length; i++) {
         _windMaterials[i].uniforms.uTime.value = windTime;
+    }
+
+    // Animate cows
+    for (const cow of _cows) {
+        cow._phase += 0.005;
+        cow.position.x = cow._centerX + Math.cos(cow._phase) * cow._radius;
+        cow.position.z = cow._centerZ + Math.sin(cow._phase) * cow._radius;
+        cow.rotation.y = cow._phase + Math.PI / 2;
     }
 
     // Shop proximity check
