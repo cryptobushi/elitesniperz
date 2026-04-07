@@ -395,8 +395,8 @@ const soundtrack = new MedievalSoundtrack();
 
 // Three.js Setup
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000000);
-scene.fog = new THREE.Fog(0x2a2a30, 100, 300);
+scene.background = new THREE.Color(0x1a0a2e);
+scene.fog = new THREE.Fog(0x1a1030, 120, 350);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
 camera.position.set(0, 20, 20);
@@ -431,10 +431,10 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 function updateCRT() {}
 
 // Lighting - Much brighter!
-const ambientLight = new THREE.AmbientLight(0x666688, 1.5); // Cool ambient reaches forest
+const ambientLight = new THREE.AmbientLight(0x8888cc, 1.8); // Bright cool ambient
 scene.add(ambientLight);
 
-const dirLight = new THREE.DirectionalLight(0xffffee, 1.5); // Brighter sun-like light
+const dirLight = new THREE.DirectionalLight(0xfff4dd, 2.0); // Strong warm sun
 dirLight.position.set(50, 100, 50);
 dirLight.castShadow = true;
 dirLight.shadow.camera.left = -150;
@@ -446,11 +446,11 @@ dirLight.shadow.mapSize.height = 2048;
 scene.add(dirLight);
 
 // Add a hemisphere light for better overall illumination
-const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x3a4a2a, 0.6);
+const hemiLight = new THREE.HemisphereLight(0x88bbff, 0x44aa44, 1.0);
 scene.add(hemiLight);
 
 // Player vision light — follows player, illuminates revealed area
-const visionLight = new THREE.PointLight(0xffffff, 4.0, 100, 1.0);
+const visionLight = new THREE.PointLight(0xfff8ee, 5.0, 120, 1.0);
 visionLight.position.set(0, 12, 0);
 scene.add(visionLight);
 
@@ -545,10 +545,10 @@ const createMap = () => {
                 float slope = 1.0 - dot(vNormal, vec3(0.0, 1.0, 0.0));
 
                 // Base colors
-                vec3 grassDark = vec3(0.18, 0.28, 0.12);
-                vec3 grassLight = vec3(0.28, 0.38, 0.18);
-                vec3 dirt = vec3(0.35, 0.25, 0.15);
-                vec3 rock = vec3(0.4, 0.38, 0.35);
+                vec3 grassDark = vec3(0.15, 0.45, 0.10);
+                vec3 grassLight = vec3(0.30, 0.60, 0.15);
+                vec3 dirt = vec3(0.45, 0.30, 0.15);
+                vec3 rock = vec3(0.50, 0.45, 0.38);
 
                 // Procedural noise for variation
                 float n1 = fbm(vWorldPos.xz * 0.08);
@@ -621,8 +621,8 @@ const createMap = () => {
                 varying vec3 vNormal;
                 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
                 void main() {
-                    vec3 darkBark = vec3(0.2, 0.13, 0.08);
-                    vec3 lightBark = vec3(0.32, 0.22, 0.14);
+                    vec3 darkBark = vec3(0.30, 0.18, 0.08);
+                    vec3 lightBark = vec3(0.50, 0.32, 0.16);
                     float n = hash(vec2(vPos.y * 8.0, atan(vPos.x, vPos.z) * 3.0));
                     vec3 col = mix(darkBark, lightBark, n);
                     // Simple lighting
@@ -655,10 +655,10 @@ const createMap = () => {
             for (let i = 0; i < colors.length; i += 3) {
                 const vy = pos[i + 1];
                 const t = rng(li + i * 0.01) * 0.15;
-                // Green base with variation
-                colors[i] = 0.15 + layer.colorShift + t * 0.3;     // R
-                colors[i + 1] = 0.30 + layer.colorShift * 0.5 + t; // G
-                colors[i + 2] = 0.06 + t * 0.2;                    // B
+                // Vibrant green with variation
+                colors[i] = 0.12 + layer.colorShift + t * 0.2;     // R
+                colors[i + 1] = 0.50 + layer.colorShift * 0.5 + t; // G — much greener
+                colors[i + 2] = 0.08 + t * 0.15;                   // B
             }
             foliageGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
@@ -749,14 +749,14 @@ const createMap = () => {
             const mossAmount = Math.max(0, worldNy) * 0.6;
             const stoneVariation = Math.sin(nx * 8.0 + seedR) * 0.08;
 
-            // Stone base
-            let r = 0.38 + stoneVariation;
-            let g = 0.36 + stoneVariation;
-            let b = 0.33 + stoneVariation * 0.5;
+            // Bright stone base
+            let r = 0.52 + stoneVariation;
+            let g = 0.48 + stoneVariation;
+            let b = 0.42 + stoneVariation * 0.5;
 
-            // Blend moss on top-facing
-            r = r * (1.0 - mossAmount) + 0.2 * mossAmount;
-            g = g * (1.0 - mossAmount) + 0.35 * mossAmount;
+            // Vibrant moss on top-facing
+            r = r * (1.0 - mossAmount) + 0.20 * mossAmount;
+            g = g * (1.0 - mossAmount) + 0.55 * mossAmount;
             b = b * (1.0 - mossAmount) + 0.12 * mossAmount;
 
             // Slight warm/cool random tint per vertex
@@ -857,9 +857,9 @@ const createMap = () => {
                 vec2 brickID = floor(brickUV);
                 float brickNoise = hash(brickID);
 
-                vec3 stoneBase = vec3(0.32, 0.30, 0.28);
-                vec3 stoneDark = vec3(0.22, 0.20, 0.18);
-                vec3 mortarColor = vec3(0.25, 0.24, 0.22);
+                vec3 stoneBase = vec3(0.55, 0.50, 0.42);
+                vec3 stoneDark = vec3(0.35, 0.30, 0.25);
+                vec3 mortarColor = vec3(0.30, 0.28, 0.24);
 
                 vec3 brickCol = mix(stoneDark, stoneBase, brickNoise);
                 // Subtle per-brick warm/cool shift
@@ -943,7 +943,7 @@ const createMap = () => {
         // For simplicity, use separate InstancedMesh for trunks and canopy
         // But for max performance: one dark material, simple cone shape
         const treeGeo = new THREE.ConeGeometry(1.8, 10, 6);
-        const treeMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 1.0, metalness: 0 });
+        const treeMat = new THREE.MeshStandardMaterial({ color: 0x1a3318, roughness: 0.9, metalness: 0 });
 
         const forestIM = new THREE.InstancedMesh(treeGeo, treeMat, TREE_COUNT);
         const dummy = new THREE.Object3D();
@@ -982,9 +982,9 @@ const createMap = () => {
             dummy.updateMatrix();
             forestIM.setMatrixAt(placed, dummy.matrix);
 
-            // Dark forest greens — visible but spooky
-            const darkness = 0.06 + _fh(i * 3 + 2) * 0.12;
-            treeColor.setRGB(darkness * 0.4, darkness, darkness * 0.3);
+            // Deep forest greens — moody but visible
+            const darkness = 0.08 + _fh(i * 3 + 2) * 0.15;
+            treeColor.setRGB(darkness * 0.3, darkness * 1.2, darkness * 0.4);
             forestIM.setColorAt(placed, treeColor);
             placed++;
         }
@@ -1290,9 +1290,9 @@ class Player {
 
     createMesh(team) {
         const group = new THREE.Group();
-        const robeColor = team === 'red' ? 0x881111 : 0x112288;
-        const robeDark = team === 'red' ? 0x550a0a : 0x0a1155;
-        const robeLight = team === 'red' ? 0xaa3333 : 0x3344aa;
+        const robeColor = team === 'red' ? 0xcc2222 : 0x2244cc;
+        const robeDark = team === 'red' ? 0x881515 : 0x152288;
+        const robeLight = team === 'red' ? 0xff4444 : 0x4466ff;
         const cloth = new THREE.MeshStandardMaterial({ color: robeColor, roughness: 0.9 });
         const clothDark = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.9 });
 
@@ -1377,7 +1377,7 @@ class Player {
         // Visor glow — two small glowing eyes under the brim
         const eyeGeo = new THREE.SphereGeometry(0.04, 4, 4);
         const eyeMat = new THREE.MeshBasicMaterial({
-            color: team === 'red' ? 0xff4444 : 0x4488ff,
+            color: team === 'red' ? 0xff6666 : 0x66aaff,
         });
         const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
         leftEye.position.set(-0.1, -0.12, 0.2);
