@@ -3306,8 +3306,8 @@ function animate() {
         let mx = 0, mz = 0;
         if (gameState.keys['w']) { mx += Math.sin(gameState.fpsYaw); mz += Math.cos(gameState.fpsYaw); }
         if (gameState.keys['s']) { mx -= Math.sin(gameState.fpsYaw); mz -= Math.cos(gameState.fpsYaw); }
-        if (gameState.keys['a']) { mx += Math.sin(gameState.fpsYaw - Math.PI/2); mz += Math.cos(gameState.fpsYaw - Math.PI/2); }
-        if (gameState.keys['d']) { mx += Math.sin(gameState.fpsYaw + Math.PI/2); mz += Math.cos(gameState.fpsYaw + Math.PI/2); }
+        if (gameState.keys['a']) { mx += Math.sin(gameState.fpsYaw + Math.PI/2); mz += Math.cos(gameState.fpsYaw + Math.PI/2); }
+        if (gameState.keys['d']) { mx += Math.sin(gameState.fpsYaw - Math.PI/2); mz += Math.cos(gameState.fpsYaw - Math.PI/2); }
         if (mx !== 0 || mz !== 0) {
             const len = Math.sqrt(mx*mx + mz*mz);
             mx /= len; mz /= len;
