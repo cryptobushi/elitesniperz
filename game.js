@@ -410,75 +410,23 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-// ── CRT POST-PROCESSING — WC3 on an old monitor ─────────────────────
-const _crtScale = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? 0.65 : 1.0;
-const _crtRT = new THREE.WebGLRenderTarget(
-    Math.floor(window.innerWidth * _crtScale),
-    Math.floor(window.innerHeight * _crtScale)
-);
-const _crtScene = new THREE.Scene();
-const _crtCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-const _crtMaterial = new THREE.ShaderMaterial({
-    uniforms: {
-        tDiffuse: { value: _crtRT.texture },
-        uTime: { value: 0 },
-        uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-    },
-    vertexShader: `
-        varying vec2 vUv;
-        void main() { vUv = uv; gl_Position = vec4(position, 1.0); }
-    `,
-    fragmentShader: `
-        uniform sampler2D tDiffuse;
-        uniform float uTime;
-        uniform vec2 uResolution;
-        varying vec2 vUv;
-
-        void main() {
-            vec2 uv = vUv;
-            vec2 dc = uv - 0.5;
-            float d = dot(dc, dc);
-
-            // Subtle barrel distortion
-            uv += dc * d * 0.04;
-
-            // Chromatic aberration + base color in one go
-            vec3 col;
-            col.r = texture2D(tDiffuse, uv + vec2(0.0006, 0.0)).r;
-            col.g = texture2D(tDiffuse, uv).g;
-            col.b = texture2D(tDiffuse, uv - vec2(0.0006, 0.0)).b;
-
-            // Scanlines — cheap step function
-            col *= 0.92 + 0.08 * step(0.5, fract(uv.y * uResolution.y * 0.5));
-
-            // Vignette
-            col *= 1.0 - d * 0.8;
-
-            // Warm phosphor tint + slight desaturation
-            float lum = dot(col, vec3(0.3, 0.59, 0.11));
-            col = mix(vec3(lum), col, 0.88);
-            col *= vec3(1.04, 1.0, 0.94);
-
-            gl_FragColor = vec4(col, 1.0);
-        }
-    `
-});
-const _crtQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), _crtMaterial);
-_crtScene.add(_crtQuad);
-
-function renderWithCRT() {
-    // Render scene to texture
-    renderer.setRenderTarget(_crtRT);
-    renderer.render(scene, camera);
-    renderer.setRenderTarget(null);
-    // Render CRT quad to screen
-    _crtMaterial.uniforms.uTime.value = performance.now() * 0.001;
-    renderer.render(_crtScene, _crtCamera);
-}
-
-function resizeCRT(w, h) {
-    _crtRT.setSize(Math.floor(w * _crtScale), Math.floor(h * _crtScale));
-    _crtMaterial.uniforms.uResolution.value.set(w, h);
+// ── CRT EFFECT — pure CSS overlay, zero GPU cost ─────────────────────
+{
+    const crt = document.createElement('div');
+    crt.id = 'crtOverlay';
+    crt.style.cssText = `
+        position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9990;
+        background:
+            repeating-linear-gradient(
+                0deg,
+                rgba(0,0,0,0.06) 0px,
+                rgba(0,0,0,0.06) 1px,
+                transparent 1px,
+                transparent 3px
+            );
+        box-shadow: inset 0 0 80px rgba(0,0,0,0.4), inset 0 0 20px rgba(0,0,0,0.2);
+    `;
+    document.body.appendChild(crt);
 }
 
 // Lighting - Much brighter!
@@ -3781,7 +3729,7 @@ function animate() {
         }
     });
 
-    renderWithCRT();
+    renderer.render(scene, camera);
 }
 
 // Handle window resize — ignore mobile keyboard resize
@@ -3799,7 +3747,6 @@ function handleResize() {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
-    resizeCRT(w, h);
 }
 window.addEventListener('resize', handleResize);
 
@@ -3818,7 +3765,7 @@ if (_isMobileDevice) {
 function preGameRender() {
     if (!gameState.gameStarted) {
         requestAnimationFrame(preGameRender);
-        renderWithCRT();
+        renderer.render(scene, camera);
     }
 }
 
