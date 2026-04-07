@@ -476,7 +476,7 @@ _crtScene.add(_crtQuad);
 function renderWithCRT() {
     // Render scene to texture
     renderer.setRenderTarget(_crtRT);
-    renderWithCRT();
+    renderer.render(scene, camera);
     renderer.setRenderTarget(null);
     // Render CRT quad to screen
     _crtMaterial.uniforms.uTime.value = performance.now() * 0.001;
