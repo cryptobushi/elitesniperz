@@ -410,11 +410,11 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-// ── CRT EFFECT — CSS overlay with dynamic chromatic aberration ────────
-const _crtOverlay = document.createElement('div');
+// ── CRT EFFECT — scanlines + vignette only ───────────────────────────
 {
-    _crtOverlay.id = 'crtOverlay';
-    _crtOverlay.style.cssText = `
+    const crt = document.createElement('div');
+    crt.id = 'crtOverlay';
+    crt.style.cssText = `
         position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9990;
         background:
             repeating-linear-gradient(
@@ -424,34 +424,11 @@ const _crtOverlay = document.createElement('div');
                 transparent 1px,
                 transparent 3px
             );
+        box-shadow: inset 0 0 120px rgba(0,0,0,0.5), inset 0 0 40px rgba(0,0,0,0.3);
     `;
-    document.body.appendChild(_crtOverlay);
+    document.body.appendChild(crt);
 }
-let _lastCamX = 0, _lastCamZ = 0;
-function updateCRT() {
-    const cx = camera.position.x, cz = camera.position.z;
-    const dx = (cx - _lastCamX) * 3;
-    const dz = (cz - _lastCamZ) * 3;
-    _lastCamX += (cx - _lastCamX) * 0.15;
-    _lastCamZ += (cz - _lastCamZ) * 0.15;
-
-    // Aberration shifts based on camera velocity
-    const rX = Math.round(5 + dx * 2);
-    const bX = Math.round(-5 - dx * 2);
-    const rY = Math.round(3 + dz * 1.5);
-    const bY = Math.round(-3 - dz * 1.5);
-
-    _crtOverlay.style.boxShadow = `
-        inset 0 0 120px rgba(0,0,0,0.5),
-        inset 0 0 40px rgba(0,0,0,0.3),
-        inset ${rX}px ${rY}px 15px rgba(255,0,0,0.12),
-        inset ${bX}px ${bY}px 15px rgba(0,0,255,0.12),
-        inset ${rX*2}px ${rY*2}px 50px rgba(255,0,0,0.08),
-        inset ${bX*2}px ${bY*2}px 50px rgba(0,0,255,0.08),
-        inset ${rX*4}px ${rY*3}px 100px rgba(255,0,0,0.05),
-        inset ${bX*4}px ${bY*3}px 100px rgba(0,0,255,0.05)
-    `;
-}
+function updateCRT() {}
 
 // Lighting - Much brighter!
 const ambientLight = new THREE.AmbientLight(0x666688, 1.5); // Cool ambient reaches forest
