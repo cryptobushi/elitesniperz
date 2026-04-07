@@ -411,7 +411,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 // Lighting - Much brighter!
-const ambientLight = new THREE.AmbientLight(0x888888, 1.2); // Brighter ambient
+const ambientLight = new THREE.AmbientLight(0x666688, 1.5); // Cool ambient reaches forest
 scene.add(ambientLight);
 
 const dirLight = new THREE.DirectionalLight(0xffffee, 1.5); // Brighter sun-like light
@@ -923,7 +923,7 @@ const createMap = () => {
         // For simplicity, use separate InstancedMesh for trunks and canopy
         // But for max performance: one dark material, simple cone shape
         const treeGeo = new THREE.ConeGeometry(1.8, 10, 6);
-        const treeMat = new THREE.MeshBasicMaterial({ color: 0x0a0a0a }); // Near-black silhouettes
+        const treeMat = new THREE.MeshStandardMaterial({ color: 0x0c1a0c, roughness: 1.0, metalness: 0 });
 
         const forestIM = new THREE.InstancedMesh(treeGeo, treeMat, TREE_COUNT);
         const dummy = new THREE.Object3D();
@@ -962,9 +962,9 @@ const createMap = () => {
             dummy.updateMatrix();
             forestIM.setMatrixAt(placed, dummy.matrix);
 
-            // Dark color variation — barely visible, silhouette trees
-            const darkness = 0.02 + _fh(i * 3 + 2) * 0.06;
-            treeColor.setRGB(darkness * 0.5, darkness, darkness * 0.3);
+            // Dark forest greens — visible but spooky
+            const darkness = 0.06 + _fh(i * 3 + 2) * 0.12;
+            treeColor.setRGB(darkness * 0.4, darkness, darkness * 0.3);
             forestIM.setColorAt(placed, treeColor);
             placed++;
         }
