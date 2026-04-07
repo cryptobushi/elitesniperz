@@ -410,6 +410,84 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+// ── CRT POST-PROCESSING — WC3 on an old monitor ─────────────────────
+const _crtRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+const _crtScene = new THREE.Scene();
+const _crtCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const _crtMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+        tDiffuse: { value: _crtRT.texture },
+        uTime: { value: 0 },
+        uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+    },
+    vertexShader: `
+        varying vec2 vUv;
+        void main() { vUv = uv; gl_Position = vec4(position, 1.0); }
+    `,
+    fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float uTime;
+        uniform vec2 uResolution;
+        varying vec2 vUv;
+
+        void main() {
+            // Subtle barrel distortion — CRT curvature
+            vec2 uv = vUv;
+            vec2 dc = uv - 0.5;
+            float d = dot(dc, dc);
+            uv = uv + dc * d * 0.06;
+
+            vec3 col = texture2D(tDiffuse, uv).rgb;
+
+            // Scanlines — every other pixel row is darker
+            float scanline = sin(uv.y * uResolution.y * 1.5) * 0.5 + 0.5;
+            scanline = pow(scanline, 1.5) * 0.12 + 0.88;
+            col *= scanline;
+
+            // Subtle RGB offset — chromatic aberration
+            float r = texture2D(tDiffuse, uv + vec2(0.0008, 0.0)).r;
+            float b = texture2D(tDiffuse, uv - vec2(0.0008, 0.0)).b;
+            col.r = mix(col.r, r, 0.5);
+            col.b = mix(col.b, b, 0.5);
+
+            // Phosphor glow — slightly warm, slightly bloomed
+            col = pow(col, vec3(0.95, 0.98, 1.02));
+
+            // Vignette — darker corners like CRT
+            float vig = 1.0 - d * 1.2;
+            vig = clamp(vig, 0.0, 1.0);
+            vig = pow(vig, 0.5);
+            col *= vig;
+
+            // Very subtle flicker
+            col *= 0.985 + 0.015 * sin(uTime * 8.0);
+
+            // Slight desaturation for that old-monitor feel
+            float lum = dot(col, vec3(0.299, 0.587, 0.114));
+            col = mix(vec3(lum), col, 0.85);
+
+            gl_FragColor = vec4(col, 1.0);
+        }
+    `
+});
+const _crtQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), _crtMaterial);
+_crtScene.add(_crtQuad);
+
+function renderWithCRT() {
+    // Render scene to texture
+    renderer.setRenderTarget(_crtRT);
+    renderWithCRT();
+    renderer.setRenderTarget(null);
+    // Render CRT quad to screen
+    _crtMaterial.uniforms.uTime.value = performance.now() * 0.001;
+    renderer.render(_crtScene, _crtCamera);
+}
+
+function resizeCRT(w, h) {
+    _crtRT.setSize(w, h);
+    _crtMaterial.uniforms.uResolution.value.set(w, h);
+}
+
 // Lighting - Much brighter!
 const ambientLight = new THREE.AmbientLight(0x666688, 1.5); // Cool ambient reaches forest
 scene.add(ambientLight);
@@ -3710,7 +3788,7 @@ function animate() {
         }
     });
 
-    renderer.render(scene, camera);
+    renderWithCRT();
 }
 
 // Handle window resize — ignore mobile keyboard resize
@@ -3728,6 +3806,7 @@ function handleResize() {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
+    resizeCRT(w, h);
 }
 window.addEventListener('resize', handleResize);
 
@@ -3746,7 +3825,7 @@ if (_isMobileDevice) {
 function preGameRender() {
     if (!gameState.gameStarted) {
         requestAnimationFrame(preGameRender);
-        renderer.render(scene, camera);
+        renderWithCRT();
     }
 }
 
