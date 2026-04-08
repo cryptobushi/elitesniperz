@@ -18,14 +18,25 @@ if (DEV_MODE) console.log('[AUTH] Dev mode — mock tokens accepted (set PRIVY_A
  */
 function parseMockToken(token) {
     if (!token.startsWith('dev:')) return null;
-    const parts = token.split(':');
-    if (parts.length < 4) return null;
+    // Format: "dev:<userId>:<twitterHandle>:<wallet>"
+    // But userId can contain colons (e.g., "did:privy:mock-abc")
+    // So split from the right: last part = wallet, second to last = twitter
+    const withoutPrefix = token.slice(4); // Remove "dev:"
+    const lastColon = withoutPrefix.lastIndexOf(':');
+    if (lastColon < 0) return null;
+    const wallet = withoutPrefix.slice(lastColon + 1);
+    const rest = withoutPrefix.slice(0, lastColon);
+    const secondLastColon = rest.lastIndexOf(':');
+    if (secondLastColon < 0) return null;
+    const twitter = rest.slice(secondLastColon + 1);
+    const userId = rest.slice(0, secondLastColon);
+    if (!userId || !twitter || !wallet) return null;
     return {
-        userId: parts[1],
+        userId,
         user: {
-            id: parts[1],
-            twitter: { username: parts[2], subject: parts[2] },
-            wallet: { address: parts[3] },
+            id: userId,
+            twitter: { username: twitter, subject: twitter },
+            wallet: { address: wallet },
         }
     };
 }
