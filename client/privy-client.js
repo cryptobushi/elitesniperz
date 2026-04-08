@@ -2,6 +2,9 @@
  * privy-client.js — Privy auth for sniperz wager system
  * Bundled via esbuild to dist/privy-bundle.js
  */
+import { Buffer } from 'buffer';
+if (typeof window !== 'undefined' && !window.Buffer) window.Buffer = Buffer;
+
 import Privy, { LocalStorage, getUserEmbeddedSolanaWallet, getEntropyDetailsFromUser } from '@privy-io/js-sdk-core';
 
 const SESSION_KEY = 'sniperz_auth';
