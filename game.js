@@ -890,7 +890,7 @@ class Player {
         this.speed = 8;
         this.normalSpeed = 8;
         this.windwalkSpeed = 14;
-        this.shootRange = 45;
+        this.shootRange = 25; // Match server SHOOT_RANGE
         this.damage = 25;
         this._spawnProtection = 3.0; // 3s invulnerable on spawn
         this.price = 1.00; // Everyone is a token
@@ -909,7 +909,7 @@ class Player {
         this.hasShield = false;
         this.goldMultiplier = 1.0;
         this.baseSpeed = 8;
-        this.baseRange = 45;
+        this.baseRange = 25;
         this.baseCooldown = 1.0;
 
         this.createMesh(team);
