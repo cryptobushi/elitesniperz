@@ -4535,7 +4535,7 @@ console.log('Multiplayer module loaded');
 // Called by wager-ui.js when a wager match starts
 // Injects the wager WebSocket as the game connection
 window._startWagerGame = function(ws, matchData) {
-    console.log('[WAGER] Starting wager game', matchData, 'ws.readyState:', ws.readyState);
+    console.log('[WAGER] Starting wager game', matchData);
 
     // Set game state
     const user = window._wagerUser;
@@ -4547,15 +4547,6 @@ window._startWagerGame = function(ws, matchData) {
     // Use the wager WebSocket as the game connection
     _ws = ws;
     _ws.binaryType = 'arraybuffer';
-
-    // Debug: verify ws sends work
-    setTimeout(() => {
-        console.log('[WAGER] ws.readyState after 1s:', _ws?.readyState, 'player:', !!gameState.player, 'online:', isOnlineMode);
-        if (_ws && _ws.readyState === 1) {
-            _ws.send(JSON.stringify({t: 'rot', r: 0}));
-            console.log('[WAGER] Sent test rot');
-        }
-    }, 1000);
 
     // Set up message handling on the wager WS (same as connectToServer)
     _ws.addEventListener('message', function(evt) {

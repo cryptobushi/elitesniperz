@@ -826,7 +826,6 @@ function handleWagerWs(ws, userId, matchId) {
     ws.on('message', function(data) {
         try {
             const str = typeof data === 'string' ? data : data.toString();
-            if (!ws._wagerMsgLogged) { console.log('[WAGER-WS] First post-start msg from', userId.slice(0,15), ':', str.slice(0,80)); ws._wagerMsgLogged = true; }
             const msg = JSON.parse(str);
             if (msg.t === 'wager_ready') {
                 entry.match.setReady(userId);
@@ -888,10 +887,7 @@ wss.on('connection', function(ws) {
                 return;
             }
             // Skip normal game handling for wager connections
-            if (ws._isWager) {
-                if (!ws._wagerSkipLogged) { console.log('[MAIN-WS] Skipping wager msg:', msg.t); ws._wagerSkipLogged = true; }
-                return;
-            }
+            if (ws._isWager) return;
 
             // Test mode: log all incoming messages (throttled for mv/rot)
             if (TEST_MODE && msg.t !== 'rot') {

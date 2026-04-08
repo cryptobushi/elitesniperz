@@ -160,7 +160,7 @@ class WagerMatch {
      */
     handleMessage(userId, msg) {
         const p = this.players.get(userId);
-        if (!p) { console.log('[WM] handleMessage: unknown userId', userId, msg.t); return; }
+        if (!p) return;
 
         // Handle join message — send back join confirmation + roster
         if (msg.t === 'join') {
@@ -185,10 +185,7 @@ class WagerMatch {
             return;
         }
 
-        if (this.ended || !this.started) {
-            console.log('[WM] handleMessage: match not active', msg.t, 'started:', this.started, 'ended:', this.ended);
-            return;
-        }
+        if (this.ended || !this.started) return;
 
         p.lastInput = Date.now();
         p.afk = false;
@@ -413,7 +410,6 @@ class WagerMatch {
             if (this.ended) return;
             const idleTime = (now - p.lastInput) / 1000;
             if (idleTime >= AFK_TIMEOUT) {
-                console.log('[WM] AFK forfeit:', userId, 'idle', idleTime.toFixed(1) + 's');
                 const opponent = this._getOpponent(userId);
                 this._endMatch(opponent, 'afk_forfeit');
             }
