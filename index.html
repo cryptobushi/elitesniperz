@@ -878,7 +878,7 @@
             body.game-active #rotateOverlay { display: flex; }
         }
 
-        /* === HUD — mobile-first compact === */
+        /* === HUD — tactical overlay === */
         #hud {
             position: absolute;
             top: env(safe-area-inset-top, 8px);
@@ -888,16 +888,55 @@
         }
 
         .stat {
-            background: rgba(0, 0, 0, 0.7);
-            border: 1px solid #00ff0066;
+            background: #0B0F14ee;
+            border: 1px solid #1F2933;
             padding: 4px 10px;
             margin-bottom: 4px;
             font-size: clamp(0.65rem, 2vw, 0.85rem);
-            color: #00ff00;
-            border-radius: 3px;
+            color: #00ff66;
+            border-radius: 2px;
             backdrop-filter: blur(4px);
             pointer-events: all;
             -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Top-right compact panel: FPS | MENU */
+        #topRightPanel {
+            position: fixed;
+            top: max(env(safe-area-inset-top, 8px), 8px);
+            right: max(env(safe-area-inset-right, 8px), 8px);
+            z-index: 100;
+            background: #0B0F14ee;
+            border: 1px solid #1F2933;
+            border-radius: 2px;
+            padding: 4px 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.65rem;
+            color: #55555f;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            pointer-events: all;
+            backdrop-filter: blur(4px);
+        }
+        #topRightPanel .trp-fps {
+            color: #55555f;
+            font-size: 0.6rem;
+            letter-spacing: 0.04em;
+        }
+        #topRightPanel .trp-sep {
+            color: #1F2933;
+            font-size: 0.7rem;
+        }
+        #topRightPanel .trp-menu {
+            color: #888894;
+            cursor: pointer;
+            font-size: 0.65rem;
+            letter-spacing: 0.06em;
+            transition: color 0.15s;
+        }
+        #topRightPanel .trp-menu:hover {
+            color: #00ff66;
         }
 
         /* === SCOREBOARD — full screen watchlist overlay === */
@@ -960,34 +999,62 @@
         #scoreboard .sb-team-blue { border-left: 3px solid #0088ff; }
         #scoreboard .sb-chart { width: 80px; height: 24px; }
 
-        /* === ABILITIES — bottom center === */
+        /* === ABILITIES — compact command bar === */
         #abilities {
             position: absolute;
             bottom: env(safe-area-inset-bottom, 12px);
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 10px;
+            gap: 0;
             padding-bottom: 12px;
+            background: #0B0F14ee;
+            border: 1px solid #1F2933;
+            border-radius: 2px;
+            backdrop-filter: blur(4px);
         }
 
         .ability {
-            background: rgba(0, 0, 0, 0.7);
-            border: 2px solid #00ff00;
-            padding: 8px;
-            width: 60px;
+            background: transparent;
+            border: none;
+            border-right: 1px solid #1F2933;
+            padding: 6px 14px;
             text-align: center;
             pointer-events: all;
             cursor: pointer;
-            border-radius: 8px;
-            backdrop-filter: blur(4px);
+            border-radius: 0;
+            display: flex;
+            align-items: center;
+            gap: 5px;
             -webkit-tap-highlight-color: transparent;
+            transition: background 0.1s;
         }
-        .ability:active { background: rgba(0, 255, 0, 0.3); }
-        .ability.cooldown { opacity: 0.4; }
-        .ability-key { color: #00ff00; font-size: 1.1rem; font-weight: bold; }
-        .ability-name { color: #aaa; font-size: 0.55rem; margin-top: 2px; }
-        .ability-cd { color: #ff0000; font-size: 0.7rem; margin-top: 2px; }
+        .ability:last-child { border-right: none; }
+        .ability:hover { background: rgba(0, 255, 102, 0.05); }
+        .ability:active { background: rgba(0, 255, 102, 0.1); }
+        .ability.cooldown { opacity: 0.3; }
+        .ability-key {
+            color: #00ff66;
+            font-size: 0.7rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 0.02em;
+        }
+        .ability-name {
+            color: #55555f;
+            font-size: 0.6rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-top: 0;
+        }
+        .ability-cd {
+            color: #ff3344;
+            font-size: 0.6rem;
+            font-family: 'Courier New', monospace;
+            margin-top: 0;
+            margin-left: 2px;
+        }
 
         /* === CONTROLS HINT === */
         #controls {
@@ -1225,14 +1292,15 @@
         /* === TEAM SCORE HUD === */
         #teamScore {
             position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
-            z-index: 500; font-family: monospace; font-size: clamp(0.9rem, 3vw, 1.3rem);
-            background: rgba(0,0,0,0.7); border: 1px solid #333; border-radius: 6px;
-            padding: 4px 16px; letter-spacing: 0.1em; pointer-events: none;
+            z-index: 500; font-family: 'Courier New', monospace; font-size: clamp(0.8rem, 2.5vw, 1.1rem);
+            background: #0B0F14ee; border: 1px solid #1F2933; border-radius: 2px;
+            padding: 4px 16px; letter-spacing: 0.08em; pointer-events: none;
+            backdrop-filter: blur(4px);
         }
-        .ts-red { color: #ff4444; font-weight: 700; }
+        .ts-red { color: #ff3344; font-weight: 700; }
         .ts-blue { color: #4488ff; font-weight: 700; }
-        .ts-sep { color: #555; margin: 0 6px; }
-        .ts-limit { color: #555; font-size: 0.75em; }
+        .ts-sep { color: #333; margin: 0 6px; font-size: 0.8em; }
+        .ts-limit { color: #444; font-size: 0.7em; }
 
         /* === SHOP PANEL === */
         #shopPanel {
@@ -1305,69 +1373,95 @@
             z-index: 600;
         }
         #chatMessages {
-            background: rgba(0,0,0,0.6);
-            border: 1px solid #00ff0033;
-            border-radius: 4px;
+            background: #0B0F14dd;
+            border: 1px solid #1F2933;
+            border-radius: 2px;
             padding: 4px 6px;
             max-height: 120px;
             overflow-y: auto;
             font-size: 0.6rem;
-            color: #ccc;
+            font-family: 'Courier New', monospace;
+            color: #888894;
             margin-bottom: 4px;
         }
         #chatMessages .chat-msg { margin-bottom: 2px; }
-        #chatMessages .chat-msg .chat-name-red { color: #ff4444; }
+        #chatMessages .chat-msg .chat-name-red { color: #ff3344; }
         #chatMessages .chat-msg .chat-name-blue { color: #4488ff; }
-        #chatMessages .chat-sys { color: #888; font-style: italic; }
+        #chatMessages .chat-sys { color: #55555f; font-style: italic; }
         #chatInput {
             width: 100%;
-            background: rgba(0,0,0,0.7);
-            border: 1px solid #00ff0044;
-            color: #00ff00;
+            background: #0B0F14dd;
+            border: 1px solid #1F2933;
+            color: #00ff66;
             padding: 4px 8px;
             font-size: 0.65rem;
             font-family: 'Courier New', monospace;
-            border-radius: 3px;
+            border-radius: 2px;
             -webkit-appearance: none;
+            outline: none;
+            transition: border-color 0.15s;
         }
-        #chatInput::placeholder { color: #00ff0044; }
+        #chatInput:focus { border-color: #00ff6644; }
+        #chatInput::placeholder { color: #333; }
 
         /* === KILL FEED === */
         #killFeed {
             position: absolute;
-            bottom: 140px;
-            left: 8px;
-            width: min(200px, 40vw);
+            top: 50px;
+            right: 8px;
+            width: min(220px, 40vw);
             pointer-events: none;
         }
 
         .kill-message {
-            background: rgba(0, 0, 0, 0.6);
-            border: 1px solid #00ff0044;
-            padding: 2px 8px;
+            background: #0B0F14cc;
+            border-left: 2px solid #1F2933;
+            border-top: none; border-bottom: none; border-right: none;
+            padding: 3px 8px;
             margin-bottom: 2px;
             text-align: left;
             font-size: 0.55rem;
-            border-radius: 3px;
+            line-height: 1.3;
+            border-radius: 0;
             font-family: 'Courier New', monospace;
-            animation: fadeIn 0.3s, fadeOut 0.5s 2.5s;
+            color: #888894;
+            animation: fadeIn 0.3s, fadeOut 0.5s 3.5s;
         }
-        .kill-message.buy { border-color: #00ff4444; color: #00ff44; }
-        .kill-message.sell { border-color: #ff444444; color: #ff4444; }
+        .kill-message.buy { border-left-color: #00ff66; color: #00ff66; }
+        .kill-message.sell { border-left-color: #ff3344; color: #ff3344; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
 
-        /* === MINIMAP === */
+        /* === MINIMAP — tactical radar === */
         .minimap {
             position: absolute;
             bottom: 8px;
             left: 8px;
             width: 120px;
-            height: 120px;
-            background: rgba(0, 0, 0, 0.7);
-            border: 1px solid #00ff0066;
-            border-radius: 4px;
+            height: 134px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .minimap-label {
+            font-family: 'Courier New', monospace;
+            font-size: 0.45rem;
+            color: #333;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+            padding-left: 1px;
+            line-height: 1;
+        }
+        .minimap-canvas {
+            background: #0B0F14ee;
+            border: 1px solid #1F2933;
+            border-radius: 2px;
+            background-image:
+                linear-gradient(rgba(31,41,51,0.3) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(31,41,51,0.3) 1px, transparent 1px);
+            background-size: 24px 24px;
         }
 
         /* === MOBILE GAME UI TWEAKS === */
@@ -1375,18 +1469,19 @@
             #controls { display: none !important; }
 
             #terminal { padding: 4px 8px; min-width: 120px; }
-            #terminal #ticker { font-size: 0.8rem; }
-            #terminal #price { font-size: 0.7rem; }
-            #terminal #pctChange { font-size: 0.55rem; }
-            #hudChart { width: 100px; height: 35px; }
+            #terminal .term-ticker { font-size: 0.75rem; }
+            #terminal .term-price { font-size: 0.65rem; }
+            #terminal .term-pct { font-size: 0.5rem; }
+            #hudChart { width: 100px; height: 30px; }
 
-            .ability { width: 44px; padding: 5px; }
-            .ability-key { font-size: 0.8rem; }
-            .ability-name { font-size: 0.45rem; }
+            .ability { padding: 4px 8px; gap: 3px; }
+            .ability-key { font-size: 0.6rem; }
+            .ability-name { font-size: 0.4rem; }
 
-            .minimap { width: 80px; height: 80px; }
+            .minimap { width: 80px; height: 94px; }
+            .minimap-canvas { background-size: 16px 16px; }
 
-            #killFeed { bottom: 100px; width: min(180px, 40vw); }
+            #killFeed { top: 45px; width: min(180px, 40vw); }
             .kill-message { font-size: 0.45rem; padding: 1px 6px; }
 
             #scoreboard { padding: 0.5rem; }
@@ -1415,6 +1510,8 @@
             #chatBox { width: min(200px, 35vw); bottom: 90px; }
             #chatMessages { max-height: 80px; font-size: 0.5rem; }
             #chatInput { font-size: 0.55rem; }
+
+            #topRightPanel { padding: 3px 8px; font-size: 0.55rem; }
 
             #streakPopup { top: 30%; }
         }
@@ -1830,7 +1927,7 @@
     <!-- ============================================
          GAME UI — ALL PRESERVED
          ============================================ -->
-    <div id="fpsCounter" style="position:fixed;top:4px;right:max(env(safe-area-inset-right),8px);color:#0f0;font-family:monospace;font-size:11px;z-index:99999;pointer-events:none;text-shadow:0 0 2px #000,0 0 4px #000;">FPS: --</div>
+    <div id="fpsCounter" style="position:fixed;top:-9999px;left:-9999px;pointer-events:none;opacity:0;">FPS: --</div>
 
     <!-- Force landscape overlay -->
     <div id="rotateOverlay">
@@ -1844,32 +1941,33 @@
 
         <div id="hud" class="hidden">
             <div id="terminal" style="
-                background:rgba(0,0,0,0.85);
-                border:1px solid #00ff0033;
-                border-radius:6px;
+                background:#0B0F14ee;
+                border:1px solid #1F2933;
+                border-radius:2px;
                 padding:6px 10px;
-                min-width:160px;
+                min-width:150px;
                 font-family:'Courier New',monospace;
                 pointer-events:all;
+                backdrop-filter:blur(4px);
             ">
                 <div style="display:flex;align-items:baseline;gap:6px;">
-                    <span id="ticker" style="color:#00ff44;font-size:1rem;font-weight:900;letter-spacing:0.05em;">$YOU</span>
-                    <span id="price" style="color:#fff;font-size:0.9rem;font-weight:700;">1.00</span>
-                    <span id="pctChange" style="color:#00ff44;font-size:0.7rem;">+0.0%</span>
+                    <span id="ticker" class="term-ticker" style="color:#00ff66;font-size:0.85rem;font-weight:700;letter-spacing:0.04em;">$YOU</span>
+                    <span id="price" class="term-price" style="color:#e8e8ec;font-size:0.8rem;font-weight:600;">1.00</span>
+                    <span id="pctChange" class="term-pct" style="color:#00ff66;font-size:0.6rem;font-weight:500;">+0.0%</span>
                 </div>
-                <div style="display:flex;gap:8px;margin-top:3px;font-size:0.6rem;color:#888;">
-                    <span>K: <span id="killCount" style="color:#00ff44;">0</span></span>
-                    <span>D: <span id="deathCount" style="color:#ff4444;">0</span></span>
-                    <span><span id="goldCount" style="color:#ffd700;">0c</span></span>
+                <div style="display:flex;gap:10px;margin-top:4px;font-size:0.58rem;color:#55555f;letter-spacing:0.03em;">
+                    <span style="color:#55555f;">K <span id="killCount" style="color:#00ff66;font-weight:600;">0</span></span>
+                    <span style="color:#55555f;">D <span id="deathCount" style="color:#ff3344;font-weight:600;">0</span></span>
+                    <span style="color:#55555f;">G <span id="goldCount" style="color:#ffd700;font-weight:600;">0c</span></span>
                 </div>
-                <canvas id="hudChart" width="150" height="50" style="margin-top:4px;border-radius:3px;background:#0a0a0a;"></canvas>
+                <canvas id="hudChart" width="140" height="40" style="margin-top:4px;border-radius:1px;background:#080C10;border:1px solid #1A1F26;"></canvas>
             </div>
-            <button id="menuBtn" style="
-                position:fixed;top:max(env(safe-area-inset-top,8px),8px);right:max(env(safe-area-inset-right,8px),8px);
-                z-index:100;background:rgba(0,0,0,0.7);border:1px solid #555;color:#fff;
-                font-family:'Courier New',monospace;font-size:0.7rem;padding:6px 10px;border-radius:4px;
-                cursor:pointer;pointer-events:all;
-            ">MENU</button>
+            <!-- Top-right panel: FPS + MENU grouped -->
+            <div id="topRightPanel">
+                <span class="trp-fps" id="trpFps">FPS: --</span>
+                <span class="trp-sep">|</span>
+                <span class="trp-menu" id="menuBtn">MENU</span>
+            </div>
         </div>
 
         <div id="gameMenu" class="hidden" style="
@@ -1888,23 +1986,23 @@
 
         <div id="abilities" class="hidden">
             <div class="ability" data-ability="windwalk">
-                <div class="ability-key">Q</div>
-                <div class="ability-name">Wind</div>
+                <div class="ability-key">[Q]</div>
+                <div class="ability-name">WIND</div>
                 <div class="ability-cd"></div>
             </div>
             <div class="ability" data-ability="farsight">
-                <div class="ability-key">E</div>
-                <div class="ability-name">Sight</div>
+                <div class="ability-key">[E]</div>
+                <div class="ability-name">SIGHT</div>
                 <div class="ability-cd"></div>
             </div>
             <div class="ability" id="shopBtn">
-                <div class="ability-key">B</div>
-                <div class="ability-name">Shop</div>
+                <div class="ability-key">[B]</div>
+                <div class="ability-name">SHOP</div>
                 <div class="ability-cd"></div>
             </div>
             <div class="ability" id="scoreBtn">
-                <div class="ability-key">TAB</div>
-                <div class="ability-name">Score</div>
+                <div class="ability-key">[TAB]</div>
+                <div class="ability-name">SCORE</div>
                 <div class="ability-cd"></div>
             </div>
         </div>
@@ -1962,7 +2060,10 @@
             <span class="ts-limit">/ <span id="tsLimit">50</span></span>
         </div>
 
-        <canvas class="minimap hidden" id="minimap"></canvas>
+        <div class="minimap hidden">
+            <div class="minimap-label">RADAR</div>
+            <canvas class="minimap-canvas" id="minimap" style="width:100%;height:calc(100% - 14px);display:block;"></canvas>
+        </div>
 
         <div id="chatBox" class="hidden">
             <div id="chatMessages"></div>
@@ -2057,6 +2158,17 @@
 
         // Expose returnToLanding for external use
         window._returnToLanding = returnToLanding;
+    })();
+    </script>
+
+    <!-- Sync hidden fpsCounter → visible trpFps panel -->
+    <script>
+    (function() {
+        const src = document.getElementById('fpsCounter');
+        const dst = document.getElementById('trpFps');
+        if (!src || !dst) return;
+        const obs = new MutationObserver(() => { dst.textContent = src.textContent; });
+        obs.observe(src, { childList: true, characterData: true, subtree: true });
     })();
     </script>
 
