@@ -8,8 +8,8 @@ const {
 const { collidesWithWall, hasLineOfSight } = require('../shared/collision');
 
 // === CONSTANTS ===
-const AFK_TIMEOUT = 30;           // seconds — forfeit on no input
-const DISCONNECT_TIMEOUT = 30;    // seconds — forfeit on ws close
+const AFK_TIMEOUT = 0;             // 0 = disabled
+const DISCONNECT_TIMEOUT = 0;      // 0 = disabled
 const TIME_LIMIT = 10 * 60;       // 10 minutes
 const RESPAWN_DELAY = 3000;       // 3s respawn in 1v1
 const BYTES_PER_PLAYER = 28;      // Same binary format as main server
@@ -407,23 +407,27 @@ class WagerMatch {
     _checkTimers() {
         const now = Date.now();
 
-        // AFK detection
-        this.players.forEach((p, userId) => {
-            if (this.ended) return;
-            const idleTime = (now - p.lastInput) / 1000;
-            if (idleTime >= AFK_TIMEOUT) {
-                const opponent = this._getOpponent(userId);
-                this._endMatch(opponent, 'afk_forfeit');
-            }
-        });
+        // AFK detection (disabled when timeout = 0)
+        if (AFK_TIMEOUT > 0) {
+            this.players.forEach((p, userId) => {
+                if (this.ended) return;
+                const idleTime = (now - p.lastInput) / 1000;
+                if (idleTime >= AFK_TIMEOUT) {
+                    const opponent = this._getOpponent(userId);
+                    this._endMatch(opponent, 'afk_forfeit');
+                }
+            });
+        }
 
-        // Disconnect detection
-        for (const [userId, disconnectTime] of this.disconnectTimers) {
-            if (this.ended) break;
-            const elapsed = (now - disconnectTime) / 1000;
-            if (elapsed >= DISCONNECT_TIMEOUT) {
-                const opponent = this._getOpponent(userId);
-                this._endMatch(opponent, 'disconnect_forfeit');
+        // Disconnect detection (disabled when timeout = 0)
+        if (DISCONNECT_TIMEOUT > 0) {
+            for (const [userId, disconnectTime] of this.disconnectTimers) {
+                if (this.ended) break;
+                const elapsed = (now - disconnectTime) / 1000;
+                if (elapsed >= DISCONNECT_TIMEOUT) {
+                    const opponent = this._getOpponent(userId);
+                    this._endMatch(opponent, 'disconnect_forfeit');
+                }
             }
         }
 
