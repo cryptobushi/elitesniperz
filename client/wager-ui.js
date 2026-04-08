@@ -15,6 +15,7 @@ let lobbyInterval = null;
 let waitingInterval = null;
 let wagerWs = null;
 let currentMatchId = null;
+let currentMatchInfo = null; // { stakeAmount, stakeToken, killTarget, creatorTwitter, joinerTwitter, opponentTwitter }
 
 // ── Styles ──────────────────────────────────────────────────────────────────
 const STYLES = `
@@ -686,6 +687,7 @@ function buildDOM() {
         <div class="wr-result-bg"></div>
         <div class="wr-result-content">
             <div class="wr-result-title" id="wrResultTitle">VICTORY</div>
+            <div id="wrResultOpponent" style="color:#aaa;font-size:0.85rem;margin:0.3rem 0;"></div>
             <div class="wr-result-score" id="wrResultScore">7 - 3</div>
             <div class="wr-result-payout" id="wrResultPayout">+9.5 USDC</div>
             <div class="wr-result-tx" id="wrResultTx"></div>
@@ -1006,9 +1008,17 @@ async function pollWaitingRoom(matchId) {
         const me = getUser();
         const amCreator = me && m.creator_id === me.id;
 
-        // Update info line
+        // Store match info for HUD and result screen
         const wrToken = m.stake_token || 'USDC';
         const wrAmt = wrToken === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
+        currentMatchInfo = {
+            stakeAmount: wrAmt,
+            stakeToken: wrToken,
+            killTarget: m.kill_target || 7,
+            creatorTwitter: m.creator_twitter,
+            joinerTwitter: m.joiner_twitter,
+            opponentTwitter: amCreator ? m.joiner_twitter : m.creator_twitter,
+        };
         els.wrInfo.textContent = `${wrAmt} ${wrToken} | First to ${m.kill_target || 7}`;
 
         // Determine who has deposited
@@ -1088,8 +1098,9 @@ async function pollWaitingRoom(matchId) {
 export function showWagerHUD(matchData) {
     const whTarget = document.getElementById('whTarget');
     const whStake = document.getElementById('whStake');
-    if (whTarget) whTarget.textContent = `First to ${matchData.killTarget || 7}`;
-    if (whStake) whStake.textContent = `${matchData.stake || '?'} ${matchData.token || 'USDC'} on the line`;
+    const info = currentMatchInfo || {};
+    if (whTarget) whTarget.textContent = `First to ${info.killTarget || matchData.killTarget || 7}`;
+    if (whStake) whStake.textContent = `${info.stakeAmount || '?'} ${info.stakeToken || 'USDC'} on the line`;
     document.getElementById('whYouScore').textContent = '0';
     document.getElementById('whOppScore').textContent = '0';
     els.hud.classList.remove('hidden');
@@ -1118,22 +1129,35 @@ export function showWagerResult(data) {
     const txEl = document.getElementById('wrResultTx');
 
     const me = getUser();
+    const info = currentMatchInfo || {};
     const won = data.winner === me?.id || data.result === 'win' || data.won;
     const isDraw = !data.winner && data.reason === 'draw';
 
     titleEl.textContent = isDraw ? 'DRAW' : (won ? 'VICTORY' : 'DEFEAT');
     titleEl.className = 'wr-result-title ' + (isDraw ? 'draw' : (won ? 'victory' : 'defeat'));
 
-    // Determine scores from red/blue kills based on my team
-    const myTeam = window._isWagerMatch ? (document.querySelector('#whYouScore')?.textContent || '0') : '0';
-    const oppTeam = window._isWagerMatch ? (document.querySelector('#whOppScore')?.textContent || '0') : '0';
-    scoreEl.textContent = `${myTeam} - ${oppTeam}`;
+    // Score from wager HUD
+    const myScore = document.getElementById('whYouScore')?.textContent || '0';
+    const oppScore = document.getElementById('whOppScore')?.textContent || '0';
+    scoreEl.textContent = `${myScore} - ${oppScore}`;
 
-    if (won && data.payout) {
-        payoutEl.textContent = `+${data.payout} ${data.token || 'USDC'}`;
+    // Opponent info
+    const oppEl = document.getElementById('wrResultOpponent');
+    if (oppEl) oppEl.textContent = info.opponentTwitter ? 'vs @' + info.opponentTwitter : '';
+
+    const stakeAmt = info.stakeAmount || '?';
+    const stakeTok = info.stakeToken || 'USDC';
+    const potTotal = (parseFloat(stakeAmt) || 0) * 2;
+    const payout = (potTotal * 0.95).toFixed(2);
+
+    if (isDraw) {
+        payoutEl.textContent = `REFUNDED ${stakeAmt} ${stakeTok}`;
+        payoutEl.className = 'wr-result-payout';
+    } else if (won) {
+        payoutEl.textContent = `+${payout} ${stakeTok}`;
         payoutEl.className = 'wr-result-payout';
     } else {
-        payoutEl.textContent = `-${data.stake || '?'} ${data.token || 'USDC'}`;
+        payoutEl.textContent = `-${stakeAmt} ${stakeTok}`;
         payoutEl.className = 'wr-result-payout loss';
     }
 
