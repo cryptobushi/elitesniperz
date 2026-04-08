@@ -724,14 +724,18 @@ function settleWagerMatch(matchId, winnerId, reason, stats) {
     const rake = Math.floor(totalPot * 0.05);
     const payout = totalPot - rake;
 
+    // Extract kills/deaths from stats (keyed by userId)
+    const creatorStats = stats[match.creator_id] || {};
+    const joinerStats = stats[match.joiner_id] || {};
+
     db.updateMatch(matchId, {
         status: 'completed',
         winner_id: winnerId,
         win_reason: reason,
-        creator_kills: stats.creatorKills || 0,
-        joiner_kills: stats.joinerKills || 0,
-        creator_deaths: stats.creatorDeaths || 0,
-        joiner_deaths: stats.joinerDeaths || 0,
+        creator_kills: creatorStats.kills || 0,
+        joiner_kills: joinerStats.kills || 0,
+        creator_deaths: creatorStats.deaths || 0,
+        joiner_deaths: joinerStats.deaths || 0,
         ended_at: Date.now()
     });
 
@@ -770,17 +774,16 @@ function settleWagerMatch(matchId, winnerId, reason, stats) {
 
     // Write match history for both
     const now = Date.now();
-    const winnerIsCreator = winnerId === match.creator_id;
+    const winnerStats = stats[winnerId] || {};
+    const loserStats = stats[loserId] || {};
     db.createMatchHistory({
         match_id: matchId, user_id: winnerId, opponent_id: loserId, result: 'win',
-        kills: winnerIsCreator ? stats.creatorKills : stats.joinerKills,
-        deaths: winnerIsCreator ? stats.creatorDeaths : stats.joinerDeaths,
+        kills: winnerStats.kills || 0, deaths: winnerStats.deaths || 0,
         stake_amount: match.stake_amount, stake_token: match.stake_token, payout, played_at: now
     });
     db.createMatchHistory({
         match_id: matchId, user_id: loserId, opponent_id: winnerId, result: 'loss',
-        kills: winnerIsCreator ? stats.joinerKills : stats.creatorKills,
-        deaths: winnerIsCreator ? stats.joinerDeaths : stats.creatorDeaths,
+        kills: loserStats.kills || 0, deaths: loserStats.deaths || 0,
         stake_amount: match.stake_amount, stake_token: match.stake_token, payout: 0, played_at: now
     });
 
@@ -822,7 +825,9 @@ function handleWagerWs(ws, userId, matchId) {
 
     ws.on('message', function(data) {
         try {
-            const msg = JSON.parse(data);
+            const str = typeof data === 'string' ? data : data.toString();
+            if (!ws._wagerMsgLogged) { console.log('[WAGER-WS] First post-start msg from', userId.slice(0,15), ':', str.slice(0,80)); ws._wagerMsgLogged = true; }
+            const msg = JSON.parse(str);
             if (msg.t === 'wager_ready') {
                 entry.match.setReady(userId);
                 // Re-read match status from DB (may have changed since initial load)
@@ -847,7 +852,9 @@ function handleWagerWs(ws, userId, matchId) {
                 // Game messages (mv, rot, ab) — forward to WagerMatch
                 entry.match.handleMessage(userId, msg);
             }
-        } catch (e) {}
+        } catch (e) {
+            // Binary data (state updates from server) — ignore parse errors
+        }
     });
 
     ws.on('close', () => {
@@ -881,7 +888,10 @@ wss.on('connection', function(ws) {
                 return;
             }
             // Skip normal game handling for wager connections
-            if (ws._isWager) return;
+            if (ws._isWager) {
+                if (!ws._wagerSkipLogged) { console.log('[MAIN-WS] Skipping wager msg:', msg.t); ws._wagerSkipLogged = true; }
+                return;
+            }
 
             // Test mode: log all incoming messages (throttled for mv/rot)
             if (TEST_MODE && msg.t !== 'rot') {

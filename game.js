@@ -4391,7 +4391,7 @@ function updateRemotePlayers(dt) {
     }
 
     // Send player rotation to server for FOV-based auto-aim
-    if (_ws && _ws.readyState === 1 && gameState.player && gameState.player.health > 0) {
+    if (_ws && _ws.readyState === 1 && gameState.player && gameState.player.health > 0 && isOnlineMode) {
         const now2 = performance.now();
         if (now2 - _lastSendTime > 33) { // 30hz rotation updates
             let rot;
@@ -4535,10 +4535,10 @@ console.log('Multiplayer module loaded');
 // Called by wager-ui.js when a wager match starts
 // Injects the wager WebSocket as the game connection
 window._startWagerGame = function(ws, matchData) {
-    console.log('[WAGER] Starting wager game', matchData);
+    console.log('[WAGER] Starting wager game', matchData, 'ws.readyState:', ws.readyState);
 
     // Set game state
-    const user = window._wagerUser; // Set by wager-ui before calling this
+    const user = window._wagerUser;
     gameState.username = user?.twitter_handle || user?.display_name || 'Player';
     gameState.team = matchData.isCreator ? 'red' : 'blue';
     gameState.gameStarted = true;
@@ -4547,6 +4547,15 @@ window._startWagerGame = function(ws, matchData) {
     // Use the wager WebSocket as the game connection
     _ws = ws;
     _ws.binaryType = 'arraybuffer';
+
+    // Debug: verify ws sends work
+    setTimeout(() => {
+        console.log('[WAGER] ws.readyState after 1s:', _ws?.readyState, 'player:', !!gameState.player, 'online:', isOnlineMode);
+        if (_ws && _ws.readyState === 1) {
+            _ws.send(JSON.stringify({t: 'rot', r: 0}));
+            console.log('[WAGER] Sent test rot');
+        }
+    }, 1000);
 
     // Set up message handling on the wager WS (same as connectToServer)
     _ws.addEventListener('message', function(evt) {
