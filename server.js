@@ -610,13 +610,13 @@ function tryShoot(attacker) {
 
 function broadcast(data) {
     wss.clients.forEach(function(ws) {
-        if (ws.readyState === 1) ws.send(data);
+        if (ws.readyState === 1 && !ws._isWager) ws.send(data);
     });
 }
 
 function broadcastExcept(data, excludeWs) {
     wss.clients.forEach(function(ws) {
-        if (ws.readyState === 1 && ws !== excludeWs) ws.send(data);
+        if (ws.readyState === 1 && ws !== excludeWs && !ws._isWager) ws.send(data);
     });
 }
 
@@ -704,7 +704,7 @@ setInterval(function() {
     // Send state snapshots at lower rate
     if (tickCount % sendEvery === 0) {
         wss.clients.forEach(function(ws) {
-            if (ws.readyState !== 1 || !ws.playerId) return;
+            if (ws.readyState !== 1 || !ws.playerId || ws._isWager) return;
             const p = players.get(ws.playerId);
             if (!p) return;
             const buf = encodeState(p.team);
