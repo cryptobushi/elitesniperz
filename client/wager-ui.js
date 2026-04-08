@@ -1117,12 +1117,17 @@ export function showWagerResult(data) {
     const payoutEl = document.getElementById('wrResultPayout');
     const txEl = document.getElementById('wrResultTx');
 
-    const won = data.result === 'win' || data.won;
+    const me = getUser();
+    const won = data.winner === me?.id || data.result === 'win' || data.won;
+    const isDraw = !data.winner && data.reason === 'draw';
 
-    titleEl.textContent = won ? 'VICTORY' : 'DEFEAT';
-    titleEl.className = 'wr-result-title ' + (won ? 'victory' : 'defeat');
+    titleEl.textContent = isDraw ? 'DRAW' : (won ? 'VICTORY' : 'DEFEAT');
+    titleEl.className = 'wr-result-title ' + (isDraw ? 'draw' : (won ? 'victory' : 'defeat'));
 
-    scoreEl.textContent = `${data.myScore || 0} - ${data.opponentScore || 0}`;
+    // Determine scores from red/blue kills based on my team
+    const myTeam = window._isWagerMatch ? (document.querySelector('#whYouScore')?.textContent || '0') : '0';
+    const oppTeam = window._isWagerMatch ? (document.querySelector('#whOppScore')?.textContent || '0') : '0';
+    scoreEl.textContent = `${myTeam} - ${oppTeam}`;
 
     if (won && data.payout) {
         payoutEl.textContent = `+${data.payout} ${data.token || 'USDC'}`;

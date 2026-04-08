@@ -364,13 +364,15 @@ class WagerMatch {
         attacker.kills++;
         attacker.streak++;
         attacker.price += 0.5 + closest.price * 0.3;
+        const goldEarned = 50 + attacker.streak * 10;
+        attacker.gold += goldEarned;
 
         // Broadcast kill event to both players
         this._broadcast(JSON.stringify({
             t: 'k',
             ki: attacker.id, kn: attacker.username,
             vi: closest.id, vn: closest.username,
-            g: 0, p: attacker.price, s: attacker.streak,
+            g: goldEarned, p: attacker.price, s: attacker.streak,
             fb: 0,
             kx: attacker.x, kz: attacker.z,
             vx: closest.x, vz: closest.z,
