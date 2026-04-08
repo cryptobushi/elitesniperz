@@ -44,7 +44,7 @@ const _createMatch = db.prepare(`
 `);
 const _getMatch = db.prepare('SELECT * FROM matches WHERE id = ?');
 const _joinMatch = db.prepare(`
-  UPDATE matches SET joiner_id = @joiner_id WHERE id = @id AND status = 'open' AND joiner_id IS NULL
+  UPDATE matches SET joiner_id = @joiner_id WHERE id = @id AND status IN ('open', 'funded_creator') AND joiner_id IS NULL
 `);
 
 // Transactions
@@ -114,7 +114,7 @@ function getMatch(id) {
 }
 
 function listOpenMatches({ token, minStake, maxStake, limit = 50, offset = 0 } = {}) {
-  let sql = "SELECT * FROM matches WHERE status = 'open'";
+  let sql = "SELECT * FROM matches WHERE status IN ('open', 'funded_creator')";
   const params = [];
 
   if (token) {
