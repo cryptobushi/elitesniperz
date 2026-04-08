@@ -384,22 +384,26 @@ export async function getSolanaProvider() {
         const accessToken = await _privyClient.getAccessToken();
         if (!accessToken) return null;
 
-        // Ensure Privy user is loaded
-        let privyUser = _privyClient.user;
-        if (!privyUser) {
-            console.log('[Privy] User not loaded, initializing...');
+        // Get the full Privy user object with linked_accounts
+        let privyUser = null;
+        try {
+            const result = await _privyClient.user.get();
+            privyUser = result?.user || result;
+        } catch(e) {
+            console.warn('[Privy] user.get() failed:', e.message);
             try {
                 await _privyClient.initialize();
-                privyUser = _privyClient.user;
-            } catch(e) {}
+                const result = await _privyClient.user.get();
+                privyUser = result?.user || result;
+            } catch(e2) {
+                console.warn('[Privy] user.get() retry failed:', e2.message);
+            }
         }
-        if (!privyUser) {
-            console.warn('[Privy] No privy user object after initialize');
+        if (!privyUser || !privyUser.linked_accounts) {
+            console.warn('[Privy] No user with linked_accounts');
             return null;
         }
-
-        console.log('[Privy] User object keys:', Object.keys(privyUser));
-        console.log('[Privy] User linked_accounts:', privyUser.linked_accounts?.length, 'accounts');
+        console.log('[Privy] User loaded:', privyUser.linked_accounts.length, 'linked accounts');
 
         // Find the embedded Solana wallet account
         let solWallet = null;
