@@ -7,17 +7,43 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="screen-orientation" content="landscape">
-    <title>Elite Snipers</title>
+    <title>sNiPeRz — Skill-Based Sniper Duels on Solana</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* === CSS CUSTOM PROPERTIES === */
+        :root {
+            --accent: #00ff66;
+            --accent-dim: #00ff6622;
+            --accent-mid: #00ff6644;
+            --base-darkest: #0a0a0f;
+            --base-dark: #12121a;
+            --base-elevated: #1a1a25;
+            --base-border: #25252f;
+            --text-primary: #e8e8ec;
+            --text-secondary: #888894;
+            --text-muted: #55555f;
+            --danger: #ff3344;
+            --warning: #ff8800;
+            --blue: #3388ff;
+            --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-display: 'Oswald', 'Impact', sans-serif;
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         html, body {
-            font-family: 'Courier New', monospace;
-            background: #000;
-            overflow: hidden;
-            color: #fff;
+            font-family: var(--font-body);
+            background: var(--base-darkest);
+            color: var(--text-primary);
             width: 100%;
             height: 100%;
+        }
+
+        /* When game is active, lock body */
+        body.game-active {
+            overflow: hidden;
             position: fixed;
             top: 0; left: 0;
             touch-action: none;
@@ -25,6 +51,761 @@
             -webkit-user-select: none;
             user-select: none;
         }
+
+        /* ============================================
+           LANDING PAGE
+           ============================================ */
+        #landingPage {
+            position: relative;
+            z-index: 10;
+            overflow-x: hidden;
+            overflow-y: auto;
+            width: 100%;
+            min-height: 100vh;
+        }
+
+        #landingPage.hidden { display: none !important; }
+
+        /* === HERO === */
+        .hero {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem 1.5rem 4rem;
+            overflow: hidden;
+        }
+
+        /* Dark grid background */
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+        }
+
+        /* Crosshair motif */
+        .hero::after {
+            content: '+';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 30vw;
+            font-weight: 100;
+            color: rgba(0, 255, 102, 0.015);
+            font-family: var(--font-body);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 720px;
+        }
+
+        .hero-tag {
+            font-family: var(--font-body);
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 1.2rem;
+            opacity: 0.8;
+        }
+
+        .hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2.8rem, 8vw, 5.5rem);
+            font-weight: 700;
+            line-height: 0.95;
+            letter-spacing: -0.01em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            margin-bottom: 0.6rem;
+        }
+
+        .hero h1 span {
+            color: var(--accent);
+        }
+
+        .hero-sub {
+            font-family: var(--font-display);
+            font-size: clamp(1.1rem, 3vw, 1.6rem);
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .hero-desc {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            max-width: 520px;
+            margin: 0 auto 2rem;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            font-family: var(--font-display);
+            font-size: 0.95rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 0.85rem 2rem;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-decoration: none;
+            border: none;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1.5px solid var(--text-muted);
+            color: var(--text-primary);
+        }
+        .btn-outline:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 20px var(--accent-dim);
+        }
+
+        .btn-filled {
+            background: var(--accent);
+            color: var(--base-darkest);
+            border: 1.5px solid var(--accent);
+        }
+        .btn-filled:hover {
+            background: #00dd55;
+            box-shadow: 0 0 30px var(--accent-dim), 0 0 60px rgba(0,255,102,0.1);
+        }
+
+        /* === LIVE TICKER STRIP === */
+        .ticker-strip {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: var(--base-dark);
+            border-top: 1px solid var(--base-border);
+            border-bottom: 1px solid var(--base-border);
+            overflow: hidden;
+            padding: 0.6rem 0;
+        }
+
+        .ticker-track {
+            display: flex;
+            gap: 3rem;
+            animation: tickerScroll 40s linear infinite;
+            white-space: nowrap;
+            width: max-content;
+        }
+
+        .ticker-item {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            letter-spacing: 0.02em;
+        }
+
+        .ticker-item .accent { color: var(--accent); }
+        .ticker-item .hot { color: var(--warning); }
+        .ticker-item .user { color: var(--text-secondary); }
+
+        .ticker-dot {
+            display: inline-block;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            vertical-align: middle;
+            margin: 0 0.3rem;
+        }
+
+        @keyframes tickerScroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        /* === SECTIONS === */
+        .section {
+            padding: 5rem 1.5rem;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: 1.3rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-primary);
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: pulseDot 2s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes pulseDot {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--accent); }
+            50% { opacity: 0.6; box-shadow: 0 0 0 6px transparent; }
+        }
+
+        /* === LIVE DUEL BOARD === */
+        .duel-section {
+            background: var(--base-dark);
+            border-top: 1px solid var(--base-border);
+            border-bottom: 1px solid var(--base-border);
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--base-border);
+        }
+
+        .filter-tab {
+            font-family: var(--font-body);
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.6rem 1.2rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            transition: all 0.15s;
+        }
+        .filter-tab:hover { color: var(--text-secondary); }
+        .filter-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .duel-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .duel-table th {
+            font-size: 0.6rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--base-border);
+        }
+
+        .duel-table td {
+            font-size: 0.8rem;
+            padding: 0.7rem 0.75rem;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            color: var(--text-secondary);
+        }
+
+        .duel-table tr {
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .duel-table tbody tr:hover {
+            background: rgba(0, 255, 102, 0.03);
+        }
+
+        .duel-handle {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 0.82rem;
+        }
+
+        .duel-wr { font-variant-numeric: tabular-nums; }
+        .duel-wr.high { color: var(--accent); }
+        .duel-wr.mid { color: var(--text-secondary); }
+        .duel-wr.low { color: var(--danger); }
+
+        .duel-stake {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .badge {
+            display: inline-block;
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            padding: 0.15rem 0.5rem;
+            border-radius: 2px;
+            text-transform: uppercase;
+        }
+        .badge-open { background: rgba(0,255,102,0.12); color: var(--accent); }
+        .badge-live { background: rgba(255,51,68,0.15); color: var(--danger); animation: badgePulse 1.5s ease-in-out infinite; }
+        .badge-hot { background: rgba(255,136,0,0.15); color: var(--warning); }
+        .badge-new { background: rgba(51,136,255,0.12); color: var(--blue); }
+
+        @keyframes badgePulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* === PLAYER CARDS === */
+        .player-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .player-card {
+            background: var(--base-dark);
+            border: 1px solid var(--base-border);
+            border-radius: 4px;
+            padding: 1.5rem;
+            transition: border-color 0.15s;
+        }
+        .player-card:hover {
+            border-color: var(--accent-mid);
+        }
+
+        .player-card-top {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .player-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--base-darkest);
+            flex-shrink: 0;
+        }
+
+        .player-handle {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+        }
+
+        .player-tier {
+            font-size: 0.6rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-top: 0.15rem;
+        }
+        .tier-elite { color: var(--accent); }
+        .tier-trusted { color: var(--blue); }
+        .tier-rising { color: var(--warning); }
+
+        .player-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .player-stat-val {
+            font-size: 1rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-primary);
+        }
+
+        .player-stat-label {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .player-form {
+            display: flex;
+            gap: 3px;
+        }
+
+        .form-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .form-dot.w { background: var(--accent); }
+        .form-dot.l { background: var(--danger); }
+
+        /* === FEATURE CARDS === */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .feature-card {
+            background: var(--base-dark);
+            border: 1px solid var(--base-border);
+            border-radius: 4px;
+            padding: 1.5rem;
+            transition: border-color 0.15s;
+        }
+        .feature-card:hover {
+            border-color: var(--accent-mid);
+        }
+
+        .feature-title {
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-desc {
+            font-size: 0.82rem;
+            line-height: 1.5;
+            color: var(--text-secondary);
+        }
+
+        /* === ARENA FEED === */
+        .feed-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .feed-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.7rem 0.75rem;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            transition: background 0.1s;
+        }
+        .feed-item:hover {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .feed-bar {
+            width: 3px;
+            height: 24px;
+            border-radius: 1px;
+            flex-shrink: 0;
+        }
+        .feed-bar.win { background: var(--accent); }
+        .feed-bar.loss { background: var(--danger); }
+        .feed-bar.streak { background: var(--warning); }
+        .feed-bar.info { background: var(--blue); }
+
+        .feed-text {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            flex: 1;
+        }
+        .feed-text strong { color: var(--text-primary); font-weight: 600; }
+
+        .feed-time {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* === GAME MODES === */
+        .modes-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .mode-card {
+            background: var(--base-dark);
+            border: 1px solid var(--base-border);
+            border-radius: 4px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: border-color 0.15s;
+        }
+        .mode-card:hover {
+            border-color: var(--accent-mid);
+        }
+
+        .mode-label {
+            font-family: var(--font-display);
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .mode-desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .mode-tag {
+            display: inline-block;
+            font-size: 0.6rem;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            padding: 0.15rem 0.4rem;
+            border-radius: 2px;
+            text-transform: uppercase;
+            margin-bottom: 0.6rem;
+        }
+        .mode-tag-free { background: rgba(0,255,102,0.1); color: var(--accent); }
+        .mode-tag-stakes { background: rgba(255,136,0,0.1); color: var(--warning); }
+        .mode-tag-team { background: rgba(51,136,255,0.1); color: var(--blue); }
+
+        /* === FINAL CTA === */
+        .final-cta {
+            text-align: center;
+            padding: 5rem 1.5rem;
+            position: relative;
+        }
+
+        .final-cta h2 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: -0.01em;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+        }
+
+        .final-cta .hero-buttons {
+            margin-bottom: 1rem;
+        }
+
+        .final-sub {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            letter-spacing: 0.02em;
+        }
+
+        /* === FOOTER === */
+        .landing-footer {
+            text-align: center;
+            padding: 2rem 1.5rem;
+            border-top: 1px solid var(--base-border);
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        /* === USERNAME MODAL (Free Play overlay) === */
+        #usernameModal {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 2000;
+            background: rgba(10, 10, 15, 0.85);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: all;
+        }
+        #usernameModal.hidden { display: none !important; }
+
+        .modal-box {
+            background: var(--base-dark);
+            border: 1px solid var(--base-border);
+            border-radius: 6px;
+            padding: 2rem;
+            width: min(92%, 380px);
+            text-align: center;
+        }
+
+        .modal-box h2 {
+            font-family: var(--font-display);
+            font-size: 1.4rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-primary);
+            margin-bottom: 0.3rem;
+        }
+
+        .modal-sub {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        #usernameInput {
+            background: var(--base-darkest);
+            border: 1px solid var(--base-border);
+            color: var(--text-primary);
+            padding: 0.7rem 1rem;
+            font-size: 0.9rem;
+            font-family: var(--font-body);
+            margin-bottom: 1rem;
+            width: 100%;
+            border-radius: 3px;
+            outline: none;
+            transition: border-color 0.15s;
+            -webkit-appearance: none;
+        }
+        #usernameInput:focus { border-color: var(--accent); }
+        #usernameInput::placeholder { color: var(--text-muted); }
+
+        #teamSelect {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .teamBtn {
+            flex: 1;
+            padding: 0.65rem;
+            font-family: var(--font-display);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .teamBtn.red {
+            background: rgba(255,51,68,0.08);
+            border: 1px solid rgba(255,51,68,0.3);
+            color: var(--danger);
+        }
+        .teamBtn.red:hover, .teamBtn.red.selected {
+            background: rgba(255,51,68,0.15);
+            border-color: var(--danger);
+        }
+        .teamBtn.blue {
+            background: rgba(51,136,255,0.08);
+            border: 1px solid rgba(51,136,255,0.3);
+            color: var(--blue);
+        }
+        .teamBtn.blue:hover, .teamBtn.blue.selected {
+            background: rgba(51,136,255,0.15);
+            border-color: var(--blue);
+        }
+
+        #modeSelect {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .modeBtn {
+            flex: 1;
+            padding: 0.5rem;
+            font-family: var(--font-body);
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            border-radius: 3px;
+            background: var(--base-elevated);
+            border: 1px solid var(--base-border);
+            color: var(--text-muted);
+            transition: all 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .modeBtn:hover { color: var(--text-secondary); }
+        .modeBtn.selected {
+            background: rgba(0,255,102,0.08);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        #startBtn {
+            width: 100%;
+            padding: 0.8rem;
+            font-family: var(--font-display);
+            font-size: 1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            background: var(--accent);
+            border: 1.5px solid var(--accent);
+            color: var(--base-darkest);
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #startBtn:hover {
+            background: #00dd55;
+            box-shadow: 0 0 20px var(--accent-dim);
+        }
+
+        .modal-close {
+            margin-top: 0.8rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: var(--font-body);
+            transition: color 0.15s;
+        }
+        .modal-close:hover { color: var(--text-secondary); }
+
+        /* === RESPONSIVE — MOBILE === */
+        @media (max-width: 768px) {
+            .player-grid { grid-template-columns: 1fr; }
+            .feature-grid { grid-template-columns: 1fr; }
+            .modes-grid { grid-template-columns: 1fr; }
+            .section { padding: 3rem 1rem; }
+            .hero { padding: 2rem 1rem 3.5rem; }
+
+            .duel-table th:nth-child(3),
+            .duel-table td:nth-child(3) { display: none; }
+        }
+
+        /* ============================================
+           GAME UI — ALL PRESERVED
+           ============================================ */
 
         #gameCanvas {
             display: block;
@@ -61,149 +842,8 @@
         @keyframes rotate { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }
 
         @media (orientation: portrait) {
-            #rotateOverlay { display: flex; }
+            body.game-active #rotateOverlay { display: flex; }
         }
-
-        /* === START MODAL === */
-        #usernameModal {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            background: linear-gradient(180deg, #1a1a3a 0%, #0a0a1a 50%, #1a1a3a 100%);
-            border: 3px outset #4444aa;
-            box-shadow: 0 0 0 1px #000, 0 0 0 3px #222266, inset 0 0 30px rgba(0,0,80,0.3);
-            padding: 1.5rem;
-            text-align: center;
-            pointer-events: all;
-            z-index: 1000;
-            width: min(92%, 420px);
-            border-radius: 2px;
-        }
-
-        #usernameModal h1 {
-            color: #ffcc00;
-            margin-bottom: 0.1rem;
-            font-size: clamp(1.4rem, 6vw, 2.2rem);
-            font-family: 'Impact', 'Arial Black', sans-serif;
-            text-shadow: 2px 2px 0 #000, -1px -1px 0 #885500, 0 0 20px rgba(255,200,0,0.4);
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
-        #usernameModal .subtitle {
-            color: #8888cc;
-            margin-bottom: 0.6rem;
-            font-size: clamp(0.55rem, 2vw, 0.75rem);
-            font-family: 'Comic Sans MS', 'Chalkboard SE', cursive;
-            font-style: italic;
-        }
-
-        #usernameModal .separator {
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #4444aa, #8888ff, #4444aa, transparent);
-            margin: 0.5rem 0;
-        }
-
-        #usernameModal .visitor-count {
-            color: #44ff44;
-            font-family: 'Courier New', monospace;
-            font-size: 0.6rem;
-            margin-bottom: 0.6rem;
-        }
-        #usernameModal .visitor-count span {
-            background: #000;
-            border: 1px inset #444;
-            padding: 1px 3px;
-            color: #00ff00;
-            font-weight: bold;
-            letter-spacing: 0.15em;
-        }
-
-        #usernameModal .nav-links {
-            display: flex; justify-content: center; gap: 0.4rem;
-            margin-bottom: 0.6rem; flex-wrap: wrap;
-        }
-        #usernameModal .nav-links a {
-            color: #6688ff; font-size: 0.6rem; font-family: 'Verdana', sans-serif;
-            text-decoration: underline; cursor: default;
-        }
-
-        #usernameInput {
-            background: #000;
-            border: 2px inset #555;
-            color: #fff;
-            padding: 0.6rem 0.8rem;
-            font-size: 0.9rem;
-            font-family: 'Verdana', sans-serif;
-            margin-bottom: 0.8rem;
-            width: 100%;
-            border-radius: 0;
-            -webkit-appearance: none;
-        }
-        #usernameInput::placeholder { color: #666; font-style: italic; }
-
-        #teamSelect {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 0.8rem;
-            justify-content: center;
-        }
-
-        .teamBtn {
-            background: linear-gradient(180deg, #333 0%, #1a1a1a 100%);
-            border: 2px outset #666;
-            color: #ccc;
-            padding: 0.6rem 1.2rem;
-            font-size: 0.8rem;
-            font-family: 'Verdana', sans-serif;
-            font-weight: bold;
-            cursor: pointer;
-            flex: 1;
-            border-radius: 0;
-            text-transform: uppercase;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .teamBtn.red {
-            border-color: #cc0000;
-            color: #ff4444;
-            background: linear-gradient(180deg, #441111 0%, #220000 100%);
-        }
-        .teamBtn.blue {
-            border-color: #0044cc;
-            color: #4488ff;
-            background: linear-gradient(180deg, #111144 0%, #000022 100%);
-        }
-        .teamBtn:active, .teamBtn.red:active { border-style: inset; }
-        .teamBtn.blue:active { border-style: inset; }
-
-        #startBtn {
-            background: linear-gradient(180deg, #ffdd44 0%, #cc8800 50%, #ffdd44 100%);
-            border: 2px outset #ffcc00;
-            color: #000;
-            padding: 0.7rem;
-            font-size: 1rem;
-            font-weight: bold;
-            font-family: 'Impact', 'Arial Black', sans-serif;
-            cursor: pointer;
-            width: 100%;
-            border-radius: 0;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            text-shadow: 1px 1px 0 rgba(255,255,255,0.3);
-            -webkit-tap-highlight-color: transparent;
-        }
-        #startBtn:active { border-style: inset; opacity: 0.9; }
-
-        #usernameModal .footer-text {
-            color: #555;
-            font-size: 0.5rem;
-            font-family: 'Verdana', sans-serif;
-            margin-top: 0.6rem;
-        }
-        #usernameModal .footer-text a { color: #6688ff; text-decoration: underline; cursor: default; }
-
-        @keyframes blink2k { 0%,49%{opacity:1}50%,100%{opacity:0} }
-        #usernameModal .blink { animation: blink2k 1s step-end infinite; }
 
         /* === HUD — mobile-first compact === */
         #hud {
@@ -227,7 +867,6 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* === SCOREBOARD — compact === */
         /* === SCOREBOARD — full screen watchlist overlay === */
         #scoreboard {
             position: fixed;
@@ -288,7 +927,7 @@
         #scoreboard .sb-team-blue { border-left: 3px solid #0088ff; }
         #scoreboard .sb-chart { width: 80px; height: 24px; }
 
-        /* === ABILITIES — bottom corners === */
+        /* === ABILITIES — bottom center === */
         #abilities {
             position: absolute;
             bottom: env(safe-area-inset-bottom, 12px);
@@ -317,7 +956,7 @@
         .ability-name { color: #aaa; font-size: 0.55rem; margin-top: 2px; }
         .ability-cd { color: #ff0000; font-size: 0.7rem; margin-top: 2px; }
 
-        /* === CONTROLS HINT — hidden on mobile === */
+        /* === CONTROLS HINT === */
         #controls {
             position: absolute;
             bottom: 12px;
@@ -362,7 +1001,7 @@
             100% { opacity: 0; transform: translate(-50%,-50%) rotate(var(--a,0deg)) translateY(-40px) scale(0); }
         }
 
-        /* Flying candle that moves from center to HUD chart */
+        /* Flying candle */
         .flying-candle {
             position: fixed;
             z-index: 9999;
@@ -603,6 +1242,7 @@
             cursor: pointer;
             transition: all 0.15s;
             -webkit-tap-highlight-color: transparent;
+            flex-wrap: wrap;
         }
         .shop-item:hover:not(.disabled) {
             background: rgba(255,215,0,0.15);
@@ -619,37 +1259,8 @@
         .shop-name { color: #fff; font-size: 0.8rem; font-weight: bold; flex: 1; }
         .shop-cost { color: #ffd700; font-size: 0.75rem; font-weight: bold; }
         .shop-desc { color: #888; font-size: 0.6rem; width: 100%; margin-top: 0.1rem; }
-        .shop-item { flex-wrap: wrap; }
 
         .hidden { display: none !important; }
-
-        /* === MODE SELECT === */
-        #modeSelect {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            justify-content: center;
-        }
-        .modeBtn {
-            background: linear-gradient(180deg, #333 0%, #1a1a1a 100%);
-            border: 2px outset #666;
-            color: #aaa;
-            padding: 0.45rem 0.8rem;
-            font-size: 0.75rem;
-            font-family: 'Verdana', sans-serif;
-            font-weight: bold;
-            cursor: pointer;
-            flex: 1;
-            border-radius: 0;
-            text-transform: uppercase;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .modeBtn:active { border-style: inset; }
-        .modeBtn.selected {
-            background: linear-gradient(180deg, #225522 0%, #113311 100%);
-            border-color: #44aa44;
-            color: #44ff44;
-        }
 
         /* === CHAT BOX === */
         #chatBox {
@@ -688,7 +1299,7 @@
         }
         #chatInput::placeholder { color: #00ff0044; }
 
-        /* === KILL FEED — above minimap, bottom left === */
+        /* === KILL FEED === */
         #killFeed {
             position: absolute;
             bottom: 140px;
@@ -726,31 +1337,25 @@
             border-radius: 4px;
         }
 
-        /* === MOBILE TWEAKS === */
-        /* === MOBILE RESPONSIVE === */
+        /* === MOBILE GAME UI TWEAKS === */
         @media (max-width: 768px), (max-height: 500px) {
             #controls { display: none !important; }
 
-            /* HUD terminal */
             #terminal { padding: 4px 8px; min-width: 120px; }
             #terminal #ticker { font-size: 0.8rem; }
             #terminal #price { font-size: 0.7rem; }
             #terminal #pctChange { font-size: 0.55rem; }
             #hudChart { width: 100px; height: 35px; }
 
-            /* Abilities bar */
             .ability { width: 44px; padding: 5px; }
             .ability-key { font-size: 0.8rem; }
             .ability-name { font-size: 0.45rem; }
 
-            /* Minimap */
             .minimap { width: 80px; height: 80px; }
 
-            /* Kill feed */
             #killFeed { bottom: 100px; width: min(180px, 40vw); }
             .kill-message { font-size: 0.45rem; padding: 1px 6px; }
 
-            /* Scoreboard */
             #scoreboard { padding: 0.5rem; }
             #scoreboard .sb-table-wrap { padding: 0.5rem 0.8rem; }
             #scoreboard .sb-title { font-size: 0.9rem; margin-bottom: 0.5rem; }
@@ -759,7 +1364,6 @@
             #scoreboard .sb-chart { width: 50px; height: 18px; }
             #scoreboard .sb-price span { display: none; }
 
-            /* Death screen */
             #deathPopup { padding: 0.5rem; }
             #deathText { font-size: clamp(1.8rem, 8vw, 3.5rem); }
             #deathKiller { font-size: clamp(0.6rem, 2.5vw, 0.9rem); }
@@ -767,7 +1371,6 @@
             #deathCandle { transform: scale(0.6); }
             #respawnBtn { font-size: clamp(0.65rem, 2vw, 0.85rem); padding: 0.4rem 1.2rem; margin-top: 0.5rem; }
 
-            /* Shop */
             #shopPanel { padding: 0.6rem; }
             #shopPanel h2 { font-size: 0.8rem; }
             .shop-item { padding: 0.35rem; gap: 0.3rem; }
@@ -776,47 +1379,408 @@
             .shop-cost { font-size: 0.6rem; }
             .shop-desc { font-size: 0.5rem; }
 
-            /* Start screen */
-            #usernameModal { padding: 0.8rem; }
-            #usernameModal h1 { font-size: clamp(1rem, 5vw, 1.6rem); }
-            #usernameModal .subtitle { font-size: 0.5rem; }
-            #usernameModal .nav-links { font-size: 0.5rem; gap: 0.2rem; }
-            #usernameModal .visitor-count { font-size: 0.5rem; }
-            #usernameModal .footer-text { font-size: 0.4rem; }
-            .modeBtn { padding: 0.35rem 0.5rem; font-size: 0.65rem; }
-            .teamBtn { padding: 0.4rem 0.8rem; font-size: 0.7rem; }
-
-            /* Chat */
             #chatBox { width: min(200px, 35vw); bottom: 90px; }
             #chatMessages { max-height: 80px; font-size: 0.5rem; }
             #chatInput { font-size: 0.55rem; }
 
-            /* Streak popup */
             #streakPopup { top: 30%; }
         }
     </style>
 </head>
 <body>
-    <div id="fpsCounter" style="position:fixed;top:4px;right:max(env(safe-area-inset-right),8px);color:#0f0;font-family:monospace;font-size:11px;z-index:99999;pointer-events:none;text-shadow:0 0 2px #000,0 0 4px #000;">FPS: --</div>
-    <!-- Force landscape overlay -->
-    <div id="rotateOverlay">
-        <div class="icon">📱</div>
-        <div>Rotate your device to<br><strong>LANDSCAPE</strong><br>to play</div>
+    <!-- ============================================
+         LANDING PAGE
+         ============================================ -->
+    <div id="landingPage">
+
+        <!-- HERO -->
+        <section class="hero">
+            <div class="hero-content">
+                <div class="hero-tag">WC3-Inspired Arena Combat</div>
+                <h1>Skill-based<br>sniper <span>duels.</span></h1>
+                <p class="hero-sub">Play free or wager on Solana.</p>
+                <p class="hero-desc">WC3-inspired arena combat. 1v1 wagers. 5v5 multiplayer. Your reputation is your record.</p>
+                <div class="hero-buttons">
+                    <button class="btn btn-outline" id="playFreeBtn">PLAY FREE</button>
+                    <button class="btn btn-filled" id="enterWagerBtn">ENTER WAGER LOBBY</button>
+                </div>
+            </div>
+
+            <!-- LIVE TICKER STRIP -->
+            <div class="ticker-strip">
+                <div class="ticker-track">
+                    <span class="ticker-item"><span class="accent">12.4 SOL</span> wagered today</span>
+                    <span class="ticker-item">Last duel: <span class="user">@bushi</span> won <span class="accent">0.42 SOL</span></span>
+                    <span class="ticker-item"><span class="accent">18</span> live matches</span>
+                    <span class="ticker-item"><span class="user">@wizardscope</span> on <span class="hot">9-win streak</span></span>
+                    <span class="ticker-item"><span class="user">@voidcat</span> upset a 72% favorite</span>
+                    <span class="ticker-item">High roller duel: <span class="accent">2.5 SOL</span></span>
+                    <span class="ticker-item"><span class="user">@phantom</span> hit <span class="accent">80% WR</span> over 20 matches</span>
+                    <span class="ticker-item">Fastest duel today: <span class="hot">14 seconds</span></span>
+                    <!-- duplicate for seamless scroll -->
+                    <span class="ticker-item"><span class="accent">12.4 SOL</span> wagered today</span>
+                    <span class="ticker-item">Last duel: <span class="user">@bushi</span> won <span class="accent">0.42 SOL</span></span>
+                    <span class="ticker-item"><span class="accent">18</span> live matches</span>
+                    <span class="ticker-item"><span class="user">@wizardscope</span> on <span class="hot">9-win streak</span></span>
+                    <span class="ticker-item"><span class="user">@voidcat</span> upset a 72% favorite</span>
+                    <span class="ticker-item">High roller duel: <span class="accent">2.5 SOL</span></span>
+                    <span class="ticker-item"><span class="user">@phantom</span> hit <span class="accent">80% WR</span> over 20 matches</span>
+                    <span class="ticker-item">Fastest duel today: <span class="hot">14 seconds</span></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- LIVE DUEL BOARD -->
+        <section class="duel-section">
+            <div class="section" style="padding-top: 3rem; padding-bottom: 3rem;">
+                <div class="section-header">
+                    <div class="pulse-dot"></div>
+                    <h2 class="section-title">LIVE ARENA</h2>
+                </div>
+                <div class="filter-tabs">
+                    <button class="filter-tab active">ALL</button>
+                    <button class="filter-tab">OPEN</button>
+                    <button class="filter-tab">LIVE</button>
+                    <button class="filter-tab">HIGH STAKES</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="duel-table">
+                        <thead>
+                            <tr>
+                                <th>Player</th>
+                                <th>Win Rate</th>
+                                <th>Matches</th>
+                                <th>Stake</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="duel-handle">@bushi</span></td>
+                                <td><span class="duel-wr high">68%</span></td>
+                                <td>142</td>
+                                <td><span class="duel-stake">0.5 SOL</span></td>
+                                <td><span class="badge badge-live">LIVE</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="duel-handle">@wizardscope</span></td>
+                                <td><span class="duel-wr high">74%</span></td>
+                                <td>89</td>
+                                <td><span class="duel-stake">1.0 SOL</span></td>
+                                <td><span class="badge badge-hot">HOT</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="duel-handle">@voidcat</span></td>
+                                <td><span class="duel-wr mid">52%</span></td>
+                                <td>67</td>
+                                <td><span class="duel-stake">0.25 SOL</span></td>
+                                <td><span class="badge badge-open">OPEN</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="duel-handle">@phantom</span></td>
+                                <td><span class="duel-wr high">80%</span></td>
+                                <td>23</td>
+                                <td><span class="duel-stake">2.5 SOL</span></td>
+                                <td><span class="badge badge-live">LIVE</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="duel-handle">@snipegod</span></td>
+                                <td><span class="duel-wr mid">61%</span></td>
+                                <td>203</td>
+                                <td><span class="duel-stake">0.1 SOL</span></td>
+                                <td><span class="badge badge-open">OPEN</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="duel-handle">@degenking</span></td>
+                                <td><span class="duel-wr low">38%</span></td>
+                                <td>45</td>
+                                <td><span class="duel-stake">5.0 SOL</span></td>
+                                <td><span class="badge badge-hot">HOT</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="duel-handle">@coldshot</span></td>
+                                <td><span class="duel-wr high">71%</span></td>
+                                <td>118</td>
+                                <td><span class="duel-stake">0.5 SOL</span></td>
+                                <td><span class="badge badge-live">LIVE</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="duel-handle">@rookie_x</span></td>
+                                <td><span class="duel-wr mid">50%</span></td>
+                                <td>4</td>
+                                <td><span class="duel-stake">0.05 SOL</span></td>
+                                <td><span class="badge badge-new">NEW</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="duel-handle">@nightowl</span></td>
+                                <td><span class="duel-wr mid">58%</span></td>
+                                <td>76</td>
+                                <td><span class="duel-stake">0.3 SOL</span></td>
+                                <td><span class="badge badge-open">OPEN</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="duel-handle">@sol_slayer</span></td>
+                                <td><span class="duel-wr high">66%</span></td>
+                                <td>91</td>
+                                <td><span class="duel-stake">1.0 SOL</span></td>
+                                <td><span class="badge badge-live">LIVE</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- PLAYER IDENTITY -->
+        <section class="section">
+            <div class="section-header">
+                <h2 class="section-title">REPUTATION IS PUBLIC</h2>
+            </div>
+            <div class="player-grid">
+                <!-- Card 1 -->
+                <div class="player-card">
+                    <div class="player-card-top">
+                        <div class="player-avatar" style="background: var(--accent);">B</div>
+                        <div>
+                            <div class="player-handle">@bushi</div>
+                            <div class="player-tier tier-elite">Elite</div>
+                        </div>
+                    </div>
+                    <div class="player-stats">
+                        <div>
+                            <div class="player-stat-val">68%</div>
+                            <div class="player-stat-label">Win Rate</div>
+                        </div>
+                        <div>
+                            <div class="player-stat-val">142</div>
+                            <div class="player-stat-label">Matches</div>
+                        </div>
+                        <div>
+                            <div class="player-stat-val">0.45</div>
+                            <div class="player-stat-label">Avg SOL</div>
+                        </div>
+                    </div>
+                    <div class="player-form">
+                        <div class="form-dot w"></div>
+                        <div class="form-dot w"></div>
+                        <div class="form-dot l"></div>
+                        <div class="form-dot w"></div>
+                        <div class="form-dot w"></div>
+                        <div class="form-dot w"></div>
+                        <div class="form-dot l"></div>
+                        <div class="form-dot w"></div>
+                    </div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="player-card">
+                    <div class="player-card-top">
+                        <div class="player-avatar" style="background: var(--blue);">W</div>
+                        <div>
+                            <div class="player-handle">@wizardscope</div>
+                            <div class="player-tier tier-trusted">Trusted</div>
+                        </div>
+                    </div>
+                    <div class="player-stats">
+                        <div>
+                            <div class="player-stat-val">74%</div>
+                            <div class="player-stat-label">Win Rate</div>
+                        </div>
+                        <div>
+                            <div class="player-stat-val">89</div>
+                            <div class="player-stat-label">Matches</div>
+                        </div>
+                        <div>
+                            <div class="player-stat-val">0.82</div>
+                            <div class="player-stat-label">Avg SOL</div>
+                        </div>
+                    </div>
+                    <div class="player-form">
+                        <div class="form-dot w"></div>
+                        <div class="form-dot w"></div>
+                        <div class="form-dot w"></div>
+                        <div class="form-dot w"></div>
+                        <div class="form-dot w"></div>
+                        <div class="form-dot l"></div>
+                        <div class="form-dot w"></div>
+                        <div class="form-dot w"></div>
+                    </div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="player-card">
+                    <div class="player-card-top">
+                        <div class="player-avatar" style="background: var(--warning);">V</div>
+                        <div>
+                            <div class="player-handle">@voidcat</div>
+                            <div class="player-tier tier-rising">Rising</div>
+                        </div>
+                    </div>
+                    <div class="player-stats">
+                        <div>
+                            <div class="player-stat-val">52%</div>
+                            <div class="player-stat-label">Win Rate</div>
+                        </div>
+                        <div>
+                            <div class="player-stat-val">67</div>
+                            <div class="player-stat-label">Matches</div>
+                        </div>
+                        <div>
+                            <div class="player-stat-val">0.20</div>
+                            <div class="player-stat-label">Avg SOL</div>
+                        </div>
+                    </div>
+                    <div class="player-form">
+                        <div class="form-dot l"></div>
+                        <div class="form-dot w"></div>
+                        <div class="form-dot l"></div>
+                        <div class="form-dot w"></div>
+                        <div class="form-dot w"></div>
+                        <div class="form-dot l"></div>
+                        <div class="form-dot w"></div>
+                        <div class="form-dot l"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- WHY SNIPERZ -->
+        <section class="section" style="background: var(--base-dark); max-width: none; border-top: 1px solid var(--base-border); border-bottom: 1px solid var(--base-border);">
+            <div style="max-width: 1100px; margin: 0 auto;">
+                <div class="section-header">
+                    <h2 class="section-title">WHY SNIPERZ</h2>
+                </div>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <div class="feature-title">Positioning Wins</div>
+                        <div class="feature-desc">Auto-shoot means the skill is WHERE you stand, not how fast you click.</div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-title">Stakes Change Everything</div>
+                        <div class="feature-desc">Free play to warm up. Real SOL when you're ready.</div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-title">Reputation Is Public</div>
+                        <div class="feature-desc">Every win, loss, and disconnect is on your record.</div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-title">Every Duel Tells a Story</div>
+                        <div class="feature-desc">Fast rounds. Visible stakes. Replayable rivalries.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ARENA FEED -->
+        <section class="section">
+            <div class="section-header">
+                <div class="pulse-dot"></div>
+                <h2 class="section-title">ARENA FEED</h2>
+            </div>
+            <div class="feed-list">
+                <div class="feed-item">
+                    <div class="feed-bar loss"></div>
+                    <div class="feed-text"><strong>@bushi</strong> lost 0.9 SOL in sudden death</div>
+                    <div class="feed-time">2m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar streak"></div>
+                    <div class="feed-text"><strong>@wizardscope</strong> hit a 10-win streak</div>
+                    <div class="feed-time">5m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar win"></div>
+                    <div class="feed-text"><strong>@voidcat</strong> upset a 72% favorite</div>
+                    <div class="feed-time">8m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar info"></div>
+                    <div class="feed-text">High Roller duel settled in 38 seconds</div>
+                    <div class="feed-time">11m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar win"></div>
+                    <div class="feed-text"><strong>@phantom</strong> won 2.5 SOL vs <strong>@degenking</strong></div>
+                    <div class="feed-time">14m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar loss"></div>
+                    <div class="feed-text"><strong>@rookie_x</strong> lost their first wager (0.05 SOL)</div>
+                    <div class="feed-time">18m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar streak"></div>
+                    <div class="feed-text"><strong>@coldshot</strong> defended a 5-match streak</div>
+                    <div class="feed-time">22m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar win"></div>
+                    <div class="feed-text"><strong>@snipegod</strong> won 0.1 SOL — 200th match milestone</div>
+                    <div class="feed-time">25m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar info"></div>
+                    <div class="feed-text"><strong>@nightowl</strong> joined the arena</div>
+                    <div class="feed-time">28m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar loss"></div>
+                    <div class="feed-text"><strong>@sol_slayer</strong> rage-quit vs <strong>@bushi</strong> — forfeit recorded</div>
+                    <div class="feed-time">31m ago</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- GAME MODES -->
+        <section class="section" style="background: var(--base-dark); max-width: none; border-top: 1px solid var(--base-border); border-bottom: 1px solid var(--base-border);">
+            <div style="max-width: 1100px; margin: 0 auto;">
+                <div class="section-header">
+                    <h2 class="section-title">GAME MODES</h2>
+                </div>
+                <div class="modes-grid">
+                    <div class="mode-card">
+                        <div class="mode-tag mode-tag-free">Free</div>
+                        <div class="mode-label">Free Play</div>
+                        <div class="mode-desc">Learn the arena. No stakes. Practice positioning against bots or live players.</div>
+                    </div>
+                    <div class="mode-card">
+                        <div class="mode-tag mode-tag-stakes">Stakes</div>
+                        <div class="mode-label">1v1 Wager Duels</div>
+                        <div class="mode-desc">High-stakes. Rep-driven. Selective matchups. Winner takes the pot.</div>
+                    </div>
+                    <div class="mode-card">
+                        <div class="mode-tag mode-tag-team">Team</div>
+                        <div class="mode-label">5v5 Multiplayer</div>
+                        <div class="mode-desc">Team chaos. Live action. Social play. First to the kill limit wins.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FINAL CTA -->
+        <section class="final-cta">
+            <h2>Step into the arena.</h2>
+            <div class="hero-buttons">
+                <button class="btn btn-outline" id="playFreeBtn2">PLAY FREE</button>
+                <button class="btn btn-filled" id="enterWagerBtn2">ENTER WAGER LOBBY</button>
+            </div>
+            <p class="final-sub" style="margin-top: 1rem;">Live duels. Public reputations. Real stakes.</p>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="landing-footer">
+            sNiPeRz &mdash; Built on Solana
+        </footer>
     </div>
 
-    <canvas id="gameCanvas"></canvas>
-
-    <div id="ui">
-        <div id="usernameModal">
-            <div class="nav-links">
-                <a>Home</a> | <a>About</a> | <a>Downloads</a> | <a>Forums</a> | <a>Contact</a>
-            </div>
-            <div class="separator"></div>
-            <h1>~ Elite Snipers ~</h1>
-            <div class="subtitle">:: A tribute to the legendary Warcraft III custom game ::</div>
-            <div class="separator"></div>
-            <div class="visitor-count">You are visitor #<span id="visitorNum">004,831</span> <span class="blink">|</span></div>
-            <input type="text" id="usernameInput" placeholder="Enter your name..." maxlength="12">
+    <!-- ============================================
+         USERNAME MODAL (Free Play Flow)
+         ============================================ -->
+    <div id="usernameModal" class="hidden">
+        <div class="modal-box">
+            <h2>Enter the Arena</h2>
+            <p class="modal-sub">Choose your name and team</p>
+            <input type="text" id="usernameInput" placeholder="Your handle..." maxlength="12">
             <div id="modeSelect">
                 <button class="modeBtn selected" data-mode="offline">OFFLINE</button>
                 <button class="modeBtn" data-mode="online">ONLINE</button>
@@ -825,12 +1789,25 @@
                 <button class="teamBtn red" data-team="red">RED TEAM</button>
                 <button class="teamBtn blue" data-team="blue">BLUE TEAM</button>
             </div>
-            <button id="startBtn">>> ENTER GAME <<</button>
-            <div class="footer-text">
-                Best viewed in 1024x768 &bull; <a>Netscape 4.0+</a> &bull; &copy; 2003 EliteSnipers.net<br>
-                <a>Sign our Guestbook!</a> &bull; <a>Link to us</a> &bull; Made with Notepad
-            </div>
+            <button id="startBtn">START GAME</button>
+            <button class="modal-close" id="modalCloseBtn">Back</button>
         </div>
+    </div>
+
+    <!-- ============================================
+         GAME UI — ALL PRESERVED
+         ============================================ -->
+    <div id="fpsCounter" style="position:fixed;top:4px;right:max(env(safe-area-inset-right),8px);color:#0f0;font-family:monospace;font-size:11px;z-index:99999;pointer-events:none;text-shadow:0 0 2px #000,0 0 4px #000;">FPS: --</div>
+
+    <!-- Force landscape overlay -->
+    <div id="rotateOverlay">
+        <div class="icon">📱</div>
+        <div>Rotate your device to<br><strong>LANDSCAPE</strong><br>to play</div>
+    </div>
+
+    <canvas id="gameCanvas" style="display:none;"></canvas>
+
+    <div id="ui" style="display:none;">
 
         <div id="hud" class="hidden">
             <div id="terminal" style="
@@ -929,6 +1906,7 @@
             <div id="deathKiller"></div>
             <button id="respawnBtn">RETURN TO SPAWN</button>
         </div>
+
         <!-- Match End Screen -->
         <div id="matchEnd" class="hidden">
             <div id="matchEndOverlay"></div>
@@ -966,6 +1944,89 @@
         }
     }
     </script>
+
+    <!-- Landing page interaction logic -->
+    <script>
+    (function() {
+        const landing = document.getElementById('landingPage');
+        const modal = document.getElementById('usernameModal');
+        const canvas = document.getElementById('gameCanvas');
+        const ui = document.getElementById('ui');
+
+        function enterGameView() {
+            landing.classList.add('hidden');
+            canvas.style.display = 'block';
+            ui.style.display = '';
+            document.body.classList.add('game-active');
+        }
+
+        function returnToLanding() {
+            landing.classList.remove('hidden');
+            canvas.style.display = 'none';
+            ui.style.display = 'none';
+            modal.classList.add('hidden');
+            document.body.classList.remove('game-active');
+            window.scrollTo(0, 0);
+        }
+
+        // "PLAY FREE" buttons open the username modal
+        document.getElementById('playFreeBtn').addEventListener('click', () => {
+            modal.classList.remove('hidden');
+        });
+        document.getElementById('playFreeBtn2').addEventListener('click', () => {
+            modal.classList.remove('hidden');
+        });
+
+        // "Back" closes modal
+        document.getElementById('modalCloseBtn').addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+
+        // "ENTER WAGER LOBBY" buttons
+        function openWagerLobby() {
+            enterGameView();
+            // Trigger wager lobby via existing wager-ui system
+            setTimeout(() => {
+                const wagerBtn = document.getElementById('wagerBtn');
+                if (wagerBtn) {
+                    wagerBtn.click();
+                } else if (typeof window.showLobby === 'function') {
+                    window.showLobby();
+                } else {
+                    // Fallback: show the username modal instead
+                    modal.classList.remove('hidden');
+                }
+            }, 100);
+        }
+
+        document.getElementById('enterWagerBtn').addEventListener('click', openWagerLobby);
+        document.getElementById('enterWagerBtn2').addEventListener('click', openWagerLobby);
+
+        // When startBtn is clicked (from the modal), transition to game
+        document.getElementById('startBtn').addEventListener('click', () => {
+            enterGameView();
+        }, true); // capture phase so it runs before game.js handler
+
+        // Intercept "QUIT MATCH" to return to landing instead of showing usernameModal
+        // game.js shows usernameModal on quit — we observe that and redirect to landing
+        const observer = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+                if (m.type === 'attributes' && m.attributeName === 'class') {
+                    // If usernameModal becomes visible while game was active, redirect to landing
+                    if (!modal.classList.contains('hidden') && document.body.classList.contains('game-active')) {
+                        modal.classList.add('hidden');
+                        returnToLanding();
+                    }
+                }
+            }
+        });
+        observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
+
+        // Expose returnToLanding for external use
+        window._returnToLanding = returnToLanding;
+    })();
+    </script>
+
     <script type="module" src="/game.js?v=20260408"></script>
 </body>
 </html>

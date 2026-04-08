@@ -3016,12 +3016,14 @@ document.getElementById('startBtn').addEventListener('click', () => {
 
     console.log('Starting game as', username, 'on team', gameState.team);
 
-    document.getElementById('usernameModal').classList.add('hidden');
-    document.getElementById('hud').classList.remove('hidden');
-    // Scoreboard starts hidden — Tab or tap kill count to toggle
-    document.getElementById('abilities').classList.remove('hidden');
-    // Controls panel removed
-    document.querySelector('.minimap').classList.remove('hidden');
+    document.getElementById('usernameModal')?.classList.add('hidden');
+    document.getElementById('landingPage')?.classList.add('hidden');
+    document.getElementById('gameCanvas').style.display = 'block';
+    document.getElementById('ui').style.display = '';
+    document.body.classList.add('game-active');
+    document.getElementById('hud')?.classList.remove('hidden');
+    document.getElementById('abilities')?.classList.remove('hidden');
+    document.querySelector('.minimap')?.classList.remove('hidden');
 
     // Set ticker to player name
     const tickerEl = document.getElementById('ticker');
@@ -3088,9 +3090,12 @@ document.getElementById('menuQuit')?.addEventListener('click', () => {
     document.querySelector('.minimap')?.classList.add('hidden');
     document.getElementById('teamScore')?.classList.add('hidden');
 
-    // Show start screen
-    document.getElementById('usernameModal').classList.remove('hidden');
-    document.getElementById('usernameModal').style.display = '';
+    // Show landing page
+    document.getElementById('landingPage')?.classList.remove('hidden');
+    document.getElementById('gameCanvas').style.display = 'none';
+    document.getElementById('ui').style.display = 'none';
+    document.body.classList.remove('game-active');
+    window.scrollTo(0, 0);
 
     // Clean up remote players
     _remotePlayers.forEach((r) => { if (r.player.mesh.parent) r.player.mesh.parent.remove(r.player.mesh); });
