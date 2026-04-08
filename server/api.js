@@ -363,27 +363,18 @@ router.post('/matches/:id/submit-signed-tx', authMiddleware, async (req, res) =>
             return res.status(403).json(fail('Not in this match'));
         }
 
-        const { signedTransaction, signature } = req.body;
-        if (!signedTransaction || !signature) return res.status(400).json(fail('Missing signedTransaction or signature'));
+        const { signedTransaction } = req.body;
+        if (!signedTransaction) return res.status(400).json(fail('Missing signedTransaction'));
 
         if (!escrow.isReady()) return res.status(503).json(fail('Escrow not configured'));
 
-        const { Connection, Transaction } = require('@solana/web3.js');
+        const { Connection } = require('@solana/web3.js');
         const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
 
-        // Decode the transaction and add the signature
-        const txBytes = Buffer.from(signedTransaction, 'base64');
-        const transaction = Transaction.from(txBytes);
+        // The client sends a fully signed transaction (base64)
+        const rawTx = Buffer.from(signedTransaction, 'base64');
 
-        // Add the user's signature
-        const user = db.getUser(userId);
-        const { PublicKey } = require('@solana/web3.js');
-        const userPubkey = new PublicKey(user.privy_wallet);
-        const sigBuffer = Buffer.from(signature, 'base64');
-        transaction.addSignature(userPubkey, sigBuffer);
-
-        // Send to Solana
-        const rawTx = transaction.serialize();
+        // Send directly to Solana
         const txSignature = await conn.sendRawTransaction(rawTx, { skipPreflight: false });
         console.log('[DEPOSIT] Submitted tx:', txSignature);
 

@@ -57,23 +57,36 @@ export async function requestDeposit(matchId, token) {
 
         const txBytes = Uint8Array.from(atob(unsignedTxBase64), c => c.charCodeAt(0));
 
-        // Use provider.request to sign the message (raw bytes)
-        const message = btoa(String.fromCharCode(...txBytes));
+        // signTransaction returns the signed transaction object
         const signResult = await provider.request({
-            method: 'signMessage',
-            params: { message },
+            method: 'signTransaction',
+            params: { transaction: txBytes },
         });
-        const signatureBase64 = signResult?.signature || signResult;
+
+        // Extract the signed transaction — could be the signed tx object or serialized bytes
+        const signedTx = signResult?.signedTransaction || signResult;
+        let signedTxBase64;
+        if (signedTx instanceof Uint8Array || signedTx instanceof ArrayBuffer) {
+            const bytes = new Uint8Array(signedTx);
+            signedTxBase64 = btoa(String.fromCharCode(...bytes));
+        } else if (typeof signedTx === 'string') {
+            signedTxBase64 = signedTx;
+        } else if (signedTx?.serialize) {
+            // It's a Transaction object — serialize it
+            const serialized = signedTx.serialize();
+            signedTxBase64 = btoa(String.fromCharCode(...new Uint8Array(serialized)));
+        } else {
+            console.log('[deposit] signResult type:', typeof signedTx, signedTx);
+            return { success: false, error: 'Unexpected sign result format' };
+        }
+
         console.log('[deposit] Signed, submitting to server...');
 
         // Step 3b: Send signed tx to server for submission
         const submitRes = await fetch(`/api/matches/${matchId}/submit-signed-tx`, {
             method: 'POST',
             headers: authHeaders(authToken),
-            body: JSON.stringify({
-                signedTransaction: unsignedTxBase64,
-                signature: signatureBase64,
-            }),
+            body: JSON.stringify({ signedTransaction: signedTxBase64 }),
         });
         const submitBody = await submitRes.json();
         if (!submitRes.ok || !submitBody.success) {
