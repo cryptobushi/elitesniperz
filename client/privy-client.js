@@ -373,17 +373,31 @@ export async function getSolanaProvider() {
     if (!ready) { console.warn('[Privy] Wallet iframe not ready for signing'); return null; }
 
     try {
-        // Get the current user from Privy
         const accessToken = await _privyClient.getAccessToken();
         if (!accessToken) return null;
 
-        // We need the user object with linked_accounts to find the wallet
-        // Re-fetch user from our server to get wallet address
-        const user = getUser();
-        if (!user?.privy_wallet) { console.warn('[Privy] No wallet address'); return null; }
+        // Get the Privy user object (has linked_accounts with wallet info)
+        const privyUser = _privyClient.user;
+        if (!privyUser) {
+            console.warn('[Privy] No privy user object cached');
+            return null;
+        }
 
-        // Get Solana provider from Privy
-        const provider = await _privyClient.embeddedWallet.getSolanaProvider(user.privy_wallet);
+        // Find the embedded Solana wallet account
+        const solWallet = getUserEmbeddedSolanaWallet(privyUser);
+        if (!solWallet) {
+            console.warn('[Privy] No embedded Solana wallet found in user');
+            return null;
+        }
+        console.log('[Privy] Found Solana wallet:', solWallet.address);
+
+        // Get entropy details for wallet access
+        const { entropyId, entropyIdVerifier } = getEntropyDetailsFromUser(privyUser);
+
+        // Get Solana provider
+        const provider = await _privyClient.embeddedWallet.getSolanaProvider(
+            solWallet, entropyId, entropyIdVerifier
+        );
         console.log('[Privy] Got Solana provider');
         return provider;
     } catch (e) {
