@@ -3,6 +3,7 @@
 const PRIVY_APP_ID = process.env.PRIVY_APP_ID || '';
 const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET || '';
 const DEV_MODE = !PRIVY_APP_ID || PRIVY_APP_ID === 'your-privy-app-id';
+const ALLOW_DEV_TOKENS = process.env.ALLOW_DEV_TOKENS !== '0'; // Allow dev tokens alongside real Privy
 
 let privy = null;
 if (!DEV_MODE) {
@@ -40,8 +41,8 @@ async function authMiddleware(req, res, next) {
 
     const token = authHeader.replace('Bearer ', '');
 
-    // Dev mode: accept mock tokens
-    if (DEV_MODE) {
+    // Dev tokens (always accepted unless ALLOW_DEV_TOKENS=0)
+    if (ALLOW_DEV_TOKENS && token.startsWith('dev:')) {
         const mock = parseMockToken(token);
         if (mock) {
             req.privyUserId = mock.userId;
@@ -49,6 +50,11 @@ async function authMiddleware(req, res, next) {
             return next();
         }
         return res.status(401).json({ success: false, error: 'Invalid dev token (use dev:userId:twitter:wallet)' });
+    }
+
+    // Dev mode only (no Privy configured)
+    if (DEV_MODE) {
+        return res.status(401).json({ success: false, error: 'No Privy configured and not a dev token' });
     }
 
     // Production: verify with Privy
@@ -68,11 +74,11 @@ async function authMiddleware(req, res, next) {
  * Returns {userId, user} on success, null on failure.
  */
 async function verifyWsToken(token) {
-    // Dev mode
-    if (DEV_MODE) {
-        const mock = parseMockToken(token);
-        return mock || null;
+    // Dev tokens
+    if (ALLOW_DEV_TOKENS && token.startsWith('dev:')) {
+        return parseMockToken(token);
     }
+    if (DEV_MODE) return null;
 
     // Production
     try {

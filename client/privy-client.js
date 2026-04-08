@@ -1,67 +1,15 @@
 /**
- * privy-client.js — Privy auth module for sniperz wager system
- *
- * Mock implementation for dev/testing. Provides login via Twitter handle prompt,
- * generates mock Privy user IDs and Solana wallets, and registers with the server.
- *
- * PRODUCTION REPLACEMENT:
- * -----------------------------------------------------------------------
- * To swap in the real Privy SDK:
- *
- * 1. Add to index.html:
- *    <script src="https://cdn.privy.io/js-sdk-core@latest"></script>
- *
- * 2. Replace initPrivy() with:
- *    import { PrivyClient } from '@privy-io/js-sdk-core';
- *    const privyClient = new PrivyClient({ appId });
- *
- * 3. Replace login() with:
- *    const { user, token } = await privyClient.login({ loginMethods: ['twitter'] });
- *    Store token, extract user.twitter and user.wallet.address.
- *
- * 4. Replace getToken() to return privyClient.getAccessToken().
- *
- * 5. Replace getWalletAddress() to return privyClient.user.wallet.address.
- * -----------------------------------------------------------------------
+ * privy-client.js — Privy auth via js-sdk-core for sniperz wager system
+ * Uses OAuth redirect flow for Twitter login + embedded Solana wallet
  */
 
 const SESSION_KEY = 'sniperz_auth';
-
 let _appId = null;
 let _user = null;
 let _token = null;
 let _listeners = [];
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Generate a deterministic mock Privy user ID from a twitter handle. */
-function mockPrivyUserId(handle) {
-    let hash = 0;
-    for (let i = 0; i < handle.length; i++) {
-        hash = ((hash << 5) - hash + handle.charCodeAt(i)) | 0;
-    }
-    const hex = Math.abs(hash).toString(16).padStart(8, '0');
-    return `did:privy:mock-${hex}`;
-}
-
-/** Generate a deterministic mock Solana wallet address from a handle. */
-function mockSolanaWallet(handle) {
-    // Base58 alphabet
-    const b58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-    let seed = 0;
-    for (let i = 0; i < handle.length; i++) {
-        seed = ((seed << 7) - seed + handle.charCodeAt(i)) | 0;
-    }
-    let addr = '';
-    let s = Math.abs(seed);
-    for (let i = 0; i < 44; i++) {
-        s = (s * 1103515245 + 12345) & 0x7fffffff;
-        addr += b58[s % 58];
-    }
-    return addr;
-}
+let _privyClient = null;
+let _initPromise = null;
 
 function _saveSession() {
     if (_token && _user) {
@@ -92,77 +40,264 @@ function _notifyListeners() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
 /**
- * Initialize the Privy client. Restores session from sessionStorage if present.
- * @param {string} appId — Privy app ID (stored for future real SDK use)
- * @returns {{ authenticated: boolean, user: object|null }}
+ * Initialize the Privy client.
  */
 export function initPrivy(appId) {
     _appId = appId;
     const restored = _loadSession();
     if (restored) {
-        // Fire listeners async so callers can register after init
         setTimeout(() => _notifyListeners(), 0);
     }
+
+    // Dynamically import and initialize Privy SDK
+    _initPromise = _initPrivySDK(appId);
+
     return { authenticated: restored, user: _user };
 }
 
+async function _initPrivySDK(appId) {
+    try {
+        const module = await import('/node_modules/@privy-io/js-sdk-core/dist/esm/client/index.mjs');
+        const PrivyClient = module.default || module.PrivyClient || module.Privy;
+        if (!PrivyClient) {
+            console.warn('[Privy] Could not find PrivyClient export, falling back to dev mode');
+            return;
+        }
+        _privyClient = new PrivyClient({ appId });
+        console.log('[Privy] SDK initialized');
+    } catch (e) {
+        console.warn('[Privy] SDK load failed, using dev mode:', e.message);
+    }
+}
+
 /**
- * Log in via Twitter. In dev mode, prompts for a handle and registers with the server.
- * @returns {Promise<{ success: boolean, user?: object, error?: string }>}
+ * Log in via Twitter/X. Shows a login modal.
  */
 export async function login() {
-    // Prompt for twitter handle
-    const handle = prompt('Enter your Twitter/X handle (without @):');
-    if (!handle || !handle.trim()) {
-        return { success: false, error: 'Login cancelled' };
+    // Try real Privy SDK first
+    if (_initPromise) await _initPromise;
+
+    if (_privyClient) {
+        try {
+            return await _loginWithPrivy();
+        } catch (e) {
+            console.warn('[Privy] Real login failed:', e.message, '— falling back to dev');
+        }
     }
 
-    const cleanHandle = handle.trim().replace(/^@/, '');
-    const userId = mockPrivyUserId(cleanHandle);
-    const wallet = mockSolanaWallet(cleanHandle);
+    // Dev fallback: show custom login modal
+    return _devLogin();
+}
 
-    // Generate a dev mock token matching server's parseMockToken format:
-    // "dev:<userId>:<twitterHandle>:<wallet>"
-    const mockToken = `dev:${userId}:${cleanHandle}:${wallet}`;
+async function _loginWithPrivy() {
+    // Generate OAuth URL for Twitter
+    const redirectUrl = window.location.origin + '/auth/callback';
+    const oauthData = await _privyClient.auth.oauth.generateURL('twitter', redirectUrl);
 
+    // Open in popup
+    const popup = window.open(oauthData.url, 'privy_login', 'width=500,height=700,left=200,top=100');
+
+    // Wait for callback
+    return new Promise((resolve, reject) => {
+        const interval = setInterval(() => {
+            try {
+                if (popup.closed) {
+                    clearInterval(interval);
+                    // Check if session was set by callback page
+                    if (_loadSession()) {
+                        _notifyListeners();
+                        resolve({ success: true, user: _user });
+                    } else {
+                        resolve({ success: false, error: 'Login cancelled' });
+                    }
+                }
+                // Check if popup redirected to our callback
+                if (popup.location.href.includes('/auth/callback')) {
+                    const url = new URL(popup.location.href);
+                    popup.close();
+                    clearInterval(interval);
+                    // Handle callback
+                    _handleOAuthCallback(url.searchParams).then(result => {
+                        resolve(result);
+                    });
+                }
+            } catch (e) {
+                // Cross-origin — popup still on Twitter, keep waiting
+            }
+        }, 500);
+
+        // Timeout after 2 minutes
+        setTimeout(() => {
+            clearInterval(interval);
+            try { popup.close(); } catch(e) {}
+            resolve({ success: false, error: 'Login timed out' });
+        }, 120000);
+    });
+}
+
+async function _handleOAuthCallback(params) {
     try {
-        const res = await fetch('/api/auth/verify', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${mockToken}`,
-            },
-        });
+        const session = await _privyClient.auth.oauth.handleCallback();
+        if (session && session.user) {
+            const accessToken = await _privyClient.getAccessToken();
+            _token = accessToken;
 
-        if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            return { success: false, error: body.error || `Server returned ${res.status}` };
+            // Register with our server
+            const res = await fetch('/api/auth/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken }
+            });
+            const body = await res.json();
+            if (body.success) {
+                _user = body.data;
+                _saveSession();
+                _notifyListeners();
+                return { success: true, user: _user };
+            }
         }
-
-        const body = await res.json();
-        if (!body.success) {
-            return { success: false, error: body.error || 'Verification failed' };
-        }
-
-        _token = mockToken;
-        _user = body.data;
-        _saveSession();
-        _notifyListeners();
-
-        return { success: true, user: _user };
+        return { success: false, error: 'OAuth callback failed' };
     } catch (e) {
         return { success: false, error: e.message };
     }
 }
 
 /**
- * Log out — clears session and notifies listeners.
+ * Dev mode login — shows a styled modal instead of prompt()
  */
+function _devLogin() {
+    return new Promise((resolve) => {
+        // Create modal
+        const overlay = document.createElement('div');
+        overlay.id = 'authOverlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:20000;display:flex;align-items:center;justify-content:center;font-family:"Courier New",monospace;';
+
+        overlay.innerHTML = `
+            <div style="background:#0a0a1a;border:2px solid #333;border-radius:8px;padding:2rem;width:min(90%,380px);text-align:center;">
+                <div style="font-size:1.3rem;font-weight:bold;color:#ffcc00;margin-bottom:0.5rem;">SIGN IN</div>
+                <div style="color:#888;font-size:0.75rem;margin-bottom:1.5rem;">Connect to play wager matches</div>
+
+                <button id="authTwitterBtn" style="width:100%;padding:12px;background:#1DA1F2;border:none;border-radius:6px;color:#fff;font-family:inherit;font-size:0.9rem;font-weight:bold;cursor:pointer;margin-bottom:0.75rem;display:flex;align-items:center;justify-content:center;gap:8px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                    Sign in with X
+                </button>
+
+                <div style="color:#444;font-size:0.65rem;margin:1rem 0;">— or dev mode —</div>
+
+                <input id="authHandleInput" type="text" placeholder="Enter Twitter/X handle"
+                    style="width:100%;padding:10px;background:#111;border:1px solid #333;border-radius:4px;color:#fff;font-family:inherit;font-size:0.85rem;text-align:center;box-sizing:border-box;margin-bottom:0.75rem;" />
+
+                <button id="authDevBtn" style="width:100%;padding:10px;background:#222;border:1px solid #444;border-radius:4px;color:#aaa;font-family:inherit;font-size:0.8rem;cursor:pointer;">
+                    Dev Login
+                </button>
+
+                <button id="authCancelBtn" style="width:100%;padding:8px;background:none;border:none;color:#666;font-family:inherit;font-size:0.75rem;cursor:pointer;margin-top:0.5rem;">
+                    Cancel
+                </button>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const cleanup = () => { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); };
+
+        // X/Twitter button — try real Privy, fall back to dev
+        document.getElementById('authTwitterBtn').addEventListener('click', async () => {
+            if (_privyClient) {
+                cleanup();
+                try {
+                    const result = await _loginWithPrivy();
+                    resolve(result);
+                } catch (e) {
+                    resolve({ success: false, error: e.message });
+                }
+                return;
+            }
+            // No SDK — use the handle input as dev login
+            const handle = document.getElementById('authHandleInput').value.trim().replace(/^@/, '');
+            if (!handle) {
+                document.getElementById('authHandleInput').style.borderColor = '#ff4444';
+                return;
+            }
+            cleanup();
+            resolve(await _doDevLogin(handle));
+        });
+
+        // Dev login button
+        document.getElementById('authDevBtn').addEventListener('click', async () => {
+            const handle = document.getElementById('authHandleInput').value.trim().replace(/^@/, '');
+            if (!handle) {
+                document.getElementById('authHandleInput').style.borderColor = '#ff4444';
+                return;
+            }
+            cleanup();
+            resolve(await _doDevLogin(handle));
+        });
+
+        // Enter key on input
+        document.getElementById('authHandleInput').addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const handle = document.getElementById('authHandleInput').value.trim().replace(/^@/, '');
+                if (!handle) return;
+                cleanup();
+                resolve(await _doDevLogin(handle));
+            }
+        });
+
+        // Cancel
+        document.getElementById('authCancelBtn').addEventListener('click', () => {
+            cleanup();
+            resolve({ success: false, error: 'Login cancelled' });
+        });
+
+        // Focus input
+        setTimeout(() => document.getElementById('authHandleInput')?.focus(), 100);
+    });
+}
+
+async function _doDevLogin(handle) {
+    const userId = _mockUserId(handle);
+    const wallet = _mockWallet(handle);
+    const mockToken = `dev:${userId}:${handle}:${wallet}`;
+
+    try {
+        const res = await fetch('/api/auth/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${mockToken}` }
+        });
+        if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            return { success: false, error: body.error || `Server ${res.status}` };
+        }
+        const body = await res.json();
+        if (!body.success) return { success: false, error: body.error };
+
+        _token = mockToken;
+        _user = body.data;
+        _saveSession();
+        _notifyListeners();
+        return { success: true, user: _user };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+function _mockUserId(handle) {
+    let hash = 0;
+    for (let i = 0; i < handle.length; i++) hash = ((hash << 5) - hash + handle.charCodeAt(i)) | 0;
+    return `did:privy:mock-${Math.abs(hash).toString(16).padStart(8, '0')}`;
+}
+
+function _mockWallet(handle) {
+    const b58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    let s = 0;
+    for (let i = 0; i < handle.length; i++) s = ((s << 7) - s + handle.charCodeAt(i)) | 0;
+    s = Math.abs(s);
+    let addr = '';
+    for (let i = 0; i < 44; i++) { s = (s * 1103515245 + 12345) & 0x7fffffff; addr += b58[s % 58]; }
+    return addr;
+}
+
 export function logout() {
     _token = null;
     _user = null;
@@ -170,69 +305,23 @@ export function logout() {
     _notifyListeners();
 }
 
-/**
- * Get the current auth token for API calls.
- * @returns {string|null}
- */
-export function getToken() {
-    return _token;
-}
+export function getToken() { return _token; }
+export function getUser() { return _user; }
+export function isAuthenticated() { return !!_token && !!_user; }
+export function getWalletAddress() { return _user?.privy_wallet || null; }
 
-/**
- * Get the cached user profile.
- * @returns {object|null} — { id, twitter_handle, privy_wallet, wins, losses, elo, ... }
- */
-export function getUser() {
-    return _user;
-}
-
-/**
- * Check if the user is authenticated.
- * @returns {boolean}
- */
-export function isAuthenticated() {
-    return !!_token && !!_user;
-}
-
-/**
- * Get the user's Privy-managed Solana wallet address.
- * @returns {string|null}
- */
-export function getWalletAddress() {
-    return _user?.privy_wallet || null;
-}
-
-/**
- * Register a callback for auth state changes.
- * Callback receives (isAuthenticated: boolean, user: object|null).
- * @param {function} callback
- * @returns {function} unsubscribe function
- */
 export function onAuthChange(callback) {
     _listeners.push(callback);
-    return () => {
-        _listeners = _listeners.filter(cb => cb !== callback);
-    };
+    return () => { _listeners = _listeners.filter(cb => cb !== callback); };
 }
 
-/**
- * Refresh the user profile from the server.
- * Useful after a match completes to get updated wins/losses/elo.
- * @returns {Promise<object|null>}
- */
 export async function refreshProfile() {
     if (!_token) return null;
     try {
-        const res = await fetch('/api/profile/me', {
-            headers: { 'Authorization': `Bearer ${_token}` },
-        });
+        const res = await fetch('/api/profile/me', { headers: { 'Authorization': `Bearer ${_token}` } });
         if (!res.ok) return null;
         const body = await res.json();
-        if (body.success && body.data) {
-            _user = body.data;
-            _saveSession();
-            return _user;
-        }
+        if (body.success && body.data) { _user = body.data; _saveSession(); return _user; }
     } catch { /* ignore */ }
     return null;
 }
