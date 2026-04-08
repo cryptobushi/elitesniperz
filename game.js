@@ -2740,6 +2740,13 @@ document.addEventListener('keydown', (e) => {
 
     gameState.keys[e.key.toLowerCase()] = true;
 
+    if (e.key === 'Escape' && gameState.gameStarted) {
+        e.preventDefault();
+        const menu = document.getElementById('gameMenu');
+        if (menu) menu.classList.toggle('hidden');
+        return;
+    }
+
     if (e.key === ' ' && gameState.player && gameState.player.health <= 0) {
         e.preventDefault();
         document.getElementById('respawnBtn')?.click();
@@ -3051,6 +3058,48 @@ document.querySelectorAll('.ability').forEach(el => {
 document.getElementById('scoreboard')?.addEventListener('click', () => {
     if (gameState.gameStarted) document.getElementById('scoreboard').classList.add('hidden');
 });
+// Menu button
+document.getElementById('menuBtn')?.addEventListener('click', () => {
+    document.getElementById('gameMenu')?.classList.remove('hidden');
+});
+document.getElementById('menuResume')?.addEventListener('click', () => {
+    document.getElementById('gameMenu')?.classList.add('hidden');
+});
+document.getElementById('menuQuit')?.addEventListener('click', () => {
+    document.getElementById('gameMenu')?.classList.add('hidden');
+
+    // If wager match, forfeit
+    if (window._isWagerMatch && _ws && _ws.readyState === 1) {
+        _ws.send(JSON.stringify({ t: 'wager_forfeit' }));
+    }
+
+    // Close WebSocket
+    if (_ws) { try { _ws.close(); } catch(e) {} _ws = null; }
+
+    // Reset game state
+    gameState.gameStarted = false;
+    isOnlineMode = false;
+    window._isWagerMatch = false;
+    window._gameStarted = false;
+
+    // Hide game UI
+    document.getElementById('hud')?.classList.add('hidden');
+    document.getElementById('abilities')?.classList.add('hidden');
+    document.querySelector('.minimap')?.classList.add('hidden');
+    document.getElementById('teamScore')?.classList.add('hidden');
+
+    // Show start screen
+    document.getElementById('usernameModal').classList.remove('hidden');
+    document.getElementById('usernameModal').style.display = '';
+
+    // Clean up remote players
+    _remotePlayers.forEach((r) => { if (r.player.mesh.parent) r.player.mesh.parent.remove(r.player.mesh); });
+    _remotePlayers.clear();
+    _serverState.clear();
+    _roster = {};
+    _myServerId = null;
+});
+
 document.addEventListener('click', (e) => {
     if (!gameState.gameStarted) return;
     const shop = document.getElementById('shopPanel');
