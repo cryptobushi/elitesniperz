@@ -241,13 +241,15 @@ router.post('/matches/:id/join', authMiddleware, async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /matches/:id/cancel — cancel a match (creator only)
 // ---------------------------------------------------------------------------
-router.post('/matches/:id/cancel', authMiddleware, (req, res) => {
+router.post('/matches/:id/cancel', authMiddleware, async (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
         if (!match) return res.status(404).json(fail('Match not found'));
 
-        if (match.creator_id !== req.privyUserId) {
-            return res.status(403).json(fail('Only the creator can cancel'));
+        // Either player can cancel before match starts
+        const userId = req.privyUserId;
+        if (userId !== match.creator_id && userId !== match.joiner_id) {
+            return res.status(403).json(fail('Not in this match'));
         }
 
         const cancellable = ['open', 'matched', 'funded_creator'];
@@ -255,13 +257,31 @@ router.post('/matches/:id/cancel', authMiddleware, (req, res) => {
             return res.status(400).json(fail('Match cannot be cancelled in its current state'));
         }
 
-        // Can't cancel if joiner already joined (and match is funded_creator)
-        if (match.status === 'funded_creator' && match.joiner_id) {
-            return res.status(400).json(fail('Cannot cancel after opponent has joined'));
+        // Refund if creator deposited
+        if (match.status === 'funded_creator') {
+            const creator = db.getUser(match.creator_id);
+            const token = req.headers.authorization?.replace('Bearer ', '') || '';
+            const isDevToken = ALLOW_DEV_TOKENS && token.startsWith('dev:');
+
+            if (!isDevToken && creator?.privy_wallet && escrow.isReady()) {
+                try {
+                    const result = await escrow.sendPayout(creator.privy_wallet, match.stake_amount, match.stake_token);
+                    if (result?.signature) {
+                        const { v4: uuidv4 } = require('uuid');
+                        db.createTransaction({
+                            id: uuidv4(), match_id: match.id, user_id: match.creator_id,
+                            tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
+                            tx_signature: result.signature, from_wallet: 'escrow', to_wallet: creator.privy_wallet
+                        });
+                    }
+                } catch (e) {
+                    console.error('[CANCEL] Refund error:', e);
+                }
+            }
         }
 
-        const updated = db.updateMatch(req.params.id, { status: 'cancelled' });
-        return res.json(success(updated));
+        db.updateMatch(req.params.id, { status: 'cancelled' });
+        return res.json(success({ cancelled: true, refunded: match.status === 'funded_creator' }));
     } catch (e) {
         console.error('POST /matches/:id/cancel error:', e);
         return res.status(500).json(fail('Failed to cancel match'));

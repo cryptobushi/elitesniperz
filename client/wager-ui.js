@@ -941,35 +941,26 @@ function renderMatches(matches) {
 async function handleJoin(matchId) {
     if (!matchId) return;
 
-    // Check if password-protected (prompt user)
-    // For now, prompt if the match has a password flag
-    let password;
-    // We'll try joining; server will reject if password needed
     try {
-        const res = await api(`/matches/${matchId}/join`, {
+        // Try joining without password first
+        let res = await api(`/matches/${matchId}/join`, {
             method: 'POST',
-            body: JSON.stringify({ password }),
+            body: JSON.stringify({}),
         });
 
-        if (res.error && res.error.includes('password')) {
-            password = prompt('This match is password protected. Enter password:');
+        // If password required, prompt and retry
+        if (!res.success && res.error && res.error.toLowerCase().includes('password')) {
+            const password = prompt('This match is password protected. Enter password:');
             if (!password) return;
-            const res2 = await api(`/matches/${matchId}/join`, {
+            res = await api(`/matches/${matchId}/join`, {
                 method: 'POST',
                 body: JSON.stringify({ password }),
             });
-            if (res2.error) throw new Error(res2.error);
-        } else if (res.error) {
-            throw new Error(res.error);
         }
 
+        if (!res.success) throw new Error(res.error || 'Failed to join');
+
         currentMatchId = matchId;
-
-        // Trigger deposit
-        try {
-            await requestDeposit({ matchId });
-        } catch (_) {}
-
         showWaitingRoom(matchId);
     } catch (err) {
         alert('Failed to join: ' + err.message);
