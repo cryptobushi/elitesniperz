@@ -442,66 +442,136 @@ const STYLES = `
 }
 #wagerResult.hidden { display: none !important; }
 
+@keyframes resultSlam {
+    0% { transform: scale(3) rotate(-5deg); opacity: 0; }
+    50% { transform: scale(1.1) rotate(1deg); opacity: 1; }
+    70% { transform: scale(0.95) rotate(0deg); }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes resultPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+@keyframes payoutCount {
+    0% { transform: scale(0.5); opacity: 0; }
+    60% { transform: scale(1.2); }
+    100% { transform: scale(1); opacity: 1; }
+}
+@keyframes shimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+}
+@keyframes floatUp {
+    0% { transform: translateY(20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+}
 .wr-result-bg {
     position: absolute;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    background: radial-gradient(ellipse at center, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.95) 100%);
+}
+.wr-result-bg.victory-bg {
+    background: radial-gradient(ellipse at center, rgba(0,80,20,0.6) 0%, rgba(0,0,0,0.97) 70%);
+}
+.wr-result-bg.defeat-bg {
+    background: radial-gradient(ellipse at center, rgba(80,0,0,0.6) 0%, rgba(0,0,0,0.97) 70%);
+}
+.wr-result-bg.draw-bg {
+    background: radial-gradient(ellipse at center, rgba(60,60,0,0.5) 0%, rgba(0,0,0,0.97) 70%);
 }
 .wr-result-content {
     position: relative;
     z-index: 1;
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
 }
 .wr-result-title {
     font-family: 'Impact', 'Arial Black', sans-serif;
-    font-size: clamp(2.5rem, 12vw, 5rem);
-    font-weight: 700;
-    letter-spacing: 0.12em;
+    font-size: clamp(4rem, 18vw, 8rem);
+    font-weight: 900;
+    letter-spacing: 0.15em;
     text-transform: uppercase;
+    animation: resultSlam 0.6s cubic-bezier(0.2, 0.8, 0.3, 1.2) forwards;
+    line-height: 1;
 }
 .wr-result-title.victory {
     color: #00ff55;
-    text-shadow: 0 0 40px rgba(0,255,85,0.9), 0 0 80px rgba(0,255,85,0.5);
+    text-shadow: 0 0 60px rgba(0,255,85,1), 0 0 120px rgba(0,255,85,0.6), 0 4px 0 #006622;
+    animation: resultSlam 0.6s cubic-bezier(0.2, 0.8, 0.3, 1.2) forwards, resultPulse 2s 0.8s ease-in-out infinite;
 }
 .wr-result-title.defeat {
     color: #ff2222;
-    text-shadow: 0 0 40px rgba(255,0,0,0.9), 0 0 80px rgba(255,0,0,0.5);
+    text-shadow: 0 0 60px rgba(255,0,0,1), 0 0 120px rgba(255,0,0,0.6), 0 4px 0 #660000;
+}
+.wr-result-title.draw {
+    color: #ffcc00;
+    text-shadow: 0 0 60px rgba(255,204,0,0.8), 0 0 120px rgba(255,204,0,0.4), 0 4px 0 #665500;
+}
+.wr-result-opponent {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: clamp(1.2rem, 5vw, 2rem);
+    color: #aaa;
+    margin-top: 0.5rem;
+    animation: floatUp 0.5s 0.3s ease-out both;
 }
 .wr-result-score {
-    font-size: clamp(1.2rem, 5vw, 2rem);
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: clamp(2.5rem, 10vw, 5rem);
     color: #fff;
-    letter-spacing: 0.15em;
+    letter-spacing: 0.2em;
     margin-top: 0.3rem;
+    animation: floatUp 0.5s 0.4s ease-out both;
+    text-shadow: 0 2px 0 #333;
 }
 .wr-result-payout {
-    font-size: clamp(1rem, 4vw, 1.6rem);
-    color: #00ff44;
-    font-weight: bold;
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: clamp(1.5rem, 7vw, 3rem);
+    font-weight: 900;
     margin-top: 0.8rem;
-    text-shadow: 0 0 10px rgba(0,255,68,0.4);
+    animation: payoutCount 0.6s 0.6s ease-out both;
 }
-.wr-result-payout.loss { color: #ff4444; }
+.wr-result-payout.win {
+    color: #00ff44;
+    text-shadow: 0 0 30px rgba(0,255,68,0.8), 0 0 60px rgba(0,255,68,0.4);
+    background: linear-gradient(90deg, #00ff44, #44ffaa, #00ff44);
+    background-size: 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: payoutCount 0.6s 0.6s ease-out both, shimmer 3s 1.2s linear infinite;
+}
+.wr-result-payout.loss {
+    color: #ff4444;
+    text-shadow: 0 0 20px rgba(255,0,0,0.5);
+}
+.wr-result-payout.draw-payout {
+    color: #ffcc00;
+    text-shadow: 0 0 20px rgba(255,204,0,0.5);
+}
 .wr-result-tx {
-    margin-top: 0.5rem;
+    margin-top: 0.8rem;
+    animation: floatUp 0.5s 0.9s ease-out both;
 }
 .wr-result-tx a {
     color: #6688ff;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     text-decoration: underline;
 }
 .wr-result-back {
-    margin-top: 1.2rem;
+    margin-top: 1.5rem;
     background: linear-gradient(180deg, #ffdd44 0%, #cc8800 50%, #ffdd44 100%);
-    border: 2px outset #ffcc00;
+    border: 3px outset #ffcc00;
     color: #000;
-    padding: 0.6rem 2rem;
-    font-size: 0.85rem;
+    padding: 0.8rem 2.5rem;
+    font-size: clamp(0.9rem, 3vw, 1.1rem);
     font-weight: bold;
     font-family: 'Impact', 'Arial Black', sans-serif;
     cursor: pointer;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
+    animation: floatUp 0.5s 1s ease-out both;
 }
 .wr-result-back:active { border-style: inset; opacity: 0.9; }
 
@@ -684,10 +754,10 @@ function buildDOM() {
     result.id = 'wagerResult';
     result.className = 'hidden';
     result.innerHTML = `
-        <div class="wr-result-bg"></div>
+        <div class="wr-result-bg" id="wrResultBg"></div>
         <div class="wr-result-content">
             <div class="wr-result-title" id="wrResultTitle">VICTORY</div>
-            <div id="wrResultOpponent" style="color:#aaa;font-size:0.85rem;margin:0.3rem 0;"></div>
+            <div class="wr-result-opponent" id="wrResultOpponent"></div>
             <div class="wr-result-score" id="wrResultScore">7 - 3</div>
             <div class="wr-result-payout" id="wrResultPayout">+9.5 USDC</div>
             <div class="wr-result-tx" id="wrResultTx"></div>
@@ -1136,6 +1206,10 @@ export function showWagerResult(data) {
     titleEl.textContent = isDraw ? 'DRAW' : (won ? 'VICTORY' : 'DEFEAT');
     titleEl.className = 'wr-result-title ' + (isDraw ? 'draw' : (won ? 'victory' : 'defeat'));
 
+    // Background glow matches result
+    const bgEl = document.getElementById('wrResultBg');
+    if (bgEl) bgEl.className = 'wr-result-bg ' + (isDraw ? 'draw-bg' : (won ? 'victory-bg' : 'defeat-bg'));
+
     // Score from wager HUD
     const myScore = document.getElementById('whYouScore')?.textContent || '0';
     const oppScore = document.getElementById('whOppScore')?.textContent || '0';
@@ -1152,10 +1226,10 @@ export function showWagerResult(data) {
 
     if (isDraw) {
         payoutEl.textContent = `REFUNDED ${stakeAmt} ${stakeTok}`;
-        payoutEl.className = 'wr-result-payout';
+        payoutEl.className = 'wr-result-payout draw-payout';
     } else if (won) {
         payoutEl.textContent = `+${payout} ${stakeTok}`;
-        payoutEl.className = 'wr-result-payout';
+        payoutEl.className = 'wr-result-payout win';
     } else {
         payoutEl.textContent = `-${stakeAmt} ${stakeTok}`;
         payoutEl.className = 'wr-result-payout loss';
