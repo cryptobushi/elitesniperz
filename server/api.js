@@ -381,11 +381,23 @@ router.post('/matches/:id/confirm-deposit', authMiddleware, async (req, res) => 
         });
         db.confirmTransaction(txSignature, Date.now());
 
-        // Update match status
-        if (isCreator && (match.status === 'open' || match.status === 'open')) {
-            db.updateMatch(match.id, { status: match.joiner_id ? 'funded_both' : 'funded_creator', funded_at: Date.now() });
+        // Update match status — track who has deposited
+        // States: open/matched → funded_creator (creator deposited) or funded_joiner (joiner deposited first)
+        //         funded_creator + joiner deposits → funded_both
+        //         funded_joiner + creator deposits → funded_both
+        const currentStatus = db.getMatch(match.id).status; // Re-read in case of race
+        if (isCreator) {
+            if (currentStatus === 'funded_joiner') {
+                db.updateMatch(match.id, { status: 'funded_both', funded_at: Date.now() });
+            } else if (['open', 'matched'].includes(currentStatus)) {
+                db.updateMatch(match.id, { status: 'funded_creator', funded_at: Date.now() });
+            }
         } else if (isJoiner) {
-            db.updateMatch(match.id, { status: 'funded_both', funded_at: Date.now() });
+            if (currentStatus === 'funded_creator') {
+                db.updateMatch(match.id, { status: 'funded_both', funded_at: Date.now() });
+            } else if (['open', 'matched'].includes(currentStatus)) {
+                db.updateMatch(match.id, { status: 'funded_joiner', funded_at: Date.now() });
+            }
         }
 
         return res.json(success({ confirmed: true, status: db.getMatch(match.id).status }));

@@ -1011,24 +1011,28 @@ async function pollWaitingRoom(matchId) {
         const wrAmt = wrToken === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
         els.wrInfo.textContent = `${wrAmt} ${wrToken} | First to ${m.kill_target || 7}`;
 
-        // Status message
-        const statusMap = {
-            'open': 'Waiting for opponent...',
-            'matched': 'Opponent joined! Both players deposit to start.',
-            'funded_creator': amCreator ? 'You deposited. Waiting for opponent...' : 'Creator deposited. Deposit to accept!',
-            'funded_both': 'Both deposited! Starting match...',
-            'in_progress': 'Match in progress!',
-        };
-        const statusEl = document.getElementById('wrStatus');
-        if (statusEl) statusEl.textContent = statusMap[m.status] || m.status;
+        // Determine who has deposited
+        const creatorFunded = ['funded_creator', 'funded_both'].includes(m.status);
+        const joinerFunded = ['funded_joiner', 'funded_both'].includes(m.status);
+        const myDeposited = amCreator ? creatorFunded : joinerFunded;
 
-        // Creator card — always show Twitter prominently
+        // Status message
+        let statusMsg = m.status;
+        if (m.status === 'open') statusMsg = 'Waiting for opponent...';
+        else if (m.status === 'matched') statusMsg = 'Opponent joined! Both players deposit to start.';
+        else if (m.status === 'funded_creator') statusMsg = amCreator ? 'You deposited. Waiting for opponent to deposit...' : 'Opponent deposited. Your turn to deposit!';
+        else if (m.status === 'funded_joiner') statusMsg = amCreator ? 'Opponent deposited. Your turn to deposit!' : 'You deposited. Waiting for opponent to deposit...';
+        else if (m.status === 'funded_both') statusMsg = 'Both deposited! Starting match...';
+        else if (m.status === 'in_progress') statusMsg = 'Match in progress!';
+        const statusEl = document.getElementById('wrStatus');
+        if (statusEl) statusEl.textContent = statusMsg;
+
+        // Creator card
         els.wrCreatorName.textContent = '@' + (m.creator_twitter || 'unknown');
         els.wrCreatorRecord.textContent = `${m.creator_wins || 0}W - ${m.creator_losses || 0}L | ELO ${m.creator_elo || 1000}`;
-        const creatorFunded = m.status === 'funded_creator' || m.status === 'funded_both';
         els.wrCreator.classList.toggle('funded', creatorFunded);
         if (els.wrCreatorStatus) {
-            els.wrCreatorStatus.textContent = creatorFunded ? '\u2713 DEPOSITED' : 'Not deposited';
+            els.wrCreatorStatus.textContent = creatorFunded ? '\u2713 DEPOSITED' : 'Awaiting deposit';
             els.wrCreatorStatus.className = 'wr-status ' + (creatorFunded ? 'ok' : 'pending');
         }
 
@@ -1037,12 +1041,11 @@ async function pollWaitingRoom(matchId) {
             els.wrJoiner.classList.remove('empty');
             els.wrJoinerName.textContent = '@' + (m.joiner_twitter || 'unknown');
             els.wrJoinerRecord.textContent = `${m.joiner_wins || 0}W - ${m.joiner_losses || 0}L | ELO ${m.joiner_elo || 1000}`;
-            const joinerFunded = m.status === 'funded_both';
+            els.wrJoiner.classList.toggle('funded', joinerFunded);
             if (els.wrJoinerStatus) {
-                els.wrJoinerStatus.textContent = joinerFunded ? '\u2713 DEPOSITED' : 'Not deposited';
+                els.wrJoinerStatus.textContent = joinerFunded ? '\u2713 DEPOSITED' : 'Awaiting deposit';
                 els.wrJoinerStatus.className = 'wr-status ' + (joinerFunded ? 'ok' : 'pending');
             }
-            els.wrJoiner.classList.toggle('funded', joinerFunded);
         } else {
             els.wrJoiner.classList.add('empty');
             els.wrJoiner.classList.remove('funded');
@@ -1054,13 +1057,15 @@ async function pollWaitingRoom(matchId) {
             }
         }
 
-        // Show/hide deposit button based on state
+        // Show/hide deposit button
         const depositBtn = document.getElementById('wrDepositBtn');
         if (depositBtn) {
-            const canDeposit = (m.status === 'open' || m.status === 'matched' || m.status === 'funded_creator');
-            const myDeposited = (amCreator && creatorFunded) || (!amCreator && m.status === 'funded_both');
-            depositBtn.style.display = (canDeposit && !myDeposited) ? 'block' : 'none';
+            const hasOpponent = !!m.joiner_id;
+            const showDeposit = hasOpponent && !myDeposited && m.status !== 'funded_both';
+            depositBtn.style.display = showDeposit ? 'block' : 'none';
             depositBtn.textContent = `DEPOSIT ${wrAmt} ${wrToken}`;
+            depositBtn.disabled = false;
+            depositBtn.style.background = '#cc8800';
         }
 
         // Both funded — start the match
