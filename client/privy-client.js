@@ -2,7 +2,7 @@
  * privy-client.js — Privy auth for sniperz wager system
  * Bundled via esbuild to dist/privy-bundle.js
  */
-import Privy from '@privy-io/js-sdk-core';
+import Privy, { LocalStorage } from '@privy-io/js-sdk-core';
 
 const SESSION_KEY = 'sniperz_auth';
 let _appId = null;
@@ -61,6 +61,7 @@ export function initPrivy(appId) {
     try {
         _privyClient = new Privy({
             appId,
+            storage: new LocalStorage(),
         });
         console.log('[Privy] SDK initialized');
     } catch (e) {
@@ -124,19 +125,17 @@ export async function login() {
         document.getElementById('authTwitterBtn').addEventListener('click', async () => {
             if (statusEl()) statusEl().textContent = 'Connecting to X...';
             try {
-                // Generate OAuth URL
                 const redirectUrl = window.location.origin + '/auth/callback';
-                const oauthData = await _privyClient.auth.oauth.init({
-                    provider: 'twitter',
-                    redirectUrl,
-                });
+                const oauthData = await _privyClient.auth.oauth.generateURL('twitter', redirectUrl);
+                console.log('[Privy] OAuth URL generated:', oauthData);
 
                 if (oauthData && oauthData.url) {
-                    // Store state for callback
                     sessionStorage.setItem('privy_oauth_state', JSON.stringify({ matchId: null }));
                     window.location.href = oauthData.url;
+                } else if (typeof oauthData === 'string') {
+                    window.location.href = oauthData;
                 } else {
-                    if (statusEl()) statusEl().textContent = 'Failed to start OAuth. Try dev login.';
+                    if (statusEl()) statusEl().textContent = 'Failed to get OAuth URL. Try dev login.';
                 }
             } catch (e) {
                 console.error('[Privy] OAuth error:', e);
@@ -176,9 +175,18 @@ export async function handleOAuthCallback() {
     if (!_privyClient) return false;
 
     try {
-        const session = await _privyClient.auth.oauth.link({
-            url: window.location.href,
-        });
+        // Extract authorization code from URL params
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code') || params.get('privy_oauth_code');
+        const state = params.get('state') || params.get('privy_oauth_state');
+
+        if (!code) {
+            console.log('[Privy] No OAuth code in callback URL');
+            return false;
+        }
+
+        console.log('[Privy] Processing OAuth callback with code');
+        const session = await _privyClient.auth.oauth.loginWithCode(code, state);
 
         if (session && session.user) {
             const accessToken = await _privyClient.getAccessToken();
@@ -189,7 +197,6 @@ export async function handleOAuthCallback() {
                 _user = serverUser;
                 _saveSession();
                 _notifyListeners();
-                // Redirect back to main page
                 window.location.href = '/';
                 return true;
             }
