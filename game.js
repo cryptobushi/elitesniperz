@@ -2731,10 +2731,10 @@ function updateAbilityUI() {
 
 // Input Handlers
 document.addEventListener('keydown', (e) => {
-    // Skip game keybinds when typing in chat
-    const chatInput = document.getElementById('chatInput');
-    if (chatInput && document.activeElement === chatInput) {
-        if (e.key === 'Escape') { chatInput.blur(); e.preventDefault(); }
+    // Skip game keybinds when typing in any input
+    const active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        if (e.key === 'Escape') { active.blur(); e.preventDefault(); }
         return; // Let normal typing happen
     }
 

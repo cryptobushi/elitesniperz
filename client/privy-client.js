@@ -57,18 +57,15 @@ export function initPrivy(appId) {
 }
 
 async function _initPrivySDK(appId) {
-    try {
-        const module = await import('/node_modules/@privy-io/js-sdk-core/dist/esm/client/index.mjs');
-        const PrivyClient = module.default || module.PrivyClient || module.Privy;
-        if (!PrivyClient) {
-            console.warn('[Privy] Could not find PrivyClient export, falling back to dev mode');
-            return;
-        }
-        _privyClient = new PrivyClient({ appId });
-        console.log('[Privy] SDK initialized');
-    } catch (e) {
-        console.warn('[Privy] SDK load failed, using dev mode:', e.message);
-    }
+    // Real Privy SDK requires a bundler (vite/esbuild) to resolve node_modules.
+    // For now, we use the dev login modal. When bundled, uncomment below:
+    // try {
+    //     const { PrivyClient } = await import('@privy-io/js-sdk-core');
+    //     _privyClient = new PrivyClient({ appId });
+    //     console.log('[Privy] SDK initialized');
+    // } catch (e) {
+    //     console.warn('[Privy] SDK not available:', e.message);
+    // }
 }
 
 /**
