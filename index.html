@@ -825,6 +825,7 @@
                 <button class="teamBtn red" data-team="red">RED TEAM</button>
                 <button class="teamBtn blue" data-team="blue">BLUE TEAM</button>
             </div>
+            <button id="buildGunBtn" style="display:block;margin:8px auto;padding:8px 24px;font-family:'Impact',sans-serif;font-size:1rem;background:linear-gradient(to bottom,#666,#333);color:#ffcc00;border:3px outset #888;cursor:pointer;letter-spacing:1px;">BUILD YOUR GUN</button>
             <button id="startBtn">>> ENTER GAME <<</button>
             <div class="footer-text">
                 Best viewed in 1024x768 &bull; <a>Netscape 4.0+</a> &bull; &copy; 2003 EliteSnipers.net<br>
@@ -872,6 +873,11 @@
             <div class="ability" id="shopBtn">
                 <div class="ability-key">B</div>
                 <div class="ability-name">Shop</div>
+                <div class="ability-cd"></div>
+            </div>
+            <div class="ability" id="fpsBtn">
+                <div class="ability-key">V</div>
+                <div class="ability-name">FPS</div>
                 <div class="ability-cd"></div>
             </div>
             <div class="ability" id="scoreBtn">
@@ -941,10 +947,12 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.10.2/dist/nipplejs.js"></script>
     <script type="importmap">
     {
         "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
         }
     }
     </script>
