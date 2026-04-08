@@ -832,7 +832,7 @@ function handleWagerWs(ws, userId, matchId) {
                     if (entry.creatorWs && entry.joinerWs) {
                         entry.match.start();
                         db.updateMatch(matchId, { status: 'in_progress', started_at: Date.now() });
-                        const startMsg = JSON.stringify({ t: 'wager_start', matchId, killTarget: currentMatch.kill_target });
+                        const startMsg = JSON.stringify({ t: 'wager_start', matchId, killTarget: currentMatch.kill_target, creatorId: currentMatch.creator_id });
                         entry.creatorWs.send(startMsg);
                         entry.joinerWs.send(startMsg);
                         console.log('[WAGER] Match ' + matchId + ' started!');

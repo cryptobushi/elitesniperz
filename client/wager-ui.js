@@ -1172,14 +1172,27 @@ export function connectWagerMatch(matchId) {
                 break;
 
             case 'wager_start': {
-                // Hide lobby/waiting overlays, show game + HUD
+                // Hide all overlays
                 els.lobby.classList.add('hidden');
                 els.waiting.classList.add('hidden');
                 els.createModal.classList.add('hidden');
                 const startModal = document.getElementById('usernameModal');
                 if (startModal) startModal.style.display = 'none';
-                const canvas = document.getElementById('gameCanvas');
-                if (canvas) canvas.style.display = '';
+
+                // Determine if we're creator or joiner
+                const me = getUser();
+                const isCreator = me && msg.creatorId === me.id;
+
+                // Start the actual game via game.js integration
+                window._wagerUser = me;
+                if (window._startWagerGame) {
+                    window._startWagerGame(ws, {
+                        matchId: msg.matchId,
+                        killTarget: msg.killTarget,
+                        isCreator,
+                    });
+                }
+
                 showWagerHUD(msg);
                 break;
             }

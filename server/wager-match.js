@@ -160,9 +160,33 @@ class WagerMatch {
      * @param {object} msg - Parsed JSON message
      */
     handleMessage(userId, msg) {
-        if (this.ended || !this.started) return;
         const p = this.players.get(userId);
         if (!p) return;
+
+        // Handle join message — send back join confirmation + roster
+        if (msg.t === 'join') {
+            const ws = this.wsMap.get(userId);
+            if (!ws) return;
+            p.username = msg.n || p.username;
+            // Build roster (just 2 players)
+            const roster = [];
+            this.players.forEach((pl, uid) => {
+                roster.push({ id: pl.id, n: pl.username, m: pl.team, b: 0 });
+            });
+            ws.send(JSON.stringify({
+                t: 'j',
+                id: p.id,
+                roster,
+                limit: this.killTarget,
+                timeLimit: 600,
+                elapsed: 0,
+                rk: 0,
+                bk: 0
+            }));
+            return;
+        }
+
+        if (this.ended || !this.started) return;
 
         p.lastInput = Date.now();
         p.afk = false;

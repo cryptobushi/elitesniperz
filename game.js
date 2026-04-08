@@ -4524,3 +4524,56 @@ requestAnimationFrame(function netLoop() {
 });
 
 console.log('Multiplayer module loaded');
+
+// === WAGER MATCH GAME INTEGRATION ===
+// Called by wager-ui.js when a wager match starts
+// Injects the wager WebSocket as the game connection
+window._startWagerGame = function(ws, matchData) {
+    console.log('[WAGER] Starting wager game', matchData);
+
+    // Set game state
+    const user = window._wagerUser; // Set by wager-ui before calling this
+    gameState.username = user?.twitter_handle || user?.display_name || 'Player';
+    gameState.team = matchData.isCreator ? 'red' : 'blue';
+    gameState.gameStarted = true;
+    isOnlineMode = true;
+
+    // Use the wager WebSocket as the game connection
+    _ws = ws;
+    _ws.binaryType = 'arraybuffer';
+
+    // Set up message handling on the wager WS (same as connectToServer)
+    _ws.addEventListener('message', function(evt) {
+        const data = evt.data;
+        if (typeof data === 'string') {
+            try { handleJsonMessage(JSON.parse(data)); } catch(e) {}
+        } else if (data instanceof ArrayBuffer) {
+            handleBinaryState(data);
+        } else if (data instanceof Blob) {
+            data.arrayBuffer().then(ab => handleBinaryState(ab));
+        }
+    });
+
+    // Send join message so the WagerMatch creates our player
+    _ws.send(JSON.stringify({
+        t: 'join',
+        n: gameState.username,
+        m: gameState.team
+    }));
+
+    // Show game UI
+    document.getElementById('usernameModal')?.classList.add('hidden');
+    document.getElementById('hud')?.classList.remove('hidden');
+    document.getElementById('abilities')?.classList.remove('hidden');
+    document.querySelector('.minimap')?.classList.remove('hidden');
+
+    // Start the game if not already started
+    if (!startGame._called) {
+        startGame();
+        startGame._called = true;
+    } else {
+        // Game already started (map created), just reset player
+        gameState.player = new Player(gameState.username, gameState.team, true);
+        gameState.cameraTarget.copy(gameState.player.position);
+    }
+};
