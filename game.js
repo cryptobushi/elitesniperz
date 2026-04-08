@@ -4,9 +4,9 @@ import { initWagerUI } from './client/wager-ui.js';
 
 // Initialize wager system (after DOM ready)
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { initPrivy('sniperz'); initWagerUI(); });
+    document.addEventListener('DOMContentLoaded', () => { initPrivy('cmnq87gi501w40cibx5gcfz9a'); initWagerUI(); });
 } else {
-    initPrivy('sniperz');
+    initPrivy('cmnq87gi501w40cibx5gcfz9a');
     initWagerUI();
 }
 
