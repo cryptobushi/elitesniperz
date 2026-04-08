@@ -451,6 +451,8 @@ const STYLES = `
     justify-content: center;
     pointer-events: all;
     font-family: 'Courier New', monospace;
+    overflow-y: auto;
+    padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
 }
 #wagerResult.hidden { display: none !important; }
 
@@ -625,6 +627,21 @@ const STYLES = `
     .wr-card .wr-name { font-size: 0.7rem; }
     .wr-players { gap: 0.8rem; }
     .wr-vs { font-size: 1.1rem; }
+
+    /* Result screen mobile */
+    .wr-result-title { font-size: clamp(2rem, 12vw, 4rem) !important; }
+    .wr-result-score { font-size: clamp(1.5rem, 8vw, 3rem) !important; }
+    .wr-result-payout { font-size: clamp(1rem, 5vw, 2rem) !important; }
+    .wr-result-opponent { font-size: clamp(0.8rem, 3.5vw, 1.2rem) !important; }
+    .wr-result-back { font-size: clamp(0.7rem, 2.5vw, 0.9rem) !important; padding: 0.5rem 1.5rem !important; margin-top: 0.8rem !important; }
+    .wr-result-content { padding: 1rem; gap: 0.2rem; }
+}
+@media (max-height: 400px) {
+    .wr-result-title { font-size: clamp(1.5rem, 8vw, 2.5rem) !important; line-height: 1 !important; }
+    .wr-result-score { font-size: clamp(1.2rem, 6vw, 2rem) !important; margin-top: 0 !important; }
+    .wr-result-payout { font-size: clamp(0.8rem, 4vw, 1.5rem) !important; margin-top: 0.3rem !important; }
+    .wr-result-back { margin-top: 0.5rem !important; }
+    .wr-result-content { padding: 0.5rem; }
 }
 `;
 
@@ -1353,16 +1370,23 @@ export function showWagerResult(data) {
     const stakeAmt = info.stakeAmount || '?';
     const stakeTok = info.stakeToken || 'USDC';
     const potTotal = (parseFloat(stakeAmt) || 0) * 2;
-    const payout = (potTotal * 0.95).toFixed(2);
+    const payoutRaw = potTotal * 0.95;
+    // Smart formatting: show enough decimals to be meaningful
+    const formatAmt = (v) => {
+        if (v === 0) return '0';
+        if (v >= 1) return v.toFixed(2);
+        if (v >= 0.01) return v.toFixed(4);
+        return v.toFixed(6);
+    };
 
     if (isDraw) {
-        payoutEl.textContent = `REFUNDED ${stakeAmt} ${stakeTok}`;
+        payoutEl.textContent = `REFUNDED ${formatAmt(parseFloat(stakeAmt) || 0)} ${stakeTok}`;
         payoutEl.className = 'wr-result-payout draw-payout';
     } else if (won) {
-        payoutEl.textContent = `+${payout} ${stakeTok}`;
+        payoutEl.textContent = `+${formatAmt(payoutRaw)} ${stakeTok}`;
         payoutEl.className = 'wr-result-payout win';
     } else {
-        payoutEl.textContent = `-${stakeAmt} ${stakeTok}`;
+        payoutEl.textContent = `-${formatAmt(parseFloat(stakeAmt) || 0)} ${stakeTok}`;
         payoutEl.className = 'wr-result-payout loss';
     }
 
