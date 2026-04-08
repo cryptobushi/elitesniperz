@@ -2,7 +2,7 @@
  * privy-client.js — Privy auth for sniperz wager system
  * Bundled via esbuild to dist/privy-bundle.js
  */
-import Privy, { LocalStorage } from '@privy-io/js-sdk-core';
+import Privy, { LocalStorage, getUserEmbeddedSolanaWallet } from '@privy-io/js-sdk-core';
 
 const SESSION_KEY = 'sniperz_auth';
 let _appId = null;
@@ -199,17 +199,45 @@ export async function handleOAuthCallback() {
             const user = session.user || session;
             console.log('[Privy] User:', JSON.stringify(user).slice(0, 200));
 
+            // Get or create Solana wallet
+            let solanaWallet = null;
+            try {
+                solanaWallet = getUserEmbeddedSolanaWallet(user);
+                if (solanaWallet) {
+                    console.log('[Privy] Existing Solana wallet:', solanaWallet.address);
+                }
+            } catch(e) {}
+
+            if (!solanaWallet) {
+                try {
+                    console.log('[Privy] Creating Solana wallet...');
+                    const walletResult = await _privyClient.embeddedWallet.createSolana();
+                    solanaWallet = getUserEmbeddedSolanaWallet(walletResult.user || walletResult);
+                    console.log('[Privy] Created Solana wallet:', solanaWallet?.address);
+                } catch(e) {
+                    console.warn('[Privy] Failed to create Solana wallet:', e.message);
+                }
+            }
+
             const accessToken = await _privyClient.getAccessToken();
             console.log('[Privy] Access token:', accessToken ? accessToken.slice(0, 20) + '...' : 'null');
 
             if (accessToken) {
                 _token = accessToken;
+
+                // Extract twitter info from linked accounts
+                const twitterAccount = user.linked_accounts?.find(a => a.type === 'twitter_oauth');
+
                 const serverUser = await _registerWithServer(accessToken);
                 if (serverUser) {
+                    // Enrich with wallet address from Privy
+                    if (solanaWallet?.address && !serverUser.privy_wallet) {
+                        serverUser.privy_wallet = solanaWallet.address;
+                    }
                     _user = serverUser;
                     _saveSession();
                     _notifyListeners();
-                    console.log('[Privy] Login complete, redirecting...');
+                    console.log('[Privy] Login complete, wallet:', solanaWallet?.address, 'redirecting...');
                     window.location.href = '/';
                     return true;
                 }

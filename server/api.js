@@ -29,16 +29,29 @@ function fail(msg) {
 // ---------------------------------------------------------------------------
 router.post('/auth/verify', authMiddleware, (req, res) => {
     try {
-        const twitter = req.privyUser.twitter || {};
-        const wallet = req.privyUser.wallet || {};
+        const pu = req.privyUser;
+        // Extract twitter — could be in .twitter or .linked_accounts
+        const twitter = pu.twitter || {};
+        const linkedTwitter = (pu.linked_accounts || []).find(a => a.type === 'twitter_oauth') || {};
+        const twitterHandle = twitter.username || linkedTwitter.username || twitter.handle || 'unknown';
+        const twitterId = twitter.subject || linkedTwitter.subject || twitter.id || null;
+        const displayName = twitter.name || linkedTwitter.name || twitterHandle;
+
+        // Extract Solana wallet — could be in .wallet, .linked_accounts, or .mfa
+        const wallet = pu.wallet || {};
+        const linkedSolWallet = (pu.linked_accounts || []).find(a =>
+            (a.type === 'wallet' && a.chain_type === 'solana') ||
+            a.type === 'solana_wallet'
+        ) || {};
+        const walletAddress = wallet.address || linkedSolWallet.address || null;
 
         const now = Date.now();
         const user = db.upsertUser({
             id: req.privyUserId,
-            twitter_handle: twitter.username || twitter.handle || 'unknown',
-            twitter_id: twitter.subject || twitter.id || null,
-            privy_wallet: wallet.address || null,
-            display_name: twitter.name || twitter.username || null,
+            twitter_handle: twitterHandle,
+            twitter_id: twitterId,
+            privy_wallet: walletAddress,
+            display_name: displayName,
             last_seen: now,
         });
 

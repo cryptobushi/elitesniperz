@@ -1,5 +1,5 @@
 // wager-ui.js — Wager lobby, create match, waiting room, and in-game HUD
-import { isAuthenticated, getUser, getToken, login, logout } from '../dist/privy-bundle.js';
+import { isAuthenticated, getUser, getToken, getWalletAddress, login, logout } from '../dist/privy-bundle.js';
 import { requestDeposit, checkBalance } from './deposit-flow.js';
 
 // ── API helper ──────────────────────────────────────────────────────────────
@@ -652,6 +652,11 @@ function buildDOM() {
                 <button class="wl-btn" id="wlLogout">LOGOUT</button>
             </div>
         </div>
+        <div id="wlWalletBox" style="display:none;margin:0.5rem auto;max-width:500px;background:#0d0d1a;border:1px solid #333;border-radius:6px;padding:0.8rem;text-align:center;">
+            <div style="color:#888;font-size:0.65rem;margin-bottom:0.4rem;">YOUR SOLANA WALLET — Send SOL or USDC here to fund wagers</div>
+            <div id="wlWalletAddr" style="background:#000;border:1px solid #444;border-radius:4px;padding:0.6rem;font-family:'Courier New',monospace;font-size:clamp(0.6rem,2.5vw,0.85rem);color:#ffcc00;word-break:break-all;cursor:pointer;user-select:all;-webkit-user-select:all;" title="Click to copy"></div>
+            <div id="wlWalletCopied" style="color:#00ff44;font-size:0.6rem;margin-top:0.3rem;min-height:1em;"></div>
+        </div>
         <div class="wl-title">WAGER 1v1</div>
         <div class="wl-subtitle">:: put your money where your crosshair is ::</div>
         <div class="wl-table-wrap">
@@ -927,7 +932,29 @@ export async function showLobby() {
     // Populate user info
     const user = getUser();
     if (user) {
-        els.wlUser.textContent = user.twitter?.username ? `@${user.twitter.username}` : (user.wallet?.address?.slice(0, 8) + '...' || '---');
+        els.wlUser.textContent = '@' + (user.twitter_handle || user.display_name || 'unknown');
+
+        // Show wallet address
+        const walletBox = document.getElementById('wlWalletBox');
+        const walletAddr = document.getElementById('wlWalletAddr');
+        const walletCopied = document.getElementById('wlWalletCopied');
+        const addr = user.privy_wallet || getWalletAddress();
+        if (addr && walletBox && walletAddr) {
+            walletBox.style.display = 'block';
+            walletAddr.textContent = addr;
+            walletAddr.onclick = () => {
+                navigator.clipboard.writeText(addr).then(() => {
+                    if (walletCopied) { walletCopied.textContent = 'Copied!'; setTimeout(() => walletCopied.textContent = '', 2000); }
+                }).catch(() => {
+                    // Fallback: select all
+                    const range = document.createRange();
+                    range.selectNodeContents(walletAddr);
+                    window.getSelection().removeAllRanges();
+                    window.getSelection().addRange(range);
+                    if (walletCopied) walletCopied.textContent = 'Select all + copy manually';
+                });
+            };
+        }
     }
 
     // Fetch balance
