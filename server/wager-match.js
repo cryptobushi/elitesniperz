@@ -358,10 +358,12 @@ class WagerMatch {
         // KILL
         closest.health = 0;
         closest.deaths++;
+        closest.price = Math.max(0.1, closest.price * 0.5);
         closest.streak = 0;
 
         attacker.kills++;
         attacker.streak++;
+        attacker.price += 0.5 + closest.price * 0.3;
 
         // Broadcast kill event to both players
         this._broadcast(JSON.stringify({
