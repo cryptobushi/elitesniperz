@@ -161,6 +161,24 @@
             justify-content: center;
             flex-wrap: wrap;
         }
+        .hero-proof {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 1.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .proof-item { white-space: nowrap; }
+        .proof-val { color: var(--accent); font-weight: 700; }
+        .proof-hot { color: var(--warning); }
+        .proof-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+        @media (max-width: 500px) {
+            .proof-sep { display: none; }
+            .hero-proof { gap: 0.3rem 1rem; }
+        }
 
         .btn {
             font-family: var(--font-display);
@@ -246,7 +264,7 @@
 
         /* === SECTIONS === */
         .section {
-            padding: 5rem 1.5rem;
+            padding: 3.5rem 1.5rem;
             max-width: 1100px;
             margin: 0 auto;
         }
@@ -344,6 +362,21 @@
         }
         .duel-table tbody tr:hover {
             background: rgba(0, 255, 102, 0.03);
+        }
+        .duel-table tbody tr.row-live {
+            background: rgba(255, 51, 68, 0.03);
+            border-left: 2px solid var(--danger);
+        }
+        .duel-table tbody tr.row-hot {
+            background: rgba(255, 136, 0, 0.03);
+            border-left: 2px solid var(--warning);
+        }
+        .duel-table tbody tr.row-highstake {
+            background: rgba(255, 136, 0, 0.05);
+        }
+        .duel-table tbody tr.row-highstake .duel-stake {
+            font-size: 0.95rem;
+            text-shadow: 0 0 8px rgba(0, 255, 102, 0.3);
         }
 
         .duel-handle {
@@ -1401,8 +1434,17 @@
                 <p class="hero-sub">Play free or wager on Solana.</p>
                 <p class="hero-desc">WC3-inspired arena combat. 1v1 wagers. 5v5 multiplayer. Your reputation is your record.</p>
                 <div class="hero-buttons">
-                    <button class="btn btn-outline" id="playFreeBtn">PLAY FREE</button>
                     <button class="btn btn-filled" id="enterWagerBtn">ENTER WAGER LOBBY</button>
+                    <button class="btn btn-outline" id="playFreeBtn">PLAY FREE</button>
+                </div>
+                <div class="hero-proof">
+                    <div class="proof-item"><span class="proof-val">18</span> live matches</div>
+                    <div class="proof-sep"></div>
+                    <div class="proof-item"><span class="proof-val">42</span> open duels</div>
+                    <div class="proof-sep"></div>
+                    <div class="proof-item"><span class="proof-val proof-hot">9-win streak</span> live now</div>
+                    <div class="proof-sep"></div>
+                    <div class="proof-item"><span class="proof-val">2.5 SOL</span> highest stake</div>
                 </div>
             </div>
 
@@ -1437,6 +1479,7 @@
                     <div class="pulse-dot"></div>
                     <h2 class="section-title">LIVE ARENA</h2>
                 </div>
+                <p style="color:var(--text-muted);font-size:0.75rem;text-align:center;margin:-0.5rem 0 1rem;">Winner takes the pot. 5% rake. All records public.</p>
                 <div class="filter-tabs">
                     <button class="filter-tab active">ALL</button>
                     <button class="filter-tab">OPEN</button>
@@ -1455,14 +1498,14 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
+                            <tr class="row-live">
                                 <td><span class="duel-handle">@bushi</span></td>
                                 <td><span class="duel-wr high">68%</span></td>
                                 <td>142</td>
                                 <td><span class="duel-stake">0.5 SOL</span></td>
                                 <td><span class="badge badge-live">LIVE</span></td>
                             </tr>
-                            <tr>
+                            <tr class="row-hot">
                                 <td><span class="duel-handle">@wizardscope</span></td>
                                 <td><span class="duel-wr high">74%</span></td>
                                 <td>89</td>
@@ -1476,7 +1519,7 @@
                                 <td><span class="duel-stake">0.25 SOL</span></td>
                                 <td><span class="badge badge-open">OPEN</span></td>
                             </tr>
-                            <tr>
+                            <tr class="row-live row-highstake">
                                 <td><span class="duel-handle">@phantom</span></td>
                                 <td><span class="duel-wr high">80%</span></td>
                                 <td>23</td>
@@ -1490,7 +1533,7 @@
                                 <td><span class="duel-stake">0.1 SOL</span></td>
                                 <td><span class="badge badge-open">OPEN</span></td>
                             </tr>
-                            <tr>
+                            <tr class="row-hot row-highstake">
                                 <td><span class="duel-handle">@degenking</span></td>
                                 <td><span class="duel-wr low">38%</span></td>
                                 <td>45</td>
@@ -1531,11 +1574,62 @@
             </div>
         </section>
 
+        <!-- ARENA FEED (moved up) -->
+        <section class="section" style="padding-top:2rem;padding-bottom:2rem;">
+            <div class="section-header">
+                <div class="pulse-dot"></div>
+                <h2 class="section-title">ARENA FEED</h2>
+            </div>
+            <div class="feed-list">
+                <div class="feed-item">
+                    <div class="feed-bar loss"></div>
+                    <div class="feed-text"><strong>@bushi</strong> got sniped for 0.9 SOL in sudden death</div>
+                    <div class="feed-time">2m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar streak"></div>
+                    <div class="feed-text"><strong>@wizardscope</strong> extended to a 10-win streak</div>
+                    <div class="feed-time">5m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar win"></div>
+                    <div class="feed-text"><strong>@voidcat</strong> upset a 72% favorite — took 0.3 SOL</div>
+                    <div class="feed-time">8m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar info"></div>
+                    <div class="feed-text">High roller duel settled in 38 seconds</div>
+                    <div class="feed-time">11m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar win"></div>
+                    <div class="feed-text"><strong>@phantom</strong> took 2.5 SOL from <strong>@degenking</strong></div>
+                    <div class="feed-time">14m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar loss"></div>
+                    <div class="feed-text"><strong>@rookie_x</strong> dropped their first wager — 0.05 SOL gone</div>
+                    <div class="feed-time">18m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar streak"></div>
+                    <div class="feed-text"><strong>@coldshot</strong> defended a 5-match streak vs challenger</div>
+                    <div class="feed-time">22m ago</div>
+                </div>
+                <div class="feed-item">
+                    <div class="feed-bar loss"></div>
+                    <div class="feed-text"><strong>@sol_slayer</strong> rage-quit vs <strong>@bushi</strong> — forfeit recorded</div>
+                    <div class="feed-time">25m ago</div>
+                </div>
+            </div>
+        </section>
+
         <!-- PLAYER IDENTITY -->
-        <section class="section">
+        <section class="section" style="padding-top:2rem;padding-bottom:2rem;">
             <div class="section-header">
                 <h2 class="section-title">REPUTATION IS PUBLIC</h2>
             </div>
+            <p style="color:var(--text-muted);font-size:0.75rem;text-align:center;margin:-0.5rem 0 1.2rem;">Every win, loss, and disconnect is visible. Choose who you face.</p>
             <div class="player-grid">
                 <!-- Card 1 -->
                 <div class="player-card">
@@ -1644,93 +1738,6 @@
             </div>
         </section>
 
-        <!-- WHY SNIPERZ -->
-        <section class="section" style="background: var(--base-dark); max-width: none; border-top: 1px solid var(--base-border); border-bottom: 1px solid var(--base-border);">
-            <div style="max-width: 1100px; margin: 0 auto;">
-                <div class="section-header">
-                    <h2 class="section-title">WHY SNIPERZ</h2>
-                </div>
-                <div class="feature-grid">
-                    <div class="feature-card">
-                        <div class="feature-title">Positioning Wins</div>
-                        <div class="feature-desc">Auto-shoot means the skill is WHERE you stand, not how fast you click.</div>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-title">Stakes Change Everything</div>
-                        <div class="feature-desc">Free play to warm up. Real SOL when you're ready.</div>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-title">Reputation Is Public</div>
-                        <div class="feature-desc">Every win, loss, and disconnect is on your record.</div>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-title">Every Duel Tells a Story</div>
-                        <div class="feature-desc">Fast rounds. Visible stakes. Replayable rivalries.</div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- ARENA FEED -->
-        <section class="section">
-            <div class="section-header">
-                <div class="pulse-dot"></div>
-                <h2 class="section-title">ARENA FEED</h2>
-            </div>
-            <div class="feed-list">
-                <div class="feed-item">
-                    <div class="feed-bar loss"></div>
-                    <div class="feed-text"><strong>@bushi</strong> lost 0.9 SOL in sudden death</div>
-                    <div class="feed-time">2m ago</div>
-                </div>
-                <div class="feed-item">
-                    <div class="feed-bar streak"></div>
-                    <div class="feed-text"><strong>@wizardscope</strong> hit a 10-win streak</div>
-                    <div class="feed-time">5m ago</div>
-                </div>
-                <div class="feed-item">
-                    <div class="feed-bar win"></div>
-                    <div class="feed-text"><strong>@voidcat</strong> upset a 72% favorite</div>
-                    <div class="feed-time">8m ago</div>
-                </div>
-                <div class="feed-item">
-                    <div class="feed-bar info"></div>
-                    <div class="feed-text">High Roller duel settled in 38 seconds</div>
-                    <div class="feed-time">11m ago</div>
-                </div>
-                <div class="feed-item">
-                    <div class="feed-bar win"></div>
-                    <div class="feed-text"><strong>@phantom</strong> won 2.5 SOL vs <strong>@degenking</strong></div>
-                    <div class="feed-time">14m ago</div>
-                </div>
-                <div class="feed-item">
-                    <div class="feed-bar loss"></div>
-                    <div class="feed-text"><strong>@rookie_x</strong> lost their first wager (0.05 SOL)</div>
-                    <div class="feed-time">18m ago</div>
-                </div>
-                <div class="feed-item">
-                    <div class="feed-bar streak"></div>
-                    <div class="feed-text"><strong>@coldshot</strong> defended a 5-match streak</div>
-                    <div class="feed-time">22m ago</div>
-                </div>
-                <div class="feed-item">
-                    <div class="feed-bar win"></div>
-                    <div class="feed-text"><strong>@snipegod</strong> won 0.1 SOL — 200th match milestone</div>
-                    <div class="feed-time">25m ago</div>
-                </div>
-                <div class="feed-item">
-                    <div class="feed-bar info"></div>
-                    <div class="feed-text"><strong>@nightowl</strong> joined the arena</div>
-                    <div class="feed-time">28m ago</div>
-                </div>
-                <div class="feed-item">
-                    <div class="feed-bar loss"></div>
-                    <div class="feed-text"><strong>@sol_slayer</strong> rage-quit vs <strong>@bushi</strong> — forfeit recorded</div>
-                    <div class="feed-time">31m ago</div>
-                </div>
-            </div>
-        </section>
-
         <!-- GAME MODES -->
         <section class="section" style="background: var(--base-dark); max-width: none; border-top: 1px solid var(--base-border); border-bottom: 1px solid var(--base-border);">
             <div style="max-width: 1100px; margin: 0 auto;">
@@ -1738,21 +1745,46 @@
                     <h2 class="section-title">GAME MODES</h2>
                 </div>
                 <div class="modes-grid">
+                    <div class="mode-card" style="border-color:var(--accent);box-shadow:0 0 20px rgba(0,255,102,0.05);">
+                        <div class="mode-tag mode-tag-stakes">Stakes</div>
+                        <div class="mode-label">1v1 Wager Duels</div>
+                        <div class="mode-desc">Real SOL on the line. Rep-driven matchmaking. Winner takes the pot.</div>
+                    </div>
                     <div class="mode-card">
                         <div class="mode-tag mode-tag-free">Free</div>
                         <div class="mode-label">Free Play</div>
-                        <div class="mode-desc">Learn the arena. No stakes. Practice positioning against bots or live players.</div>
-                    </div>
-                    <div class="mode-card">
-                        <div class="mode-tag mode-tag-stakes">Stakes</div>
-                        <div class="mode-label">1v1 Wager Duels</div>
-                        <div class="mode-desc">High-stakes. Rep-driven. Selective matchups. Winner takes the pot.</div>
+                        <div class="mode-desc">Learn positioning. No stakes. Practice against bots or live players.</div>
                     </div>
                     <div class="mode-card">
                         <div class="mode-tag mode-tag-team">Team</div>
                         <div class="mode-label">5v5 Multiplayer</div>
-                        <div class="mode-desc">Team chaos. Live action. Social play. First to the kill limit wins.</div>
+                        <div class="mode-desc">Team chaos. Live action. First to the kill limit wins.</div>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- WHY SNIPERZ (moved after game modes) -->
+        <section class="section" style="padding-top:2rem;padding-bottom:2rem;">
+            <div class="section-header">
+                <h2 class="section-title">WHY SNIPERZ</h2>
+            </div>
+            <div class="feature-grid" style="max-width:1100px;margin:0 auto;">
+                <div class="feature-card">
+                    <div class="feature-title">Positioning Wins</div>
+                    <div class="feature-desc">Auto-shoot means the skill is WHERE you stand, not how fast you click.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-title">Stakes Change Everything</div>
+                    <div class="feature-desc">Free play to warm up. Real SOL when you're ready to prove it.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-title">Reputation Is Public</div>
+                    <div class="feature-desc">Every win, loss, and disconnect is on your permanent record.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-title">Every Duel Tells a Story</div>
+                    <div class="feature-desc">Fast rounds. Visible stakes. Rivalries that carry weight.</div>
                 </div>
             </div>
         </section>
@@ -1760,11 +1792,12 @@
         <!-- FINAL CTA -->
         <section class="final-cta">
             <h2>Step into the arena.</h2>
+            <p class="final-sub" style="margin-bottom: 1.2rem;">You've seen the board. Pick how you enter.</p>
             <div class="hero-buttons">
-                <button class="btn btn-outline" id="playFreeBtn2">PLAY FREE</button>
                 <button class="btn btn-filled" id="enterWagerBtn2">ENTER WAGER LOBBY</button>
+                <button class="btn btn-outline" id="playFreeBtn2">PLAY FREE FIRST</button>
             </div>
-            <p class="final-sub" style="margin-top: 1rem;">Live duels. Public reputations. Real stakes.</p>
+            <p class="final-sub" style="margin-top: 1rem;font-size:0.7rem;">Live duels. Public reputations. Real stakes.</p>
         </section>
 
         <!-- FOOTER -->
