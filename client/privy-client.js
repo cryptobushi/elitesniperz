@@ -398,16 +398,47 @@ export async function getSolanaProvider() {
             return null;
         }
 
+        console.log('[Privy] User object keys:', Object.keys(privyUser));
+        console.log('[Privy] User linked_accounts:', privyUser.linked_accounts?.length, 'accounts');
+
         // Find the embedded Solana wallet account
-        const solWallet = getUserEmbeddedSolanaWallet(privyUser);
+        let solWallet = null;
+        try {
+            solWallet = getUserEmbeddedSolanaWallet(privyUser);
+        } catch(e) {
+            console.warn('[Privy] getUserEmbeddedSolanaWallet error:', e.message);
+            // Fallback: search linked_accounts manually
+            if (privyUser.linked_accounts) {
+                solWallet = privyUser.linked_accounts.find(a =>
+                    a.type === 'wallet' && a.chain_type === 'solana' && a.wallet_client_type === 'privy'
+                );
+            }
+        }
+
         if (!solWallet) {
-            console.warn('[Privy] No embedded Solana wallet found in user');
+            // Last resort: use the address from our DB
+            const dbUser = getUser();
+            if (dbUser?.privy_wallet) {
+                console.log('[Privy] Using wallet address from DB:', dbUser.privy_wallet);
+                solWallet = { address: dbUser.privy_wallet };
+            }
+        }
+
+        if (!solWallet) {
+            console.warn('[Privy] No Solana wallet found');
             return null;
         }
         console.log('[Privy] Found Solana wallet:', solWallet.address);
 
-        // Get entropy details for wallet access
-        const { entropyId, entropyIdVerifier } = getEntropyDetailsFromUser(privyUser);
+        // Get entropy details — wrap in try/catch since user format may vary
+        let entropyId, entropyIdVerifier;
+        try {
+            const entropy = getEntropyDetailsFromUser(privyUser);
+            entropyId = entropy.entropyId;
+            entropyIdVerifier = entropy.entropyIdVerifier;
+        } catch(e) {
+            console.warn('[Privy] Entropy details not available:', e.message);
+        }
 
         // Get Solana provider
         const provider = await _privyClient.embeddedWallet.getSolanaProvider(
