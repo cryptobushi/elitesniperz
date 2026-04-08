@@ -351,6 +351,80 @@ router.get('/matches/:id/deposit-tx', authMiddleware, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /matches/:id/submit-signed-tx — receive signed tx, submit to Solana, then confirm
+// ---------------------------------------------------------------------------
+router.post('/matches/:id/submit-signed-tx', authMiddleware, async (req, res) => {
+    try {
+        const match = db.getMatch(req.params.id);
+        if (!match) return res.status(404).json(fail('Match not found'));
+
+        const userId = req.privyUserId;
+        if (userId !== match.creator_id && userId !== match.joiner_id) {
+            return res.status(403).json(fail('Not in this match'));
+        }
+
+        const { signedTransaction, signature } = req.body;
+        if (!signedTransaction || !signature) return res.status(400).json(fail('Missing signedTransaction or signature'));
+
+        if (!escrow.isReady()) return res.status(503).json(fail('Escrow not configured'));
+
+        const { Connection, Transaction } = require('@solana/web3.js');
+        const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
+
+        // Decode the transaction and add the signature
+        const txBytes = Buffer.from(signedTransaction, 'base64');
+        const transaction = Transaction.from(txBytes);
+
+        // Add the user's signature
+        const user = db.getUser(userId);
+        const { PublicKey } = require('@solana/web3.js');
+        const userPubkey = new PublicKey(user.privy_wallet);
+        const sigBuffer = Buffer.from(signature, 'base64');
+        transaction.addSignature(userPubkey, sigBuffer);
+
+        // Send to Solana
+        const rawTx = transaction.serialize();
+        const txSignature = await conn.sendRawTransaction(rawTx, { skipPreflight: false });
+        console.log('[DEPOSIT] Submitted tx:', txSignature);
+
+        // Wait for confirmation
+        await conn.confirmTransaction(txSignature, 'confirmed');
+        console.log('[DEPOSIT] Confirmed tx:', txSignature);
+
+        // Now do the confirm-deposit logic
+        const isCreator = userId === match.creator_id;
+        const { v4: uuidv4 } = require('uuid');
+        db.createTransaction({
+            id: uuidv4(), match_id: match.id, user_id: userId,
+            tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token,
+            tx_signature: txSignature, from_wallet: user.privy_wallet, to_wallet: 'escrow'
+        });
+        db.confirmTransaction(txSignature, Date.now());
+
+        // Update match status
+        const currentStatus = db.getMatch(match.id).status;
+        if (isCreator) {
+            if (currentStatus === 'funded_joiner') {
+                db.updateMatch(match.id, { status: 'funded_both', funded_at: Date.now() });
+            } else if (['open', 'matched'].includes(currentStatus)) {
+                db.updateMatch(match.id, { status: 'funded_creator', funded_at: Date.now() });
+            }
+        } else {
+            if (currentStatus === 'funded_creator') {
+                db.updateMatch(match.id, { status: 'funded_both', funded_at: Date.now() });
+            } else if (['open', 'matched'].includes(currentStatus)) {
+                db.updateMatch(match.id, { status: 'funded_joiner', funded_at: Date.now() });
+            }
+        }
+
+        return res.json(success({ txSignature, status: db.getMatch(match.id).status }));
+    } catch (e) {
+        console.error('POST /matches/:id/submit-signed-tx error:', e);
+        return res.status(500).json(fail('Transaction submission failed: ' + e.message));
+    }
+});
+
+// ---------------------------------------------------------------------------
 // POST /matches/:id/confirm-deposit — confirm deposit tx signature
 // ---------------------------------------------------------------------------
 router.post('/matches/:id/confirm-deposit', authMiddleware, async (req, res) => {

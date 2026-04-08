@@ -52,15 +52,35 @@ export async function requestDeposit(matchId, token) {
             return { success: false, error: 'Wallet not available. Try logging out and back in.' };
         }
 
-        // Step 3: Deserialize and sign transaction
+        // Step 3: Sign the transaction with Privy wallet
         console.log('[deposit] Signing transaction with Privy wallet...');
+
         const txBytes = Uint8Array.from(atob(unsignedTxBase64), c => c.charCodeAt(0));
 
-        // Use the provider to sign and send
-        const { signature } = await provider.signAndSendTransaction({
-            serializedTransaction: txBytes,
+        // Use provider.request to sign the message (raw bytes)
+        const message = btoa(String.fromCharCode(...txBytes));
+        const signResult = await provider.request({
+            method: 'signMessage',
+            params: { message },
         });
-        console.log('[deposit] Transaction sent:', signature);
+        const signatureBase64 = signResult?.signature || signResult;
+        console.log('[deposit] Signed, submitting to server...');
+
+        // Step 3b: Send signed tx to server for submission
+        const submitRes = await fetch(`/api/matches/${matchId}/submit-signed-tx`, {
+            method: 'POST',
+            headers: authHeaders(authToken),
+            body: JSON.stringify({
+                signedTransaction: unsignedTxBase64,
+                signature: signatureBase64,
+            }),
+        });
+        const submitBody = await submitRes.json();
+        if (!submitRes.ok || !submitBody.success) {
+            return { success: false, error: submitBody.error || 'Failed to submit transaction' };
+        }
+        const signature = submitBody.data?.txSignature;
+        console.log('[deposit] Transaction confirmed:', signature);
 
         // Step 4: Confirm with server
         console.log('[deposit] Confirming deposit on server...');
