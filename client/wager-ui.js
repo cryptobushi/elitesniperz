@@ -973,7 +973,9 @@ export function showCreateMatch() {
 // ── Waiting room ────────────────────────────────────────────────────────────
 export function showWaitingRoom(matchId) {
     currentMatchId = matchId;
-    hideLobby();
+    // Hide lobby but don't restore start screen
+    els.lobby.classList.add('hidden');
+    if (lobbyInterval) { clearInterval(lobbyInterval); lobbyInterval = null; }
     els.waiting.classList.remove('hidden');
 
     // Populate with current info from create form (best effort)
