@@ -85,6 +85,11 @@ class WagerMatch {
     /**
      * Assign a WebSocket to a player.
      */
+    setReady(userId) {
+        if (!this._ready) this._ready = new Set();
+        this._ready.add(userId);
+    }
+
     setPlayerWs(userId, ws) {
         this.wsMap.set(userId, ws);
         const p = this.players.get(userId);

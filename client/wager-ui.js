@@ -1152,7 +1152,7 @@ export function connectWagerMatch(matchId) {
 
     ws.addEventListener('open', () => {
         ws.send(JSON.stringify({
-            type: 'wager_auth',
+            t: 'wager_auth',
             token: getToken(),
             matchId,
         }));
@@ -1162,7 +1162,11 @@ export function connectWagerMatch(matchId) {
         let msg;
         try { msg = JSON.parse(ev.data); } catch (_) { return; }
 
-        switch (msg.type) {
+        switch (msg.t) {
+            case 'wager_authed':
+                // Authenticated — send ready
+                ws.send(JSON.stringify({ t: 'wager_ready' }));
+                break;
             case 'wager_lobby':
                 // Match info update while in lobby/waiting
                 break;
@@ -1174,15 +1178,14 @@ export function connectWagerMatch(matchId) {
                 els.createModal.classList.add('hidden');
                 const startModal = document.getElementById('usernameModal');
                 if (startModal) startModal.style.display = 'none';
-                // Show game canvas
                 const canvas = document.getElementById('gameCanvas');
                 if (canvas) canvas.style.display = '';
-                showWagerHUD(msg.match || msg);
+                showWagerHUD(msg);
                 break;
             }
 
             case 'wager_score':
-                updateWagerScore(msg.myKills ?? msg.you ?? 0, msg.opponentKills ?? msg.opponent ?? 0);
+                updateWagerScore(msg.ck ?? 0, msg.jk ?? 0);
                 break;
 
             case 'wager_end':
@@ -1193,6 +1196,10 @@ export function connectWagerMatch(matchId) {
                 hideWagerHUD();
                 alert('Match timed out.');
                 showLobby();
+                break;
+
+            case 'error':
+                console.warn('[wager ws] Error:', msg.msg);
                 break;
         }
     });

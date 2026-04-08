@@ -825,14 +825,17 @@ function handleWagerWs(ws, userId, matchId) {
             const msg = JSON.parse(data);
             if (msg.t === 'wager_ready') {
                 entry.match.setReady(userId);
-                // Start if both ready and both funded
-                if (match.status === 'funded_both' || match.status === 'in_progress') {
-                    if (!entry.match.running) {
+                // Re-read match status from DB (may have changed since initial load)
+                const currentMatch = db.getMatch(matchId);
+                if (currentMatch && currentMatch.status === 'funded_both' && !entry.match.running) {
+                    // Check both players are connected
+                    if (entry.creatorWs && entry.joinerWs) {
                         entry.match.start();
                         db.updateMatch(matchId, { status: 'in_progress', started_at: Date.now() });
-                        const startMsg = JSON.stringify({ t: 'wager_start', matchId, killTarget: match.kill_target });
-                        if (entry.creatorWs) entry.creatorWs.send(startMsg);
-                        if (entry.joinerWs) entry.joinerWs.send(startMsg);
+                        const startMsg = JSON.stringify({ t: 'wager_start', matchId, killTarget: currentMatch.kill_target });
+                        entry.creatorWs.send(startMsg);
+                        entry.joinerWs.send(startMsg);
+                        console.log('[WAGER] Match ' + matchId + ' started!');
                     }
                 }
             } else if (msg.t === 'wager_forfeit') {
