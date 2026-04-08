@@ -130,6 +130,14 @@ export function initPrivy(appId) {
 
     if (restored) {
         setTimeout(() => _notifyListeners(), 0);
+        // Re-initialize Privy session so _privyClient.user is populated
+        if (_privyClient) {
+            _privyClient.initialize().then(() => {
+                console.log('[Privy] Session restored, user:', _privyClient.user ? 'loaded' : 'null');
+            }).catch(e => {
+                console.warn('[Privy] Session restore failed:', e.message);
+            });
+        }
     }
 
     // Check for OAuth callback after SDK is ready
@@ -376,10 +384,17 @@ export async function getSolanaProvider() {
         const accessToken = await _privyClient.getAccessToken();
         if (!accessToken) return null;
 
-        // Get the Privy user object (has linked_accounts with wallet info)
-        const privyUser = _privyClient.user;
+        // Ensure Privy user is loaded
+        let privyUser = _privyClient.user;
         if (!privyUser) {
-            console.warn('[Privy] No privy user object cached');
+            console.log('[Privy] User not loaded, initializing...');
+            try {
+                await _privyClient.initialize();
+                privyUser = _privyClient.user;
+            } catch(e) {}
+        }
+        if (!privyUser) {
+            console.warn('[Privy] No privy user object after initialize');
             return null;
         }
 
