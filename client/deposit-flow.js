@@ -8,7 +8,7 @@
  * Production: would sign with Privy embedded wallet and submit to Solana.
  */
 
-import { getToken } from './privy-client.js';
+import { getToken } from '../dist/privy-bundle.js';
 
 // ---------------------------------------------------------------------------
 // Helpers

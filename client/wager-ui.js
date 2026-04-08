@@ -1,5 +1,5 @@
 // wager-ui.js — Wager lobby, create match, waiting room, and in-game HUD
-import { isAuthenticated, getUser, getToken, login, logout } from './privy-client.js';
+import { isAuthenticated, getUser, getToken, login, logout } from '../dist/privy-bundle.js';
 import { requestDeposit, checkBalance } from './deposit-flow.js';
 
 // ── API helper ──────────────────────────────────────────────────────────────

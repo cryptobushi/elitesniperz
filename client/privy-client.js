@@ -1,15 +1,15 @@
 /**
- * privy-client.js — Privy auth via js-sdk-core for sniperz wager system
- * Uses OAuth redirect flow for Twitter login + embedded Solana wallet
+ * privy-client.js — Privy auth for sniperz wager system
+ * Bundled via esbuild to dist/privy-bundle.js
  */
+import Privy from '@privy-io/js-sdk-core';
 
 const SESSION_KEY = 'sniperz_auth';
 let _appId = null;
+let _privyClient = null;
 let _user = null;
 let _token = null;
 let _listeners = [];
-let _privyClient = null;
-let _initPromise = null;
 
 function _saveSession() {
     if (_token && _user) {
@@ -40,131 +40,51 @@ function _notifyListeners() {
     }
 }
 
+// Register with our server
+async function _registerWithServer(accessToken) {
+    const res = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken }
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    return body.success ? body.data : null;
+}
+
 /**
- * Initialize the Privy client.
+ * Initialize Privy
  */
 export function initPrivy(appId) {
     _appId = appId;
     const restored = _loadSession();
+
+    try {
+        _privyClient = new Privy({
+            appId,
+        });
+        console.log('[Privy] SDK initialized');
+    } catch (e) {
+        console.warn('[Privy] SDK init failed:', e.message);
+    }
+
     if (restored) {
         setTimeout(() => _notifyListeners(), 0);
     }
 
-    // Dynamically import and initialize Privy SDK
-    _initPromise = _initPrivySDK(appId);
-
     return { authenticated: restored, user: _user };
 }
 
-async function _initPrivySDK(appId) {
-    // Real Privy SDK requires a bundler (vite/esbuild) to resolve node_modules.
-    // For now, we use the dev login modal. When bundled, uncomment below:
-    // try {
-    //     const { PrivyClient } = await import('@privy-io/js-sdk-core');
-    //     _privyClient = new PrivyClient({ appId });
-    //     console.log('[Privy] SDK initialized');
-    // } catch (e) {
-    //     console.warn('[Privy] SDK not available:', e.message);
-    // }
-}
-
 /**
- * Log in via Twitter/X. Shows a login modal.
+ * Login via Twitter/X using Privy OAuth
  */
 export async function login() {
-    // Try real Privy SDK first
-    if (_initPromise) await _initPromise;
-
-    if (_privyClient) {
-        try {
-            return await _loginWithPrivy();
-        } catch (e) {
-            console.warn('[Privy] Real login failed:', e.message, '— falling back to dev');
-        }
+    if (!_privyClient) {
+        console.warn('[Privy] No client, falling back to dev login');
+        return _devLogin();
     }
 
-    // Dev fallback: show custom login modal
-    return _devLogin();
-}
-
-async function _loginWithPrivy() {
-    // Generate OAuth URL for Twitter
-    const redirectUrl = window.location.origin + '/auth/callback';
-    const oauthData = await _privyClient.auth.oauth.generateURL('twitter', redirectUrl);
-
-    // Open in popup
-    const popup = window.open(oauthData.url, 'privy_login', 'width=500,height=700,left=200,top=100');
-
-    // Wait for callback
-    return new Promise((resolve, reject) => {
-        const interval = setInterval(() => {
-            try {
-                if (popup.closed) {
-                    clearInterval(interval);
-                    // Check if session was set by callback page
-                    if (_loadSession()) {
-                        _notifyListeners();
-                        resolve({ success: true, user: _user });
-                    } else {
-                        resolve({ success: false, error: 'Login cancelled' });
-                    }
-                }
-                // Check if popup redirected to our callback
-                if (popup.location.href.includes('/auth/callback')) {
-                    const url = new URL(popup.location.href);
-                    popup.close();
-                    clearInterval(interval);
-                    // Handle callback
-                    _handleOAuthCallback(url.searchParams).then(result => {
-                        resolve(result);
-                    });
-                }
-            } catch (e) {
-                // Cross-origin — popup still on Twitter, keep waiting
-            }
-        }, 500);
-
-        // Timeout after 2 minutes
-        setTimeout(() => {
-            clearInterval(interval);
-            try { popup.close(); } catch(e) {}
-            resolve({ success: false, error: 'Login timed out' });
-        }, 120000);
-    });
-}
-
-async function _handleOAuthCallback(params) {
-    try {
-        const session = await _privyClient.auth.oauth.handleCallback();
-        if (session && session.user) {
-            const accessToken = await _privyClient.getAccessToken();
-            _token = accessToken;
-
-            // Register with our server
-            const res = await fetch('/api/auth/verify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken }
-            });
-            const body = await res.json();
-            if (body.success) {
-                _user = body.data;
-                _saveSession();
-                _notifyListeners();
-                return { success: true, user: _user };
-            }
-        }
-        return { success: false, error: 'OAuth callback failed' };
-    } catch (e) {
-        return { success: false, error: e.message };
-    }
-}
-
-/**
- * Dev mode login — shows a styled modal instead of prompt()
- */
-function _devLogin() {
     return new Promise((resolve) => {
-        // Create modal
+        // Show login modal with both options
         const overlay = document.createElement('div');
         overlay.id = 'authOverlay';
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:20000;display:flex;align-items:center;justify-content:center;font-family:"Courier New",monospace;';
@@ -179,7 +99,9 @@ function _devLogin() {
                     Sign in with X
                 </button>
 
-                <div style="color:#444;font-size:0.65rem;margin:1rem 0;">— or dev mode —</div>
+                <div id="authStatus" style="color:#888;font-size:0.7rem;margin:0.5rem 0;min-height:1.2em;"></div>
+
+                <div style="color:#444;font-size:0.65rem;margin:0.8rem 0;">— or dev mode —</div>
 
                 <input id="authHandleInput" type="text" placeholder="Enter Twitter/X handle"
                     style="width:100%;padding:10px;background:#111;border:1px solid #333;border-radius:4px;color:#fff;font-family:inherit;font-size:0.85rem;text-align:center;box-sizing:border-box;margin-bottom:0.75rem;" />
@@ -195,43 +117,41 @@ function _devLogin() {
         `;
 
         document.body.appendChild(overlay);
-
         const cleanup = () => { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); };
+        const statusEl = () => document.getElementById('authStatus');
 
-        // X/Twitter button — try real Privy, fall back to dev
+        // Twitter/X login via Privy OAuth
         document.getElementById('authTwitterBtn').addEventListener('click', async () => {
-            if (_privyClient) {
-                cleanup();
-                try {
-                    const result = await _loginWithPrivy();
-                    resolve(result);
-                } catch (e) {
-                    resolve({ success: false, error: e.message });
+            if (statusEl()) statusEl().textContent = 'Connecting to X...';
+            try {
+                // Generate OAuth URL
+                const redirectUrl = window.location.origin + '/auth/callback';
+                const oauthData = await _privyClient.auth.oauth.init({
+                    provider: 'twitter',
+                    redirectUrl,
+                });
+
+                if (oauthData && oauthData.url) {
+                    // Store state for callback
+                    sessionStorage.setItem('privy_oauth_state', JSON.stringify({ matchId: null }));
+                    window.location.href = oauthData.url;
+                } else {
+                    if (statusEl()) statusEl().textContent = 'Failed to start OAuth. Try dev login.';
                 }
-                return;
+            } catch (e) {
+                console.error('[Privy] OAuth error:', e);
+                if (statusEl()) statusEl().textContent = 'OAuth error: ' + e.message;
             }
-            // No SDK — use the handle input as dev login
-            const handle = document.getElementById('authHandleInput').value.trim().replace(/^@/, '');
-            if (!handle) {
-                document.getElementById('authHandleInput').style.borderColor = '#ff4444';
-                return;
-            }
-            cleanup();
-            resolve(await _doDevLogin(handle));
         });
 
-        // Dev login button
+        // Dev login
         document.getElementById('authDevBtn').addEventListener('click', async () => {
             const handle = document.getElementById('authHandleInput').value.trim().replace(/^@/, '');
-            if (!handle) {
-                document.getElementById('authHandleInput').style.borderColor = '#ff4444';
-                return;
-            }
+            if (!handle) { document.getElementById('authHandleInput').style.borderColor = '#ff4444'; return; }
             cleanup();
             resolve(await _doDevLogin(handle));
         });
 
-        // Enter key on input
         document.getElementById('authHandleInput').addEventListener('keydown', async (e) => {
             if (e.key === 'Enter') {
                 const handle = document.getElementById('authHandleInput').value.trim().replace(/^@/, '');
@@ -241,17 +161,46 @@ function _devLogin() {
             }
         });
 
-        // Cancel
         document.getElementById('authCancelBtn').addEventListener('click', () => {
             cleanup();
             resolve({ success: false, error: 'Login cancelled' });
         });
 
-        // Focus input
         setTimeout(() => document.getElementById('authHandleInput')?.focus(), 100);
     });
 }
 
+// Handle OAuth callback (called on page load if URL has callback params)
+export async function handleOAuthCallback() {
+    if (!window.location.pathname.includes('/auth/callback')) return false;
+    if (!_privyClient) return false;
+
+    try {
+        const session = await _privyClient.auth.oauth.link({
+            url: window.location.href,
+        });
+
+        if (session && session.user) {
+            const accessToken = await _privyClient.getAccessToken();
+            _token = accessToken;
+
+            const serverUser = await _registerWithServer(accessToken);
+            if (serverUser) {
+                _user = serverUser;
+                _saveSession();
+                _notifyListeners();
+                // Redirect back to main page
+                window.location.href = '/';
+                return true;
+            }
+        }
+    } catch (e) {
+        console.error('[Privy] OAuth callback error:', e);
+    }
+    return false;
+}
+
+// Dev mode login
 async function _doDevLogin(handle) {
     const userId = _mockUserId(handle);
     const wallet = _mockWallet(handle);
@@ -299,6 +248,9 @@ export function logout() {
     _token = null;
     _user = null;
     sessionStorage.removeItem(SESSION_KEY);
+    if (_privyClient) {
+        try { _privyClient.logout(); } catch(e) {}
+    }
     _notifyListeners();
 }
 
@@ -321,4 +273,9 @@ export async function refreshProfile() {
         if (body.success && body.data) { _user = body.data; _saveSession(); return _user; }
     } catch { /* ignore */ }
     return null;
+}
+
+// Check for OAuth callback on page load
+if (typeof window !== 'undefined') {
+    handleOAuthCallback();
 }

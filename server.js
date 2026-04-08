@@ -18,6 +18,11 @@ app.use(express.json());
 app.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 app.use(express.static(path.join(__dirname)));
 
+// OAuth callback — serve index.html so the client JS handles it
+app.get('/auth/callback', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // === WAGER SYSTEM ===
 const apiRouter = require('./server/api');
 const { verifyWsToken } = require('./server/auth');

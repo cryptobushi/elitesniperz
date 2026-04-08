@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { initPrivy } from './client/privy-client.js';
+import { initPrivy } from './dist/privy-bundle.js';
 import { initWagerUI } from './client/wager-ui.js';
 
 // Initialize wager system (after DOM ready)
