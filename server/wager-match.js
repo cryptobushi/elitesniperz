@@ -122,8 +122,7 @@ class WagerMatch {
             p.lastInput = Date.now();
         });
 
-        // Send initial state to both players
-        this._sendRoster();
+        // Roster is sent when players send 'join' message (handleMessage)
 
         // Game tick at 64hz
         const sendEvery = Math.round(TICK_RATE / SEND_RATE);

@@ -3769,6 +3769,9 @@ function connectToServer() {
 }
 
 function handleBinaryState(buf) {
+    // Don't process binary state until we know our own ID (prevents ghost self-remote)
+    if (!_myServerId) return;
+
     const view = new DataView(buf);
     const count = view.getUint16(0, true);
     if (!handleBinaryState._logged) {
@@ -4562,6 +4565,9 @@ window._startWagerGame = function(ws, matchData) {
     document.getElementById('hud')?.classList.remove('hidden');
     document.getElementById('abilities')?.classList.remove('hidden');
     document.querySelector('.minimap')?.classList.remove('hidden');
+
+    // Hide the 5v5 team score HUD (wager has its own HUD)
+    document.getElementById('teamScore')?.classList.add('hidden');
 
     // Start the Three.js game (creates map, player, starts render loop)
     if (!window._gameStarted) {
