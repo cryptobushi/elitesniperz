@@ -171,39 +171,54 @@ export async function login() {
 
 // Handle OAuth callback (called on page load if URL has callback params)
 export async function handleOAuthCallback() {
-    if (!window.location.pathname.includes('/auth/callback')) return false;
-    if (!_privyClient) return false;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('privy_oauth_code') || params.get('code');
+    const state = params.get('privy_oauth_state') || params.get('state');
+    const provider = params.get('privy_oauth_provider') || 'twitter';
+
+    // Not a callback URL
+    if (!code) return false;
+
+    console.log('[Privy] OAuth callback detected, provider:', provider, 'code:', code.slice(0, 10) + '...');
+
+    if (!_privyClient) {
+        console.error('[Privy] No client for callback — redirecting home');
+        window.location.href = '/';
+        return false;
+    }
 
     try {
-        // Extract authorization code from URL params
-        const params = new URLSearchParams(window.location.search);
-        const code = params.get('code') || params.get('privy_oauth_code');
-        const state = params.get('state') || params.get('privy_oauth_state');
-
-        if (!code) {
-            console.log('[Privy] No OAuth code in callback URL');
-            return false;
-        }
-
-        console.log('[Privy] Processing OAuth callback with code');
+        console.log('[Privy] Calling loginWithCode...');
         const session = await _privyClient.auth.oauth.loginWithCode(code, state);
+        console.log('[Privy] loginWithCode result:', session ? 'success' : 'null');
 
-        if (session && session.user) {
+        if (session) {
+            const user = session.user || session;
+            console.log('[Privy] User:', JSON.stringify(user).slice(0, 200));
+
             const accessToken = await _privyClient.getAccessToken();
-            _token = accessToken;
+            console.log('[Privy] Access token:', accessToken ? accessToken.slice(0, 20) + '...' : 'null');
 
-            const serverUser = await _registerWithServer(accessToken);
-            if (serverUser) {
-                _user = serverUser;
-                _saveSession();
-                _notifyListeners();
-                window.location.href = '/';
-                return true;
+            if (accessToken) {
+                _token = accessToken;
+                const serverUser = await _registerWithServer(accessToken);
+                if (serverUser) {
+                    _user = serverUser;
+                    _saveSession();
+                    _notifyListeners();
+                    console.log('[Privy] Login complete, redirecting...');
+                    window.location.href = '/';
+                    return true;
+                }
             }
         }
     } catch (e) {
         console.error('[Privy] OAuth callback error:', e);
     }
+
+    // Failed — redirect home anyway
+    console.warn('[Privy] Callback failed, redirecting home');
+    window.location.href = '/';
     return false;
 }
 
