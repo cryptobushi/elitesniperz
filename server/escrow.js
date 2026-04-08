@@ -107,9 +107,13 @@ async function createDepositTransaction(userWalletPubkey, amount, token) {
             return null;
         }
 
-        // Serialize without signatures — user will sign client-side
+        // Serialize the message (what the user signs) and the full tx (for reconstruction)
+        const message = tx.serializeMessage();
         const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
-        return serialized.toString('base64');
+        return {
+            transaction: serialized.toString('base64'),
+            message: message.toString('base64'),
+        };
     } catch (err) {
         console.error('[escrow] createDepositTransaction error:', err.message);
         return null;

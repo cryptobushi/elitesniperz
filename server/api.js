@@ -340,10 +340,13 @@ router.get('/matches/:id/deposit-tx', authMiddleware, async (req, res) => {
         if (!user || !user.privy_wallet) return res.status(400).json(fail('No wallet'));
         if (!escrow.isReady()) return res.status(503).json(fail('Escrow not configured'));
 
-        const tx = await escrow.createDepositTransaction(user.privy_wallet, match.stake_amount, match.stake_token);
-        if (!tx) return res.status(500).json(fail('Failed to create transaction'));
+        const txData = await escrow.createDepositTransaction(user.privy_wallet, match.stake_amount, match.stake_token);
+        if (!txData) return res.status(500).json(fail('Failed to create transaction'));
 
-        return res.json(success({ transaction: tx }));
+        return res.json(success({
+            transaction: txData.transaction,  // Full serialized tx (base64)
+            message: txData.message,          // Message bytes to sign (base64)
+        }));
     } catch (e) {
         console.error('GET /matches/:id/deposit-tx error:', e);
         return res.status(500).json(fail('Failed to create deposit transaction'));
@@ -363,18 +366,27 @@ router.post('/matches/:id/submit-signed-tx', authMiddleware, async (req, res) =>
             return res.status(403).json(fail('Not in this match'));
         }
 
-        const { signedTransaction } = req.body;
-        if (!signedTransaction) return res.status(400).json(fail('Missing signedTransaction'));
+        const { transaction: txBase64, signature: sigBase64 } = req.body;
+        if (!txBase64 || !sigBase64) return res.status(400).json(fail('Missing transaction or signature'));
 
         if (!escrow.isReady()) return res.status(503).json(fail('Escrow not configured'));
 
-        const { Connection } = require('@solana/web3.js');
+        const { Connection, Transaction, PublicKey } = require('@solana/web3.js');
         const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
 
-        // The client sends a fully signed transaction (base64)
-        const rawTx = Buffer.from(signedTransaction, 'base64');
+        // Reconstruct the transaction and add the user's signature
+        const txBytes = Buffer.from(txBase64, 'base64');
+        const transaction = Transaction.from(txBytes);
 
-        // Send directly to Solana
+        const user = db.getUser(userId);
+        if (!user?.privy_wallet) return res.status(400).json(fail('No wallet'));
+
+        const userPubkey = new PublicKey(user.privy_wallet);
+        const sigBuffer = Buffer.from(sigBase64, 'base64');
+        transaction.addSignature(userPubkey, sigBuffer);
+
+        // Submit to Solana
+        const rawTx = transaction.serialize();
         const txSignature = await conn.sendRawTransaction(rawTx, { skipPreflight: false });
         console.log('[DEPOSIT] Submitted tx:', txSignature);
 

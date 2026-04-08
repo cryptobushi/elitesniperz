@@ -38,9 +38,10 @@ export async function requestDeposit(matchId, token) {
         const txBody = await txRes.json();
         if (!txBody.success) return { success: false, error: txBody.error || 'Failed to get deposit transaction' };
 
-        const unsignedTxBase64 = txBody.data?.transaction;
-        if (!unsignedTxBase64 || unsignedTxBase64 === 'dev-mock-tx') {
-            // Dev mode fallback
+        const txBase64 = txBody.data?.transaction;
+        const messageBase64 = txBody.data?.message;
+
+        if (!txBase64 || txBase64 === 'dev-mock-tx') {
             console.log('[deposit] Dev mode — auto-confirming');
             return _devConfirm(matchId, authToken);
         }
@@ -52,41 +53,24 @@ export async function requestDeposit(matchId, token) {
             return { success: false, error: 'Wallet not available. Try logging out and back in.' };
         }
 
-        // Step 3: Sign the transaction with Privy wallet
-        console.log('[deposit] Signing transaction with Privy wallet...');
+        // Step 3: Sign the transaction MESSAGE bytes (not the full tx)
+        console.log('[deposit] Signing transaction message with Privy wallet...');
 
-        const txBytes = Uint8Array.from(atob(unsignedTxBase64), c => c.charCodeAt(0));
-
-        // signTransaction returns the signed transaction object
         const signResult = await provider.request({
-            method: 'signTransaction',
-            params: { transaction: txBytes },
+            method: 'signMessage',
+            params: { message: messageBase64 },
         });
-
-        // Extract the signed transaction — could be the signed tx object or serialized bytes
-        const signedTx = signResult?.signedTransaction || signResult;
-        let signedTxBase64;
-        if (signedTx instanceof Uint8Array || signedTx instanceof ArrayBuffer) {
-            const bytes = new Uint8Array(signedTx);
-            signedTxBase64 = btoa(String.fromCharCode(...bytes));
-        } else if (typeof signedTx === 'string') {
-            signedTxBase64 = signedTx;
-        } else if (signedTx?.serialize) {
-            // It's a Transaction object — serialize it
-            const serialized = signedTx.serialize();
-            signedTxBase64 = btoa(String.fromCharCode(...new Uint8Array(serialized)));
-        } else {
-            console.log('[deposit] signResult type:', typeof signedTx, signedTx);
-            return { success: false, error: 'Unexpected sign result format' };
-        }
-
+        const signatureBase64 = signResult?.signature || signResult;
         console.log('[deposit] Signed, submitting to server...');
 
-        // Step 3b: Send signed tx to server for submission
+        // Step 4: Send signature + original tx to server for reconstruction and submission
         const submitRes = await fetch(`/api/matches/${matchId}/submit-signed-tx`, {
             method: 'POST',
             headers: authHeaders(authToken),
-            body: JSON.stringify({ signedTransaction: signedTxBase64 }),
+            body: JSON.stringify({
+                transaction: txBase64,
+                signature: signatureBase64,
+            }),
         });
         const submitBody = await submitRes.json();
         if (!submitRes.ok || !submitBody.success) {
