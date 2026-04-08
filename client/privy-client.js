@@ -40,6 +40,63 @@ function _notifyListeners() {
     }
 }
 
+// Initialize embedded wallet iframe proxy
+let _walletIframeReady = false;
+function _initWalletIframe() {
+    if (!_privyClient) return;
+    try {
+        const iframeUrl = _privyClient.embeddedWallet.getURL();
+        if (!iframeUrl) {
+            console.warn('[Privy] No iframe URL from embeddedWallet.getURL()');
+            return;
+        }
+        console.log('[Privy] Loading wallet iframe:', iframeUrl.slice(0, 80) + '...');
+        const iframe = document.createElement('iframe');
+        iframe.src = iframeUrl;
+        iframe.id = 'privy-wallet-iframe';
+        iframe.style.cssText = 'display:none;width:0;height:0;border:none;position:absolute;';
+        iframe.allow = 'publickey-credentials-get *';
+        document.body.appendChild(iframe);
+
+        iframe.onload = () => {
+            try {
+                _privyClient.setMessagePoster(iframe.contentWindow);
+                _walletIframeReady = true;
+                console.log('[Privy] Wallet iframe ready');
+            } catch (e) {
+                console.warn('[Privy] Failed to set message poster:', e.message);
+            }
+        };
+
+        // Listen for messages from the iframe
+        window.addEventListener('message', (e) => {
+            try {
+                if (_privyClient && _privyClient.embeddedWallet) {
+                    _privyClient.embeddedWallet.onMessage(e.data);
+                }
+            } catch (err) {
+                // Ignore non-privy messages
+            }
+        });
+    } catch (e) {
+        console.warn('[Privy] Wallet iframe init error:', e.message);
+    }
+}
+
+// Wait for wallet iframe to be ready (with timeout)
+function _waitForWalletIframe(timeoutMs = 5000) {
+    if (_walletIframeReady) return Promise.resolve(true);
+    return new Promise((resolve) => {
+        const start = Date.now();
+        const check = () => {
+            if (_walletIframeReady) return resolve(true);
+            if (Date.now() - start > timeoutMs) return resolve(false);
+            setTimeout(check, 100);
+        };
+        check();
+    });
+}
+
 // Register with our server
 async function _registerWithServer(accessToken) {
     const res = await fetch('/api/auth/verify', {
@@ -64,6 +121,9 @@ export function initPrivy(appId) {
             storage: new LocalStorage(),
         });
         console.log('[Privy] SDK initialized');
+
+        // Initialize embedded wallet iframe proxy
+        _initWalletIframe();
     } catch (e) {
         console.warn('[Privy] SDK init failed:', e.message);
     }
@@ -210,10 +270,16 @@ export async function handleOAuthCallback() {
 
             if (!solanaWallet) {
                 try {
-                    console.log('[Privy] Creating Solana wallet...');
-                    const walletResult = await _privyClient.embeddedWallet.createSolana();
-                    solanaWallet = getUserEmbeddedSolanaWallet(walletResult.user || walletResult);
-                    console.log('[Privy] Created Solana wallet:', solanaWallet?.address);
+                    console.log('[Privy] Waiting for wallet iframe...');
+                    const iframeOk = await _waitForWalletIframe(8000);
+                    if (iframeOk) {
+                        console.log('[Privy] Creating Solana wallet...');
+                        const walletResult = await _privyClient.embeddedWallet.createSolana();
+                        solanaWallet = getUserEmbeddedSolanaWallet(walletResult.user || walletResult);
+                        console.log('[Privy] Created Solana wallet:', solanaWallet?.address);
+                    } else {
+                        console.warn('[Privy] Wallet iframe not ready, skipping wallet creation');
+                    }
                 } catch(e) {
                     console.warn('[Privy] Failed to create Solana wallet:', e.message);
                 }
