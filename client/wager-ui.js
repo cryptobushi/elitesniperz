@@ -877,7 +877,7 @@ async function refreshBalance() {
 async function fetchMatches() {
     try {
         const data = await api('/matches');
-        const matches = data.matches || data || [];
+        const matches = data.data || data.matches || [];
         renderMatches(Array.isArray(matches) ? matches : []);
     } catch (err) {
         console.warn('Failed to fetch matches:', err);
@@ -888,7 +888,7 @@ function renderMatches(matches) {
     const tbody = els.wlMatches;
     const empty = els.wlEmpty;
 
-    const openMatches = matches.filter(m => m.status === 'waiting' || m.status === 'open');
+    const openMatches = matches.filter(m => m.status === 'open' || m.status === 'funded_creator');
 
     if (openMatches.length === 0) {
         tbody.innerHTML = '';
@@ -992,9 +992,9 @@ function hideWaitingRoom() {
 async function pollWaitingRoom(matchId) {
     try {
         const data = await api(`/matches/${matchId}`);
-        if (data.error) return;
+        if (!data.success) return;
 
-        const m = data.match || data;
+        const m = data.data || data;
 
         // Update info line
         const wrToken = m.stake_token || 'USDC';
