@@ -656,6 +656,30 @@ function buildDOM() {
             <div style="color:#888;font-size:0.65rem;margin-bottom:0.4rem;">YOUR SOLANA WALLET — Send SOL or USDC here to fund wagers</div>
             <div id="wlWalletAddr" style="background:#000;border:1px solid #444;border-radius:4px;padding:0.6rem;font-family:'Courier New',monospace;font-size:clamp(0.6rem,2.5vw,0.85rem);color:#ffcc00;word-break:break-all;cursor:pointer;user-select:all;-webkit-user-select:all;" title="Click to copy"></div>
             <div id="wlWalletCopied" style="color:#00ff44;font-size:0.6rem;margin-top:0.3rem;min-height:1em;"></div>
+            <button id="wlWithdrawBtn" style="margin-top:0.5rem;padding:6px 16px;background:#222;border:1px solid #555;color:#ffcc00;font-family:inherit;font-size:0.7rem;border-radius:4px;cursor:pointer;">WITHDRAW</button>
+        </div>
+        <div id="wlWithdrawModal" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10001;display:flex;align-items:center;justify-content:center;">
+            <div style="background:#0a0a1a;border:2px solid #333;border-radius:8px;padding:1.5rem;width:min(90%,360px);font-family:'Courier New',monospace;">
+                <div style="color:#ffcc00;font-weight:bold;font-size:1rem;text-align:center;margin-bottom:1rem;">WITHDRAW FUNDS</div>
+                <div style="color:#888;font-size:0.65rem;margin-bottom:0.5rem;">Destination Solana address</div>
+                <input id="wdDest" type="text" placeholder="Paste Solana wallet address" style="width:100%;padding:8px;background:#111;border:1px solid #333;border-radius:4px;color:#fff;font-family:inherit;font-size:0.75rem;box-sizing:border-box;margin-bottom:0.5rem;" />
+                <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
+                    <div style="flex:1;">
+                        <div style="color:#888;font-size:0.65rem;margin-bottom:0.3rem;">Amount</div>
+                        <input id="wdAmount" type="number" step="0.001" placeholder="0.00" style="width:100%;padding:8px;background:#111;border:1px solid #333;border-radius:4px;color:#fff;font-family:inherit;font-size:0.85rem;box-sizing:border-box;" />
+                    </div>
+                    <div style="width:80px;">
+                        <div style="color:#888;font-size:0.65rem;margin-bottom:0.3rem;">Token</div>
+                        <select id="wdToken" style="width:100%;padding:8px;background:#111;border:1px solid #333;border-radius:4px;color:#fff;font-family:inherit;font-size:0.85rem;">
+                            <option value="SOL">SOL</option>
+                            <option value="USDC">USDC</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="wdStatus" style="color:#888;font-size:0.65rem;min-height:1.2em;margin-bottom:0.5rem;text-align:center;"></div>
+                <button id="wdSubmit" style="width:100%;padding:10px;background:#cc8800;border:none;color:#000;font-weight:bold;border-radius:4px;cursor:pointer;font-family:inherit;font-size:0.85rem;margin-bottom:0.5rem;">WITHDRAW</button>
+                <button id="wdCancel" style="width:100%;padding:6px;background:none;border:none;color:#666;font-family:inherit;font-size:0.7rem;cursor:pointer;">Cancel</button>
+            </div>
         </div>
         <div class="wl-title">WAGER 1v1</div>
         <div class="wl-subtitle">:: put your money where your crosshair is ::</div>
@@ -848,6 +872,74 @@ function bindEvents() {
     document.getElementById('wrResultBack')?.addEventListener('click', () => {
         els.result.classList.add('hidden');
         showLobby();
+    });
+
+    // Withdraw modal
+    document.getElementById('wlWithdrawBtn')?.addEventListener('click', () => {
+        document.getElementById('wlWithdrawModal')?.classList.remove('hidden');
+        document.getElementById('wdStatus').textContent = '';
+    });
+    document.getElementById('wdCancel')?.addEventListener('click', () => {
+        document.getElementById('wlWithdrawModal')?.classList.add('hidden');
+    });
+    document.getElementById('wdSubmit')?.addEventListener('click', async () => {
+        const dest = document.getElementById('wdDest')?.value?.trim();
+        const amount = parseFloat(document.getElementById('wdAmount')?.value);
+        const token = document.getElementById('wdToken')?.value || 'SOL';
+        const statusEl = document.getElementById('wdStatus');
+        const btn = document.getElementById('wdSubmit');
+
+        if (!dest) { statusEl.textContent = 'Enter destination address'; statusEl.style.color = '#ff4444'; return; }
+        if (!amount || amount <= 0) { statusEl.textContent = 'Enter valid amount'; statusEl.style.color = '#ff4444'; return; }
+
+        btn.disabled = true;
+        btn.textContent = 'PROCESSING...';
+        statusEl.textContent = 'Creating transaction...';
+        statusEl.style.color = '#ffcc00';
+
+        try {
+            // Step 1: Get unsigned withdrawal tx
+            const txRes = await api('/wallet/withdraw-tx', {
+                method: 'POST',
+                body: JSON.stringify({ destination: dest, amount, token }),
+            });
+            if (!txRes.success) throw new Error(txRes.error);
+
+            statusEl.textContent = 'Signing with your wallet...';
+            const provider = await (await import('../dist/privy-bundle.js')).getSolanaProvider();
+            if (!provider) throw new Error('Wallet not available');
+
+            // Step 2: Sign the message
+            const signResult = await provider.request({
+                method: 'signMessage',
+                params: { message: txRes.data.message },
+            });
+
+            statusEl.textContent = 'Submitting to Solana...';
+
+            // Step 3: Submit
+            const submitRes = await api('/wallet/submit-withdraw', {
+                method: 'POST',
+                body: JSON.stringify({
+                    transaction: txRes.data.transaction,
+                    signature: signResult?.signature || signResult,
+                }),
+            });
+            if (!submitRes.success) throw new Error(submitRes.error);
+
+            statusEl.textContent = 'Withdrawn! TX: ' + (submitRes.data.txSignature || '').slice(0, 20) + '...';
+            statusEl.style.color = '#00ff44';
+            refreshBalance();
+            setTimeout(() => {
+                document.getElementById('wlWithdrawModal')?.classList.add('hidden');
+            }, 3000);
+        } catch (e) {
+            statusEl.textContent = 'Failed: ' + e.message;
+            statusEl.style.color = '#ff4444';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'WITHDRAW';
+        }
     });
 }
 

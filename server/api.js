@@ -507,11 +507,100 @@ router.get('/wallet/balance', authMiddleware, async (req, res) => {
         if (!user || !user.privy_wallet) return res.json(success({ sol: 0, usdc: 0 }));
         if (!escrow.isReady()) return res.json(success({ sol: 0, usdc: 0 }));
 
-        const sol = await escrow.getBalance(user.privy_wallet, 'SOL');
-        const usdc = await escrow.getBalance(user.privy_wallet, 'USDC');
-        return res.json(success({ sol: sol || 0, usdc: usdc || 0 }));
+        const solLamports = await escrow.getBalance(user.privy_wallet, 'SOL');
+        const usdcBase = await escrow.getBalance(user.privy_wallet, 'USDC');
+        const sol = (solLamports || 0) / 1e9;
+        const usdc = (usdcBase || 0) / 1e6;
+        return res.json(success({ sol, usdc, solLamports: solLamports || 0, usdcBase: usdcBase || 0 }));
     } catch (e) {
         return res.status(500).json(fail('Balance check failed'));
+    }
+});
+
+// ---------------------------------------------------------------------------
+// POST /wallet/withdraw-tx — create unsigned withdrawal transaction
+// ---------------------------------------------------------------------------
+router.post('/wallet/withdraw-tx', authMiddleware, async (req, res) => {
+    try {
+        const { destination, amount, token } = req.body;
+        if (!destination || !amount || !token) return res.status(400).json(fail('Missing destination, amount, or token'));
+        if (!['SOL', 'USDC'].includes(token)) return res.status(400).json(fail('Token must be SOL or USDC'));
+        if (amount <= 0) return res.status(400).json(fail('Amount must be positive'));
+
+        const user = db.getUser(req.privyUserId);
+        if (!user?.privy_wallet) return res.status(400).json(fail('No wallet'));
+
+        const { Connection, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } = require('@solana/web3.js');
+        const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
+
+        const fromPubkey = new PublicKey(user.privy_wallet);
+        let toPubkey;
+        try { toPubkey = new PublicKey(destination); } catch(e) {
+            return res.status(400).json(fail('Invalid destination address'));
+        }
+
+        const tx = new Transaction();
+        const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
+        tx.lastValidBlockHeight = lastValidBlockHeight;
+        tx.feePayer = fromPubkey;
+
+        if (token === 'SOL') {
+            const lamports = Math.round(amount * LAMPORTS_PER_SOL);
+            tx.add(SystemProgram.transfer({ fromPubkey, toPubkey, lamports }));
+        } else {
+            const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = require('@solana/spl-token');
+            const fromAta = await getAssociatedTokenAddress(escrow.USDC_MINT, fromPubkey);
+            const toAta = await getAssociatedTokenAddress(escrow.USDC_MINT, toPubkey);
+            // Check if destination ATA exists
+            try { await require('@solana/spl-token').getAccount(conn, toAta); } catch(e) {
+                tx.add(createAssociatedTokenAccountInstruction(fromPubkey, toAta, toPubkey, escrow.USDC_MINT));
+            }
+            const baseUnits = Math.round(amount * 1e6);
+            tx.add(createTransferInstruction(fromAta, toAta, fromPubkey, baseUnits));
+        }
+
+        const message = tx.serializeMessage();
+        const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+
+        return res.json(success({
+            transaction: serialized.toString('base64'),
+            message: message.toString('base64'),
+        }));
+    } catch (e) {
+        console.error('POST /wallet/withdraw-tx error:', e);
+        return res.status(500).json(fail('Failed to create withdrawal transaction'));
+    }
+});
+
+// ---------------------------------------------------------------------------
+// POST /wallet/submit-withdraw — submit signed withdrawal transaction
+// ---------------------------------------------------------------------------
+router.post('/wallet/submit-withdraw', authMiddleware, async (req, res) => {
+    try {
+        const { transaction: txBase64, signature: sigBase64 } = req.body;
+        if (!txBase64 || !sigBase64) return res.status(400).json(fail('Missing transaction or signature'));
+
+        const { Connection, Transaction, PublicKey } = require('@solana/web3.js');
+        const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
+
+        const user = db.getUser(req.privyUserId);
+        if (!user?.privy_wallet) return res.status(400).json(fail('No wallet'));
+
+        const txBytes = Buffer.from(txBase64, 'base64');
+        const transaction = Transaction.from(txBytes);
+        const userPubkey = new PublicKey(user.privy_wallet);
+        const sigBuffer = Buffer.from(sigBase64, 'base64');
+        transaction.addSignature(userPubkey, sigBuffer);
+
+        const rawTx = transaction.serialize();
+        const txSignature = await conn.sendRawTransaction(rawTx, { skipPreflight: false });
+        await conn.confirmTransaction(txSignature, 'confirmed');
+
+        return res.json(success({ txSignature }));
+    } catch (e) {
+        console.error('POST /wallet/submit-withdraw error:', e);
+        return res.status(500).json(fail('Withdrawal failed: ' + e.message));
     }
 });
 
