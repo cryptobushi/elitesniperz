@@ -2,7 +2,7 @@
  * privy-client.js — Privy auth for sniperz wager system
  * Bundled via esbuild to dist/privy-bundle.js
  */
-import Privy, { LocalStorage, getUserEmbeddedSolanaWallet } from '@privy-io/js-sdk-core';
+import Privy, { LocalStorage, getUserEmbeddedSolanaWallet, getEntropyDetailsFromUser } from '@privy-io/js-sdk-core';
 
 const SESSION_KEY = 'sniperz_auth';
 let _appId = null;
@@ -361,6 +361,35 @@ function _mockWallet(handle) {
     let addr = '';
     for (let i = 0; i < 44; i++) { s = (s * 1103515245 + 12345) & 0x7fffffff; addr += b58[s % 58]; }
     return addr;
+}
+
+/**
+ * Get the Privy Solana provider for signing transactions.
+ * Returns a provider with signAndSendTransaction() or null.
+ */
+export async function getSolanaProvider() {
+    if (!_privyClient) return null;
+    const ready = await _waitForWalletIframe(5000);
+    if (!ready) { console.warn('[Privy] Wallet iframe not ready for signing'); return null; }
+
+    try {
+        // Get the current user from Privy
+        const accessToken = await _privyClient.getAccessToken();
+        if (!accessToken) return null;
+
+        // We need the user object with linked_accounts to find the wallet
+        // Re-fetch user from our server to get wallet address
+        const user = getUser();
+        if (!user?.privy_wallet) { console.warn('[Privy] No wallet address'); return null; }
+
+        // Get Solana provider from Privy
+        const provider = await _privyClient.embeddedWallet.getSolanaProvider(user.privy_wallet);
+        console.log('[Privy] Got Solana provider');
+        return provider;
+    } catch (e) {
+        console.error('[Privy] Failed to get Solana provider:', e);
+        return null;
+    }
 }
 
 export function logout() {

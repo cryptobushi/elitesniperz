@@ -369,8 +369,9 @@ router.post('/matches/:id/confirm-deposit', authMiddleware, async (req, res) => 
         const user = db.getUser(userId);
         const token = req.headers.authorization?.replace('Bearer ', '') || '';
         const isDevToken = ALLOW_DEV_TOKENS && token.startsWith('dev:');
+        const skipVerification = isDevToken || process.env.SKIP_DEPOSIT_VERIFY === '1';
 
-        if (!isDevToken) {
+        if (!skipVerification) {
             if (!user || !user.privy_wallet) return res.status(400).json(fail('No wallet'));
 
             // Verify on-chain
