@@ -1,4 +1,14 @@
 import * as THREE from 'three';
+import { initPrivy } from './client/privy-client.js';
+import { initWagerUI } from './client/wager-ui.js';
+
+// Initialize wager system (after DOM ready)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { initPrivy('sniperz'); initWagerUI(); });
+} else {
+    initPrivy('sniperz');
+    initWagerUI();
+}
 
 // Online mode state (declared early to avoid temporal dead zone)
 let isOnlineMode = false;
