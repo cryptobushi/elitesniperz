@@ -174,7 +174,20 @@ router.get('/matches/:id', (req, res) => {
         if (!match) return res.status(404).json(fail('Match not found'));
 
         const { password_hash, ...rest } = match;
-        return res.json(success({ ...rest, passwordProtected: !!password_hash }));
+        const creator = db.getUser(match.creator_id);
+        const joiner = match.joiner_id ? db.getUser(match.joiner_id) : null;
+        return res.json(success({
+            ...rest,
+            passwordProtected: !!password_hash,
+            creator_twitter: creator?.twitter_handle || null,
+            creator_wins: creator?.wins || 0,
+            creator_losses: creator?.losses || 0,
+            creator_elo: creator?.elo || 1000,
+            joiner_twitter: joiner?.twitter_handle || null,
+            joiner_wins: joiner?.wins || 0,
+            joiner_losses: joiner?.losses || 0,
+            joiner_elo: joiner?.elo || 1000,
+        }));
     } catch (e) {
         console.error('GET /matches/:id error:', e);
         return res.status(500).json(fail('Failed to fetch match'));
@@ -214,8 +227,11 @@ router.post('/matches/:id/join', authMiddleware, async (req, res) => {
         }
 
         const updated = db.joinMatch(req.params.id, req.privyUserId);
-        const { password_hash, ...rest } = updated;
-        return res.json(success({ ...rest, passwordProtected: !!password_hash }));
+        // Move to 'matched' — both players are now connected
+        db.updateMatch(req.params.id, { status: 'matched' });
+        const refreshed = db.getMatch(req.params.id);
+        const { password_hash: pw, ...rest } = refreshed;
+        return res.json(success({ ...rest, passwordProtected: !!pw }));
     } catch (e) {
         console.error('POST /matches/:id/join error:', e);
         return res.status(500).json(fail('Failed to join match'));
@@ -234,7 +250,7 @@ router.post('/matches/:id/cancel', authMiddleware, (req, res) => {
             return res.status(403).json(fail('Only the creator can cancel'));
         }
 
-        const cancellable = ['open', 'funded_creator'];
+        const cancellable = ['open', 'matched', 'funded_creator'];
         if (!cancellable.includes(match.status)) {
             return res.status(400).json(fail('Match cannot be cancelled in its current state'));
         }

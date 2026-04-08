@@ -627,7 +627,7 @@ function buildDOM() {
             </div>
             <div class="cm-label">Password (optional)</div>
             <input type="text" class="cm-input" id="cmPassword" placeholder="Leave empty for public" maxlength="32">
-            <button class="cm-submit" id="cmSubmit">>> CREATE & DEPOSIT <<</button>
+            <button class="cm-submit" id="cmSubmit">>> CREATE MATCH <<</button>
             <button class="cm-cancel" id="cmCancel">CANCEL</button>
         </div>
     `;
@@ -638,23 +638,26 @@ function buildDOM() {
     waiting.id = 'waitingRoom';
     waiting.className = 'hidden';
     waiting.innerHTML = `
-        <div class="wr-title">WAITING FOR OPPONENT</div>
+        <div class="wr-title">MATCH LOBBY</div>
         <div class="wr-info" id="wrInfo">5 USDC | First to 7</div>
+        <div id="wrStatus" style="color:#ffcc00;font-size:0.85rem;margin:0.5rem 0;text-align:center;">Waiting for opponent...</div>
         <div class="wr-players">
-            <div class="wr-card funded" id="wrCreator">
+            <div class="wr-card" id="wrCreator">
                 <div class="wr-name" id="wrCreatorName">---</div>
-                <div class="wr-record" id="wrCreatorRecord">0-0</div>
-                <div class="wr-status ok">&#10003; FUNDED</div>
+                <div class="wr-record" id="wrCreatorRecord">0W - 0L</div>
+                <div class="wr-status pending" id="wrCreatorStatus">Not deposited</div>
             </div>
             <div class="wr-vs">VS</div>
             <div class="wr-card empty" id="wrJoiner">
-                <div class="wr-name" id="wrJoinerName">???</div>
+                <div class="wr-name" id="wrJoinerName">Waiting for opponent...</div>
                 <div class="wr-record" id="wrJoinerRecord"></div>
-                <div class="wr-status pending" id="wrJoinerStatus">Waiting...</div>
+                <div class="wr-status pending" id="wrJoinerStatus"></div>
             </div>
         </div>
-        <div class="wr-dots">. . .</div>
-        <button class="wr-cancel" id="wrCancel">CANCEL MATCH</button>
+        <button id="wrDepositBtn" style="display:none;margin:1rem auto;padding:10px 24px;background:#cc8800;border:none;color:#000;font-weight:bold;border-radius:4px;cursor:pointer;font-family:inherit;font-size:0.9rem;">DEPOSIT</button>
+        <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:0.5rem;">
+            <button class="wr-cancel" id="wrCancel">CANCEL MATCH</button>
+        </div>
     `;
     document.body.appendChild(waiting);
 
@@ -740,6 +743,30 @@ function bindEvents() {
         showLobby();
     });
 
+    // Waiting room deposit
+    document.getElementById('wrDepositBtn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('wrDepositBtn');
+        if (!currentMatchId || btn.disabled) return;
+        btn.disabled = true;
+        btn.textContent = 'DEPOSITING...';
+        try {
+            const result = await requestDeposit(currentMatchId);
+            if (result.success) {
+                btn.textContent = '\u2713 DEPOSITED';
+                btn.style.background = '#00aa44';
+                btn.style.display = 'none';
+            } else {
+                btn.textContent = 'DEPOSIT FAILED - RETRY';
+                btn.style.background = '#cc2222';
+                btn.disabled = false;
+            }
+        } catch (e) {
+            btn.textContent = 'DEPOSIT FAILED - RETRY';
+            btn.style.background = '#cc2222';
+            btn.disabled = false;
+        }
+    });
+
     // Result back button
     document.getElementById('wrResultBack')?.addEventListener('click', () => {
         els.result.classList.add('hidden');
@@ -803,23 +830,13 @@ async function handleCreateMatch() {
         if (!matchId) throw new Error('No match ID returned');
         currentMatchId = matchId;
 
-        // Trigger deposit flow (dev mode auto-confirms)
-        try {
-            const depositResult = await requestDeposit(matchId);
-            if (!depositResult.success) {
-                console.warn('Deposit flow:', depositResult.error);
-            }
-        } catch (depositErr) {
-            console.warn('Deposit flow error (match still created):', depositErr);
-        }
-
         els.createModal.classList.add('hidden');
         showWaitingRoom(matchId);
     } catch (err) {
         alert('Failed to create match: ' + err.message);
     } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = '>> CREATE & DEPOSIT <<';
+        submitBtn.textContent = '>> CREATE MATCH <<';
     }
 }
 
@@ -898,8 +915,8 @@ function renderMatches(matches) {
 
     empty.classList.add('hidden');
     tbody.innerHTML = openMatches.map(m => {
-        const creator = m.creator_twitter || m.creator_id || 'Anon';
-        const record = m.creator_wins !== undefined ? `${m.creator_wins}-${m.creator_losses}` : '0-0';
+        const creator = m.creator_twitter ? '@' + m.creator_twitter : 'Anon';
+        const record = `${m.creator_wins || 0}W-${m.creator_losses || 0}L`;
         const token = m.stake_token || 'USDC';
         const amt = token === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
         const stake = `${amt} ${token}`;
@@ -995,47 +1012,74 @@ async function pollWaitingRoom(matchId) {
         if (!data.success) return;
 
         const m = data.data || data;
+        const me = getUser();
+        const amCreator = me && m.creator_id === me.id;
 
         // Update info line
         const wrToken = m.stake_token || 'USDC';
         const wrAmt = wrToken === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
         els.wrInfo.textContent = `${wrAmt} ${wrToken} | First to ${m.kill_target || 7}`;
 
-        // Creator card
-        els.wrCreatorName.textContent = m.creatorTwitter || m.creatorName || 'You';
-        els.wrCreatorRecord.textContent = m.creatorRecord || '';
-        els.wrCreator.classList.toggle('funded', !!m.creatorFunded);
+        // Status message
+        const statusMap = {
+            'open': 'Waiting for opponent...',
+            'matched': 'Opponent joined! Both players deposit to start.',
+            'funded_creator': amCreator ? 'You deposited. Waiting for opponent...' : 'Creator deposited. Deposit to accept!',
+            'funded_both': 'Both deposited! Starting match...',
+            'in_progress': 'Match in progress!',
+        };
+        const statusEl = document.getElementById('wrStatus');
+        if (statusEl) statusEl.textContent = statusMap[m.status] || m.status;
+
+        // Creator card — always show Twitter prominently
+        els.wrCreatorName.textContent = '@' + (m.creator_twitter || 'unknown');
+        els.wrCreatorRecord.textContent = `${m.creator_wins || 0}W - ${m.creator_losses || 0}L | ELO ${m.creator_elo || 1000}`;
+        const creatorFunded = m.status === 'funded_creator' || m.status === 'funded_both';
+        els.wrCreator.classList.toggle('funded', creatorFunded);
+        if (els.wrCreatorStatus) {
+            els.wrCreatorStatus.textContent = creatorFunded ? '\u2713 DEPOSITED' : 'Not deposited';
+            els.wrCreatorStatus.className = 'wr-status ' + (creatorFunded ? 'ok' : 'pending');
+        }
 
         // Joiner card
-        if (m.joinerName || m.joinerTwitter) {
+        if (m.joiner_id) {
             els.wrJoiner.classList.remove('empty');
-            els.wrJoinerName.textContent = m.joinerTwitter || m.joinerName || 'Opponent';
-            els.wrJoinerRecord.textContent = m.joinerRecord || '';
-            if (m.joinerFunded) {
-                els.wrJoinerStatus.textContent = '\u2713 FUNDED';
-                els.wrJoinerStatus.className = 'wr-status ok';
-                els.wrJoiner.classList.add('funded');
-            } else {
-                els.wrJoinerStatus.textContent = 'Depositing...';
-                els.wrJoinerStatus.className = 'wr-status pending';
+            els.wrJoinerName.textContent = '@' + (m.joiner_twitter || 'unknown');
+            els.wrJoinerRecord.textContent = `${m.joiner_wins || 0}W - ${m.joiner_losses || 0}L | ELO ${m.joiner_elo || 1000}`;
+            const joinerFunded = m.status === 'funded_both';
+            if (els.wrJoinerStatus) {
+                els.wrJoinerStatus.textContent = joinerFunded ? '\u2713 DEPOSITED' : 'Not deposited';
+                els.wrJoinerStatus.className = 'wr-status ' + (joinerFunded ? 'ok' : 'pending');
             }
+            els.wrJoiner.classList.toggle('funded', joinerFunded);
         } else {
             els.wrJoiner.classList.add('empty');
             els.wrJoiner.classList.remove('funded');
-            els.wrJoinerName.textContent = '???';
+            els.wrJoinerName.textContent = 'Waiting for opponent...';
             els.wrJoinerRecord.textContent = '';
-            els.wrJoinerStatus.textContent = 'Waiting...';
-            els.wrJoinerStatus.className = 'wr-status pending';
+            if (els.wrJoinerStatus) {
+                els.wrJoinerStatus.textContent = '';
+                els.wrJoinerStatus.className = 'wr-status pending';
+            }
+        }
+
+        // Show/hide deposit button based on state
+        const depositBtn = document.getElementById('wrDepositBtn');
+        if (depositBtn) {
+            const canDeposit = (m.status === 'open' || m.status === 'matched' || m.status === 'funded_creator');
+            const myDeposited = (amCreator && creatorFunded) || (!amCreator && m.status === 'funded_both');
+            depositBtn.style.display = (canDeposit && !myDeposited) ? 'block' : 'none';
+            depositBtn.textContent = `DEPOSIT ${wrAmt} ${wrToken}`;
         }
 
         // Both funded — start the match
-        if (m.status === 'funded_both' || m.status === 'ready') {
+        if (m.status === 'funded_both') {
             hideWaitingRoom();
             connectWagerMatch(matchId);
         }
 
-        // Cancelled
-        if (m.status === 'cancelled') {
+        // Cancelled or expired
+        if (m.status === 'cancelled' || m.status === 'expired') {
             hideWaitingRoom();
             showLobby();
         }
