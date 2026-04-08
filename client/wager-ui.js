@@ -1172,6 +1172,10 @@ export function connectWagerMatch(matchId) {
                 break;
 
             case 'wager_start': {
+                // Stop all polling
+                if (lobbyInterval) { clearInterval(lobbyInterval); lobbyInterval = null; }
+                if (waitingInterval) { clearInterval(waitingInterval); waitingInterval = null; }
+
                 // Hide all overlays
                 els.lobby.classList.add('hidden');
                 els.waiting.classList.add('hidden');
