@@ -72,6 +72,9 @@ export function initPrivy(appId) {
         setTimeout(() => _notifyListeners(), 0);
     }
 
+    // Check for OAuth callback after SDK is ready
+    handleOAuthCallback();
+
     return { authenticated: restored, user: _user };
 }
 
@@ -297,7 +300,4 @@ export async function refreshProfile() {
     return null;
 }
 
-// Check for OAuth callback on page load
-if (typeof window !== 'undefined') {
-    handleOAuthCallback();
-}
+// OAuth callback is checked after initPrivy() is called

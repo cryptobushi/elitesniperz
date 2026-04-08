@@ -79,20 +79,20 @@ class AudioManager {
 
         // Start fetching immediately
         const soundFiles = {
-            firstBlood: 'sounds/first_blood.wav',
-            doubleKill: 'sounds/Double_Kill.wav',
-            multiKill: 'sounds/MultiKill.wav',
-            megaKill: 'sounds/MegaKill.wav',
-            ultraKill: 'sounds/UltraKill.wav',
-            monsterKill: 'sounds/MonsterKill.wav',
-            ludicrousKill: 'sounds/LudicrousKill.wav',
-            killingSpree: 'sounds/Killing_Spree.wav',
-            rampage: 'sounds/Rampage.wav',
-            dominating: 'sounds/Dominating.wav',
-            unstoppable: 'sounds/Unstoppable.wav',
-            godlike: 'sounds/GodLike.wav',
-            headshot: 'sounds/Headshot.wav',
-            sniperFire: 'sounds/sniper_fire_h3_1.wav'
+            firstBlood: '/sounds/first_blood.wav',
+            doubleKill: '/sounds/Double_Kill.wav',
+            multiKill: '/sounds/MultiKill.wav',
+            megaKill: '/sounds/MegaKill.wav',
+            ultraKill: '/sounds/UltraKill.wav',
+            monsterKill: '/sounds/MonsterKill.wav',
+            ludicrousKill: '/sounds/LudicrousKill.wav',
+            killingSpree: '/sounds/Killing_Spree.wav',
+            rampage: '/sounds/Rampage.wav',
+            dominating: '/sounds/Dominating.wav',
+            unstoppable: '/sounds/Unstoppable.wav',
+            godlike: '/sounds/GodLike.wav',
+            headshot: '/sounds/Headshot.wav',
+            sniperFire: '/sounds/sniper_fire_h3_1.wav'
         };
 
         for (const [name, path] of Object.entries(soundFiles)) {
@@ -3634,7 +3634,7 @@ let _aabbWalls = null; // Will be loaded from map-data.json
 let _mapDataLoaded = null;
 
 // Fetch map data for AABB collision (used in online mode + as alternative collision)
-fetch('map-data.json').then(r => r.json()).then(data => {
+fetch('/map-data.json').then(r => r.json()).then(data => {
     _mapDataLoaded = data;
     _aabbWalls = [];
     data.walls.forEach(w => {
