@@ -1350,6 +1350,11 @@ export function initWagerUI() {
     injectStyles();
     buildDOM();
     bindEvents();
+
+    // Auto-show lobby if already authenticated (e.g., after OAuth redirect)
+    if (isAuthenticated()) {
+        setTimeout(() => showLobby(), 100);
+    }
 }
 
 export default {
