@@ -13,8 +13,20 @@ const { collidesWithWall, hasLineOfSight } = require('./shared/collision');
 
 // === EXPRESS + STATIC ===
 const app = express();
+app.use(express.json());
 app.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 app.use(express.static(path.join(__dirname)));
+
+// === WAGER SYSTEM ===
+const apiRouter = require('./server/api');
+const { verifyWsToken } = require('./server/auth');
+const WagerMatch = require('./server/wager-match');
+const escrow = require('./server/escrow');
+const db = require('./db/index');
+app.use('/api', apiRouter);
+
+// Active wager matches: matchId -> { match: WagerMatch, creatorWs, joinerWs }
+const activeWagerMatches = new Map();
 
 // === TLS (Let's Encrypt) ===
 const CERT_DIR = '/etc/letsencrypt/live/sniperz.fun';
@@ -701,12 +713,171 @@ setInterval(function() {
 }, 1000 / TICK_RATE);
 
 // === CONNECTIONS ===
-wss.on('connection', function(ws) {
-    ws.playerId = null;
+// === WAGER MATCH SETTLEMENT ===
+function settleWagerMatch(matchId, winnerId, reason, stats) {
+    const match = db.getMatch(matchId);
+    if (!match || match.status === 'settled') return;
+
+    const loserId = winnerId === match.creator_id ? match.joiner_id : match.creator_id;
+    const totalPot = match.stake_amount * 2;
+    const rake = Math.floor(totalPot * 0.05);
+    const payout = totalPot - rake;
+
+    db.updateMatch(matchId, {
+        status: 'completed',
+        winner_id: winnerId,
+        win_reason: reason,
+        creator_kills: stats.creatorKills || 0,
+        joiner_kills: stats.joinerKills || 0,
+        creator_deaths: stats.creatorDeaths || 0,
+        joiner_deaths: stats.joinerDeaths || 0,
+        ended_at: Date.now()
+    });
+
+    // Get winner's wallet for payout
+    const winner = db.getUser(winnerId);
+    const loser = db.getUser(loserId);
+
+    if (winner && winner.privy_wallet && escrow.isReady()) {
+        // Send payout to winner
+        escrow.sendPayout(winner.privy_wallet, payout, match.stake_token).then(result => {
+            if (result && result.signature) {
+                db.createTransaction({
+                    id: require('uuid').v4(), match_id: matchId, user_id: winnerId,
+                    tx_type: 'payout', amount: payout, token: match.stake_token,
+                    tx_signature: result.signature, from_wallet: 'escrow', to_wallet: winner.privy_wallet
+                });
+                db.confirmTransaction(result.signature, Date.now());
+            }
+        }).catch(e => console.error('[WAGER] Payout error:', e));
+
+        // Send rake to treasury
+        escrow.sendRake(rake, match.stake_token).then(result => {
+            if (result && result.signature) {
+                db.createTransaction({
+                    id: require('uuid').v4(), match_id: matchId, user_id: null,
+                    tx_type: 'rake', amount: rake, token: match.stake_token,
+                    tx_signature: result.signature, from_wallet: 'escrow', to_wallet: 'treasury'
+                });
+            }
+        }).catch(e => console.error('[WAGER] Rake error:', e));
+    }
+
+    // Update user stats
+    db.updateUserStats(winnerId, { wins: (winner?.wins || 0) + 1, total_earned: (winner?.total_earned || 0) + payout });
+    db.updateUserStats(loserId, { losses: (loser?.losses || 0) + 1 });
+
+    // Write match history for both
+    const now = Date.now();
+    const winnerIsCreator = winnerId === match.creator_id;
+    db.createMatchHistory({
+        match_id: matchId, user_id: winnerId, opponent_id: loserId, result: 'win',
+        kills: winnerIsCreator ? stats.creatorKills : stats.joinerKills,
+        deaths: winnerIsCreator ? stats.creatorDeaths : stats.joinerDeaths,
+        stake_amount: match.stake_amount, stake_token: match.stake_token, payout, played_at: now
+    });
+    db.createMatchHistory({
+        match_id: matchId, user_id: loserId, opponent_id: winnerId, result: 'loss',
+        kills: winnerIsCreator ? stats.joinerKills : stats.creatorKills,
+        deaths: winnerIsCreator ? stats.joinerDeaths : stats.creatorDeaths,
+        stake_amount: match.stake_amount, stake_token: match.stake_token, payout: 0, played_at: now
+    });
+
+    db.updateMatch(matchId, { status: 'settled', rake_amount: rake });
+    activeWagerMatches.delete(matchId);
+    console.log('[WAGER] Settled match ' + matchId + ' winner=' + winnerId + ' payout=' + payout + ' rake=' + rake);
+}
+
+// === WAGER WEBSOCKET HANDLER ===
+function handleWagerWs(ws, userId, matchId) {
+    const match = db.getMatch(matchId);
+    if (!match) { ws.send(JSON.stringify({ t: 'error', msg: 'Match not found' })); ws.close(); return; }
+    if (userId !== match.creator_id && userId !== match.joiner_id) { ws.send(JSON.stringify({ t: 'error', msg: 'Not in this match' })); ws.close(); return; }
+
+    const isCreator = userId === match.creator_id;
+
+    // Create or get WagerMatch instance
+    if (!activeWagerMatches.has(matchId)) {
+        const wm = new WagerMatch(matchId, match.creator_id, match.joiner_id, match.kill_target, (winnerId, reason, stats) => {
+            settleWagerMatch(matchId, winnerId, reason, stats);
+        });
+        activeWagerMatches.set(matchId, { match: wm, creatorWs: null, joinerWs: null });
+    }
+
+    const entry = activeWagerMatches.get(matchId);
+    if (isCreator) entry.creatorWs = ws; else entry.joinerWs = ws;
+    entry.match.setPlayerWs(userId, ws);
+
+    // Send lobby info
+    const creator = db.getUser(match.creator_id);
+    const joiner = db.getUser(match.joiner_id);
+    ws.send(JSON.stringify({
+        t: 'wager_lobby', matchId, killTarget: match.kill_target,
+        stake: { amount: match.stake_amount, token: match.stake_token },
+        creator: creator ? { twitter: creator.twitter_handle, wins: creator.wins, losses: creator.losses } : null,
+        joiner: joiner ? { twitter: joiner.twitter_handle, wins: joiner.wins, losses: joiner.losses } : null,
+        status: match.status
+    }));
 
     ws.on('message', function(data) {
         try {
             const msg = JSON.parse(data);
+            if (msg.t === 'wager_ready') {
+                entry.match.setReady(userId);
+                // Start if both ready and both funded
+                if (match.status === 'funded_both' || match.status === 'in_progress') {
+                    if (!entry.match.running) {
+                        entry.match.start();
+                        db.updateMatch(matchId, { status: 'in_progress', started_at: Date.now() });
+                        const startMsg = JSON.stringify({ t: 'wager_start', matchId, killTarget: match.kill_target });
+                        if (entry.creatorWs) entry.creatorWs.send(startMsg);
+                        if (entry.joinerWs) entry.joinerWs.send(startMsg);
+                    }
+                }
+            } else if (msg.t === 'wager_forfeit') {
+                const winnerId = isCreator ? match.joiner_id : match.creator_id;
+                entry.match.stop();
+                const stats = entry.match.getState();
+                settleWagerMatch(matchId, winnerId, 'forfeit', stats);
+            } else {
+                // Game messages (mv, rot, ab) — forward to WagerMatch
+                entry.match.handleMessage(userId, msg);
+            }
+        } catch (e) {}
+    });
+
+    ws.on('close', () => {
+        // WagerMatch handles disconnect countdown internally via setPlayerWs
+    });
+}
+
+wss.on('connection', function(ws) {
+    ws.playerId = null;
+    ws._isWager = false;
+
+    ws.on('message', function(data) {
+        try {
+            const msg = JSON.parse(data);
+
+            // Wager auth — first message routes to wager mode
+            if (msg.t === 'wager_auth' && !ws._isWager && !ws.playerId) {
+                ws._isWager = true;
+                verifyWsToken(msg.token).then(result => {
+                    if (!result) { ws.send(JSON.stringify({ t: 'error', msg: 'Auth failed' })); ws.close(); return; }
+                    ws._wagerUserId = result.userId;
+                    ws.send(JSON.stringify({ t: 'wager_authed', userId: result.userId }));
+                    // If matchId provided, join immediately
+                    if (msg.matchId) handleWagerWs(ws, result.userId, msg.matchId);
+                }).catch(() => { ws.close(); });
+                return;
+            }
+            // Wager join after auth
+            if (msg.t === 'wager_join' && ws._isWager && ws._wagerUserId) {
+                handleWagerWs(ws, ws._wagerUserId, msg.matchId);
+                return;
+            }
+            // Skip normal game handling for wager connections
+            if (ws._isWager) return;
 
             // Test mode: log all incoming messages (throttled for mv/rot)
             if (TEST_MODE && msg.t !== 'rot') {

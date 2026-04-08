@@ -40,10 +40,21 @@ function isNearSpawn(x, z, team) {
     return Math.sqrt((x - s) * (x - s) + (z - s) * (z - s)) < 15;
 }
 
+// Wager match constants
+const WAGER_KILL_TARGETS = [5, 7, 10];
+const WAGER_TIME_LIMIT = 600; // 10 minutes in seconds
+const WAGER_AFK_TIMEOUT = 30; // Seconds before AFK forfeit
+const WAGER_DISCONNECT_TIMEOUT = 30;
+const RAKE_PERCENT = 0.05; // 5% rake
+const MIN_STAKE_SOL = 10000000; // 0.01 SOL in lamports
+const MIN_STAKE_USDC = 1000000; // 1 USDC in base units (1e6)
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         MAP_SIZE, VISION_RADIUS, FARSIGHT_RADIUS, SHOOT_RANGE, SHOOT_COOLDOWN,
         SPAWN_PROTECTION, MAX_PLAYERS, TICK_RATE, SEND_RATE,
-        SHOP_ITEMS, BOT_NAMES, terrainY, spawnPos, isNearSpawn
+        SHOP_ITEMS, BOT_NAMES, terrainY, spawnPos, isNearSpawn,
+        WAGER_KILL_TARGETS, WAGER_TIME_LIMIT, WAGER_AFK_TIMEOUT,
+        WAGER_DISCONNECT_TIMEOUT, RAKE_PERCENT, MIN_STAKE_SOL, MIN_STAKE_USDC
     };
 }

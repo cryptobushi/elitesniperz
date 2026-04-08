@@ -18,8 +18,14 @@
   },
   "homepage": "https://github.com/cryptobushi/elitesniperz#readme",
   "dependencies": {
+    "@privy-io/server-auth": "^1.32.5",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.4",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.8.0",
     "express": "^5.2.1",
     "puppeteer": "^24.40.0",
+    "uuid": "^13.0.0",
     "ws": "^8.20.0"
   }
 }
