@@ -797,18 +797,18 @@ async function handleCreateMatch() {
             }),
         });
 
-        if (res.error) throw new Error(res.error);
+        if (!res.success) throw new Error(res.error || 'Failed to create match');
 
-        const matchId = res.matchId || res.id;
+        const matchId = res.data?.id || res.data?.matchId;
+        if (!matchId) throw new Error('No match ID returned');
         currentMatchId = matchId;
 
-        // Trigger deposit flow
+        // Trigger deposit flow (dev mode auto-confirms)
         try {
-            await requestDeposit({
-                matchId,
-                amount: stakeVal,
-                token,
-            });
+            const depositResult = await requestDeposit(matchId);
+            if (!depositResult.success) {
+                console.warn('Deposit flow:', depositResult.error);
+            }
         } catch (depositErr) {
             console.warn('Deposit flow error (match still created):', depositErr);
         }

@@ -269,6 +269,7 @@ router.get('/leaderboard', (req, res) => {
 // GET /matches/:id/deposit-tx — get unsigned deposit transaction
 // ---------------------------------------------------------------------------
 const escrow = require('./escrow');
+const { ALLOW_DEV_TOKENS } = require('./auth');
 
 router.get('/matches/:id/deposit-tx', authMiddleware, async (req, res) => {
     try {
@@ -278,6 +279,12 @@ router.get('/matches/:id/deposit-tx', authMiddleware, async (req, res) => {
         const userId = req.privyUserId;
         if (userId !== match.creator_id && userId !== match.joiner_id) {
             return res.status(403).json(fail('Not in this match'));
+        }
+
+        // Dev mode: return a mock transaction
+        const token = req.headers.authorization?.replace('Bearer ', '') || '';
+        if (ALLOW_DEV_TOKENS && token.startsWith('dev:')) {
+            return res.json(success({ transaction: 'dev-mock-tx', devMode: true }));
         }
 
         const user = db.getUser(userId);
@@ -311,17 +318,22 @@ router.post('/matches/:id/confirm-deposit', authMiddleware, async (req, res) => 
         if (!txSignature) return res.status(400).json(fail('Missing txSignature'));
 
         const user = db.getUser(userId);
-        if (!user || !user.privy_wallet) return res.status(400).json(fail('No wallet'));
+        const token = req.headers.authorization?.replace('Bearer ', '') || '';
+        const isDevToken = ALLOW_DEV_TOKENS && token.startsWith('dev:');
 
-        // Verify on-chain
-        const result = await escrow.confirmDeposit(txSignature, match.stake_amount, match.stake_token, user.privy_wallet);
-        if (!result || !result.confirmed) {
-            return res.status(400).json(fail('Deposit not confirmed: ' + (result?.error || 'unknown')));
-        }
+        if (!isDevToken) {
+            if (!user || !user.privy_wallet) return res.status(400).json(fail('No wallet'));
 
-        // Record funding wallet if first deposit
-        if (result.fromWallet && !user.funding_wallet) {
-            db.upsertUser({ id: userId, twitter_handle: user.twitter_handle, funding_wallet: result.fromWallet });
+            // Verify on-chain
+            const result = await escrow.confirmDeposit(txSignature, match.stake_amount, match.stake_token, user.privy_wallet);
+            if (!result || !result.confirmed) {
+                return res.status(400).json(fail('Deposit not confirmed: ' + (result?.error || 'unknown')));
+            }
+
+            // Record funding wallet if first deposit
+            if (result.fromWallet && !user.funding_wallet) {
+                db.upsertUser({ id: userId, twitter_handle: user.twitter_handle, funding_wallet: result.fromWallet });
+            }
         }
 
         // Log transaction

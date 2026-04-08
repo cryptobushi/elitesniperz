@@ -90,4 +90,4 @@ async function verifyWsToken(token) {
     }
 }
 
-module.exports = { privy, authMiddleware, verifyWsToken, DEV_MODE };
+module.exports = { privy, authMiddleware, verifyWsToken, DEV_MODE, ALLOW_DEV_TOKENS };
