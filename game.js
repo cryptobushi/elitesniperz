@@ -3947,13 +3947,15 @@ function handleJsonMessage(msg) {
                     _roster[r.id] = { username: r.n, team: r.m, isBot: !!r.b };
                 });
             }
-            // Init team score HUD
+            // Init team score HUD (skip in wager mode — wager has own HUD)
             if (msg.limit) {
                 _matchKillLimit = msg.limit;
                 _matchTimeLimit = msg.timeLimit || 1200;
                 _matchStartTime = Date.now() - (msg.elapsed || 0) * 1000;
-                updateTeamScore(msg.rk || 0, msg.bk || 0);
-                document.getElementById('teamScore')?.classList.remove('hidden');
+                if (!window._isWagerMatch) {
+                    updateTeamScore(msg.rk || 0, msg.bk || 0);
+                    document.getElementById('teamScore')?.classList.remove('hidden');
+                }
             }
             break;
         }
@@ -3981,8 +3983,18 @@ function handleJsonMessage(msg) {
             addKillFeed(msg.kn, msg.vn);
             audioManager.play('sniperFire');
 
-            // Update team score HUD
-            if (msg.rk !== undefined) updateTeamScore(msg.rk, msg.bk);
+            // Update score HUD
+            if (msg.rk !== undefined) {
+                if (window._isWagerMatch && window._updateWagerScoreFromKill) {
+                    // Wager mode: update wager HUD with red/blue kills
+                    const myTeam = gameState.team;
+                    const myKills = myTeam === 'red' ? msg.rk : msg.bk;
+                    const oppKills = myTeam === 'red' ? msg.bk : msg.rk;
+                    window._updateWagerScoreFromKill(myKills, oppKills);
+                } else {
+                    updateTeamScore(msg.rk, msg.bk);
+                }
+            }
 
             // Find killer + victim meshes for tracer VFX
             const killer = msg.ki === _myServerId ? gameState.player :
@@ -4544,6 +4556,9 @@ window._startWagerGame = function(ws, matchData) {
     gameState.gameStarted = true;
     isOnlineMode = true;
 
+    // Mark as wager mode (disables 5v5 HUD elements)
+    window._isWagerMatch = true;
+
     // Use the wager WebSocket as the game connection
     _ws = ws;
     _ws.binaryType = 'arraybuffer';
@@ -4566,8 +4581,11 @@ window._startWagerGame = function(ws, matchData) {
     document.getElementById('abilities')?.classList.remove('hidden');
     document.querySelector('.minimap')?.classList.remove('hidden');
 
-    // Hide the 5v5 team score HUD (wager has its own HUD)
+    // Hide 5v5-specific HUD elements (wager has its own)
     document.getElementById('teamScore')?.classList.add('hidden');
+    document.getElementById('shopPanel')?.classList.add('hidden');
+    // Hide gold display in wager (no shop)
+    document.getElementById('goldDisplay')?.style.setProperty('display', 'none');
 
     // Start the Three.js game (creates map, player, starts render loop)
     if (!window._gameStarted) {

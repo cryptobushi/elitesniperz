@@ -1101,6 +1101,8 @@ export function updateWagerScore(myKills, opponentKills) {
     if (youEl) youEl.textContent = myKills;
     if (oppEl) oppEl.textContent = opponentKills;
 }
+// Expose to game.js for kill event updates
+window._updateWagerScoreFromKill = updateWagerScore;
 
 function hideWagerHUD() {
     els.hud.classList.add('hidden');
