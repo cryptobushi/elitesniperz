@@ -469,7 +469,32 @@ export function logout() {
     _notifyListeners();
 }
 
-export function getToken() { return _token; }
+export function getToken() {
+    // Try to get a fresh token from Privy SDK if available
+    if (_privyClient && _token) {
+        try {
+            // getAccessToken returns a promise but we need sync — use cached token
+            // The async refresh happens in refreshToken() below
+            return _token;
+        } catch(e) {}
+    }
+    return _token;
+}
+
+export async function refreshToken() {
+    if (!_privyClient) return _token;
+    try {
+        const newToken = await _privyClient.getAccessToken();
+        if (newToken) {
+            _token = newToken;
+            _saveSession();
+        }
+        return _token;
+    } catch(e) {
+        console.warn('[Privy] Token refresh failed:', e.message);
+        return _token;
+    }
+}
 export function getUser() { return _user; }
 export function isAuthenticated() { return !!_token && !!_user; }
 export function getWalletAddress() { return _user?.privy_wallet || null; }

@@ -4,9 +4,21 @@ import { requestDeposit, checkBalance } from './deposit-flow.js';
 
 // ── API helper ──────────────────────────────────────────────────────────────
 async function api(path, options = {}) {
-    const token = getToken();
+    let token = getToken();
     const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) };
-    const res = await fetch('/api' + path, { ...options, headers });
+    let res = await fetch('/api' + path, { ...options, headers });
+
+    // If token expired, refresh from Privy and retry once
+    if (res.status === 401 && token) {
+        try {
+            const { refreshToken } = await import('../dist/privy-bundle.js');
+            const newToken = await refreshToken();
+            if (newToken && newToken !== token) {
+                headers.Authorization = 'Bearer ' + newToken;
+                res = await fetch('/api' + path, { ...options, headers });
+            }
+        } catch(_) {}
+    }
     return res.json();
 }
 
