@@ -144,10 +144,18 @@ router.get('/matches', (req, res) => {
 
         const matches = db.listOpenMatches({ token, minStake, maxStake, limit, offset });
 
-        // Strip password_hash, add passwordProtected boolean
+        // Strip password_hash, add passwordProtected boolean + creator info
         const sanitized = matches.map((m) => {
             const { password_hash, ...rest } = m;
-            return { ...rest, passwordProtected: !!password_hash };
+            const creator = db.getUser(m.creator_id);
+            return {
+                ...rest,
+                passwordProtected: !!password_hash,
+                creator_twitter: creator?.twitter_handle || null,
+                creator_wins: creator?.wins || 0,
+                creator_losses: creator?.losses || 0,
+                creator_elo: creator?.elo || 1000,
+            };
         });
 
         return res.json(success(sanitized));

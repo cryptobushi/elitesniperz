@@ -789,7 +789,12 @@ async function handleCreateMatch() {
     try {
         const res = await api('/matches', {
             method: 'POST',
-            body: JSON.stringify({ stake: stakeVal, token, killTarget, password }),
+            body: JSON.stringify({
+                stakeAmount: token === 'SOL' ? Math.round(stakeVal * 1e9) : Math.round(stakeVal * 1e6),
+                stakeToken: token,
+                killTarget,
+                password: password || undefined
+            }),
         });
 
         if (res.error) throw new Error(res.error);
@@ -893,11 +898,13 @@ function renderMatches(matches) {
 
     empty.classList.add('hidden');
     tbody.innerHTML = openMatches.map(m => {
-        const creator = m.creatorTwitter || m.creatorName || 'Anon';
-        const record = m.creatorRecord || '0-0';
-        const stake = `${m.stake} ${m.token || 'USDC'}`;
-        const target = `FT${m.killTarget || 7}`;
-        const lock = m.hasPassword ? '<span class="wl-lock">&#x1f512;</span>' : '';
+        const creator = m.creator_twitter || m.creator_id || 'Anon';
+        const record = m.creator_wins !== undefined ? `${m.creator_wins}-${m.creator_losses}` : '0-0';
+        const token = m.stake_token || 'USDC';
+        const amt = token === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
+        const stake = `${amt} ${token}`;
+        const target = `FT${m.kill_target || 7}`;
+        const lock = m.passwordProtected ? '<span class="wl-lock">&#x1f512;</span>' : '';
         return `<tr>
             <td class="wl-creator">${esc(creator)}</td>
             <td class="wl-record">${esc(record)}</td>
@@ -988,7 +995,9 @@ async function pollWaitingRoom(matchId) {
         const m = data.match || data;
 
         // Update info line
-        els.wrInfo.textContent = `${m.stake || '?'} ${m.token || 'USDC'} | First to ${m.killTarget || 7}`;
+        const wrToken = m.stake_token || 'USDC';
+        const wrAmt = wrToken === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
+        els.wrInfo.textContent = `${wrAmt} ${wrToken} | First to ${m.kill_target || 7}`;
 
         // Creator card
         els.wrCreatorName.textContent = m.creatorTwitter || m.creatorName || 'You';
