@@ -3091,9 +3091,12 @@ function startGame() {
             gameState.bots.push(bot);
         }
         console.log('Bots created:', gameState.bots.length);
-    } else {
-        console.log('Online mode — bots managed by server');
+    } else if (!_ws) {
+        // Online mode — connect to public server (skip if wager WS already set)
+        console.log('Online mode — connecting to server');
         connectToServer();
+    } else {
+        console.log('Online mode — using existing WebSocket (wager match)');
     }
 
     updateScoreboard();
@@ -4554,26 +4557,34 @@ window._startWagerGame = function(ws, matchData) {
         }
     });
 
-    // Send join message so the WagerMatch creates our player
-    _ws.send(JSON.stringify({
-        t: 'join',
-        n: gameState.username,
-        m: gameState.team
-    }));
-
     // Show game UI
     document.getElementById('usernameModal')?.classList.add('hidden');
     document.getElementById('hud')?.classList.remove('hidden');
     document.getElementById('abilities')?.classList.remove('hidden');
     document.querySelector('.minimap')?.classList.remove('hidden');
 
-    // Start the game if not already started
-    if (!startGame._called) {
+    // Start the Three.js game (creates map, player, starts render loop)
+    if (!window._gameStarted) {
         startGame();
-        startGame._called = true;
+        window._gameStarted = true;
     } else {
-        // Game already started (map created), just reset player
+        // Game already running (map exists), reset player for new match
+        if (gameState.player && gameState.player.mesh.parent) {
+            gameState.player.mesh.parent.remove(gameState.player.mesh);
+        }
         gameState.player = new Player(gameState.username, gameState.team, true);
         gameState.cameraTarget.copy(gameState.player.position);
+        // Clear old remote players
+        _remotePlayers.forEach((r) => { if (r.player.mesh.parent) r.player.mesh.parent.remove(r.player.mesh); });
+        _remotePlayers.clear();
+        _serverState.clear();
+        _roster = {};
     }
+
+    // Send join AFTER game is initialized
+    _ws.send(JSON.stringify({
+        t: 'join',
+        n: gameState.username,
+        m: gameState.team
+    }));
 };
