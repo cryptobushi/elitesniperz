@@ -1,8 +1,4 @@
 import * as THREE from 'three';
-import { buildGunMesh, getMuzzlePosition, DEFAULT_GUN, randomGun, GunBuilderUI, loadGunData } from './gun-builder.js';
-
-// === LOCAL GUN DATA ===
-let _localGunData = loadGunData();
 
 // Online mode state (declared early to avoid temporal dead zone)
 let isOnlineMode = false;
@@ -40,13 +36,6 @@ const gameState = {
     firstBlood: false,
     // Gold + Shop
     gold: 0,
-    // FPS mode
-    fpsMode: false,
-    fpsYaw: 0,
-    fpsPitch: 0,
-    fpsTransition: 0, // 0=top-down, 1=FPS, lerps smoothly
-    fpsScoped: false,
-    fpsScopeZoom: 0, // 0=hip, 1=fully scoped, lerps
     // Debug
     debug: {
         godMode: false,
@@ -339,6 +328,7 @@ const createMap = () => {
                     vec3 lightBark = vec3(0.50, 0.32, 0.16);
                     float n = hash(vec2(vPos.y * 8.0, atan(vPos.x, vPos.z) * 3.0));
                     vec3 col = mix(darkBark, lightBark, n);
+                    // Simple lighting
                     float diff = max(dot(vNormal, normalize(vec3(0.5, 0.8, 0.3))), 0.0);
                     col *= 0.4 + diff * 0.6;
                     gl_FragColor = vec4(col, 1.0);
@@ -411,8 +401,10 @@ const createMap = () => {
                     void main() {
                         vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3));
                         float diff = max(dot(vNormal, lightDir), 0.0);
+                        // Subsurface-ish effect: lighten from below too
                         float wrap = max(dot(vNormal, vec3(0.0, -1.0, 0.0)) * 0.3, 0.0);
                         vec3 col = vColor * (0.35 + diff * 0.55 + wrap * 0.15);
+                        // Darken interior (lower parts)
                         col *= 0.85 + 0.15 * smoothstep(-0.5, 1.0, vHeight);
                         gl_FragColor = vec4(col, 1.0);
                     }
@@ -495,12 +487,12 @@ const createMap = () => {
                 }
             `,
             fragmentShader: `
-                #include <fog_pars_fragment>
                 varying vec3 vColor;
                 varying vec3 vNormal;
                 void main() {
                     vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3));
                     float diff = max(dot(vNormal, lightDir), 0.0);
+                    // Ambient occlusion approximation
                     float ao = 0.5 + 0.5 * vNormal.y;
                     vec3 col = vColor * (0.3 + diff * 0.6) * (0.7 + ao * 0.3);
                     gl_FragColor = vec4(col, 1.0);
@@ -643,11 +635,6 @@ const createMap = () => {
 // Vision radius = shoot range. No canvas overlay tricks.
 const VISION_RADIUS = 35;
 const FARSIGHT_RADIUS = 55;
-const FPS_EYE_HEIGHT = 1.4;
-const FPS_SENSITIVITY = 0.002;
-const FPS_FOV = 75;
-const FPS_SCOPE_FOV = 25; // Zoomed in through scope
-const TOPDOWN_FOV = 60;
 
 class FogOfWar {
     constructor() {
@@ -882,11 +869,10 @@ fogOfWar.init();
 
 // Player Class
 class Player {
-    constructor(username, team, isPlayer = false, gunData = null) {
+    constructor(username, team, isPlayer = false) {
         this.username = username;
         this.team = team;
         this.isPlayer = isPlayer;
-        this.gunData = gunData;
         this.health = 100;
         this.maxHealth = 100;
         this.kills = 0;
@@ -1052,13 +1038,81 @@ class Player {
         group.add(rightArm);
         this.rightArm = rightArm;
 
-        // === SNIPER RIFLE — Modular gun builder ===
-        const gunData = this.gunData || (this.isPlayer ? _localGunData : randomGun());
-        const rifleGroup = buildGunMesh(gunData);
-        this._gunData = gunData;
+        // === OVERSIZED SNIPER RIFLE ===
+        const rifleGroup = new THREE.Group();
+        const gunMetal = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3, metalness: 0.9 });
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2a10, roughness: 0.8, metalness: 0.1 });
+
+        // Barrel — extra long and thick
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.8, 6), gunMetal);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.z = 1.2;
+        barrel.castShadow = true;
+        rifleGroup.add(barrel);
+
+        // Muzzle brake
+        const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.06, 0.2, 6), gunMetal);
+        muzzle.rotation.x = Math.PI / 2;
+        muzzle.position.z = 2.7;
+        rifleGroup.add(muzzle);
+
+        // Receiver body — chunky box
+        const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.8), gunMetal);
+        receiver.position.set(0, 0.02, 0.1);
+        receiver.castShadow = true;
+        rifleGroup.add(receiver);
+
+        // Scope — oversized
+        const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.8, 6), new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.3, metalness: 0.9 }));
+        scope.rotation.x = Math.PI / 2;
+        scope.position.set(0, 0.2, 0.5);
+        scope.castShadow = true;
+        rifleGroup.add(scope);
+
+        // Scope lens
+        const lens = new THREE.Mesh(new THREE.CircleGeometry(0.09, 8), new THREE.MeshStandardMaterial({
+            color: 0x2244aa, roughness: 0.1, metalness: 1, emissive: 0x0000aa, emissiveIntensity: 0.3
+        }));
+        lens.position.set(0, 0.2, 0.91);
+        rifleGroup.add(lens);
+
+        // Scope mount rings
+        for (let i = 0; i < 2; i++) {
+            const mount = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.02, 6, 8), gunMetal);
+            mount.rotation.y = Math.PI / 2;
+            mount.position.set(0, 0.2, 0.25 + i * 0.5);
+            rifleGroup.add(mount);
+        }
+
+        // Stock — big chunky wood
+        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 0.7), woodMat);
+        stock.position.set(0, 0, -0.4);
+        stock.castShadow = true;
+        rifleGroup.add(stock);
+
+        // Stock butt
+        const stockEnd = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), woodMat);
+        stockEnd.position.z = -0.75;
+        stockEnd.scale.set(1.5, 2, 0.8);
+        rifleGroup.add(stockEnd);
+
+        // Grip
+        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.2), woodMat);
+        grip.position.set(0, -0.18, 0.2);
+        rifleGroup.add(grip);
+
+        // Magazine — oversized box mag
+        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.35, 0.14), gunMetal);
+        mag.position.set(0, -0.12, 0.05);
+        rifleGroup.add(mag);
+
+        // Bolt handle
+        const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.18), gunMetal);
+        bolt.position.set(0.06, 0.05, 0);
+        rifleGroup.add(bolt);
 
         rifleGroup.position.set(0.3, 0.5, 0.3);
-        rifleGroup.rotation.y = Math.PI + 0.1;
+        rifleGroup.rotation.y = 0.1;
         group.add(rifleGroup);
 
         this.rifleGroup = rifleGroup;
@@ -1179,8 +1233,6 @@ class Player {
             // Idle bob
             this.mesh.position.y += Math.sin(time * 2) * 0.008;
         }
-
-        // Update GLB animation mixer
 
         // Spawn protection countdown + visual
         if (this._spawnProtection > 0) {
@@ -1613,7 +1665,7 @@ class Player {
         }
 
         // Calculate muzzle position (end of barrel)
-        const muzzleOffset = this._gunData ? getMuzzlePosition(this._gunData) : new THREE.Vector3(0, 0, 2.5);
+        const muzzleOffset = new THREE.Vector3(0, 0, 2.5);
         if (this.weapon) {
             muzzleOffset.applyQuaternion(this.weapon.quaternion);
         }
@@ -2683,26 +2735,6 @@ document.addEventListener('keydown', (e) => {
         document.getElementById('respawnBtn')?.click();
         return;
     }
-    if (e.key.toLowerCase() === 'v' && gameState.player && gameState.player.health > 0) {
-        e.preventDefault();
-        gameState.fpsMode = !gameState.fpsMode;
-        gameState.fpsScoped = false;
-        gameState.fpsScopeZoom = 0;
-        const canvas = document.getElementById('gameCanvas');
-        if (gameState.fpsMode) {
-            gameState.fpsYaw = gameState.player.mesh.rotation.y || 0;
-            gameState.fpsPitch = 0;
-            canvas.requestPointerLock?.();
-            document.body.style.cursor = 'none';
-        } else {
-            document.exitPointerLock?.();
-            document.body.style.cursor = '';
-        }
-        // Tell server
-        if (_ws && _ws.readyState === 1) {
-            _ws.send(JSON.stringify({ t: 'vmode', fps: gameState.fpsMode ? 1 : 0 }));
-        }
-    }
     if (e.key.toLowerCase() === 'q') {
         e.preventDefault();
         useWindwalk();
@@ -2757,29 +2789,7 @@ document.addEventListener('keyup', (e) => {
     }
 });
 
-// Pointer lock management for FPS mode
-document.addEventListener('pointerlockchange', () => {
-    if (gameState.fpsMode && !document.pointerLockElement) {
-        // Pointer lock was lost — re-request after a frame
-        document.body.style.cursor = 'none';
-        setTimeout(() => {
-            if (gameState.fpsMode) {
-                document.getElementById('gameCanvas')?.requestPointerLock?.();
-            }
-        }, 100);
-    }
-    if (!gameState.fpsMode && !document.pointerLockElement) {
-        document.body.style.cursor = '';
-    }
-});
-
 document.addEventListener('mousemove', (e) => {
-    if (gameState.fpsMode) {
-        const sens = gameState.fpsScoped ? FPS_SENSITIVITY * 0.35 : FPS_SENSITIVITY;
-        gameState.fpsYaw -= e.movementX * sens;
-        gameState.fpsPitch = Math.max(-Math.PI/3, Math.min(Math.PI/3, gameState.fpsPitch - e.movementY * sens));
-        return;
-    }
     gameState.mousePos.x = (e.clientX / window.innerWidth) * 2 - 1;
     gameState.mousePos.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
@@ -2798,20 +2808,8 @@ document.addEventListener('mousemove', (e) => {
 document.addEventListener('mousedown', (e) => {
     if (!gameState.gameStarted) return;
 
-    // Right click — scope zoom in FPS mode, camera drag in top-down
-    if (e.button === 2) {
-        e.preventDefault();
-        if (gameState.fpsMode) {
-            // Block scope during recoil
-            if (window._fpsRecoilTimer > 0) return;
-            gameState.fpsScoped = true;
-            return;
-        }
-        gameState.isDraggingCamera = true;
-        gameState.lastMousePos.set(e.clientX, e.clientY);
-        return;
-    }
-    if (e.button === 1) {
+    // Right click or middle mouse for camera drag
+    if (e.button === 1 || e.button === 2) {
         gameState.isDraggingCamera = true;
         gameState.lastMousePos.set(e.clientX, e.clientY);
         e.preventDefault();
@@ -2820,30 +2818,6 @@ document.addEventListener('mousedown', (e) => {
 
     // Left click
     if (e.button === 0 && gameState.player) {
-        if (gameState.fpsMode) {
-            // Block shooting during recoil
-            if (window._fpsRecoilTimer > 0) return;
-            // FPS manual shoot
-            if (_ws && _ws.readyState === 1 && gameState.player && gameState.player.health > 0) {
-                // Exit scope on fire
-                gameState.fpsScoped = false;
-                _ws.send(JSON.stringify({ t: 'fps_shoot', yaw: gameState.fpsYaw, pitch: gameState.fpsPitch }));
-                // Local shooting effect
-                if (gameState.player.createShootingEffect) {
-                    const lookDir = new THREE.Vector3(
-                        Math.sin(gameState.fpsYaw),
-                        0,
-                        Math.cos(gameState.fpsYaw)
-                    );
-                    const target = gameState.player.position.clone().add(lookDir.multiplyScalar(25));
-                    gameState.player.createShootingEffect(target);
-                }
-                // Procedural recoil on viewmodel
-                window._fpsRecoilTimer = 0.4;
-                audioManager.play('sniperFire');
-            }
-            return; // Don't do click-to-move
-        }
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(gameState.mousePos, camera);
 
@@ -2889,11 +2863,7 @@ document.addEventListener('mousedown', (e) => {
 });
 
 document.addEventListener('mouseup', (e) => {
-    if (e.button === 2) {
-        gameState.fpsScoped = false;
-        gameState.isDraggingCamera = false;
-    }
-    if (e.button === 1) {
+    if (e.button === 1 || e.button === 2) {
         gameState.isDraggingCamera = false;
     }
 });
@@ -3013,22 +2983,6 @@ document.querySelectorAll('.teamBtn').forEach(btn => {
         vc.textContent = String(n).padStart(6, '0').replace(/(\d)(?=(\d{3})+$)/g, '$1,');
     }
 }
-
-// Gun Builder button
-let _gunBuilder = null;
-document.getElementById('buildGunBtn').addEventListener('click', () => {
-    if (!_gunBuilder) {
-        _gunBuilder = new GunBuilderUI((savedGun) => {
-            _localGunData = savedGun;
-            // Rebuild FPS viewmodel if it exists
-            if (window._fpsViewmodel) {
-                window._fpsViewmodel.parent.remove(window._fpsViewmodel);
-                window._fpsViewmodel = null;
-            }
-        });
-    }
-    _gunBuilder.open(_localGunData);
-});
 
 document.getElementById('startBtn').addEventListener('click', () => {
     audioManager.init(); // Unlock audio on first user interaction
@@ -3299,52 +3253,11 @@ function animate() {
     }
 
     // WASD camera movement (alternative to edge scroll)
-    // Update FPS mobile controls visibility
-    updateFpsMobileVisibility();
-
-    if (gameState.fpsMode && gameState.player && gameState.player.health > 0) {
-        // FPS: direct movement — WASD on desktop, joystick on mobile
-        let mx = 0, mz = 0;
-        if (gameState.keys['w']) { mx += Math.sin(gameState.fpsYaw); mz += Math.cos(gameState.fpsYaw); }
-        if (gameState.keys['s']) { mx -= Math.sin(gameState.fpsYaw); mz -= Math.cos(gameState.fpsYaw); }
-        if (gameState.keys['a']) { mx += Math.sin(gameState.fpsYaw + Math.PI/2); mz += Math.cos(gameState.fpsYaw + Math.PI/2); }
-        if (gameState.keys['d']) { mx += Math.sin(gameState.fpsYaw - Math.PI/2); mz += Math.cos(gameState.fpsYaw - Math.PI/2); }
-        // Mobile joystick input
-        if (_fpsMobileControls) {
-            const jv = _fpsMobileControls.getMoveVec();
-            if (Math.abs(jv.x) > 0.1 || Math.abs(jv.y) > 0.1) {
-                // Joystick: x=right(+), y=up(+)=forward
-                // Forward/back along yaw
-                mx -= Math.sin(gameState.fpsYaw) * jv.y;
-                mz -= Math.cos(gameState.fpsYaw) * jv.y;
-                // Strafe
-                mx += Math.sin(gameState.fpsYaw + Math.PI/2) * jv.x;
-                mz += Math.cos(gameState.fpsYaw + Math.PI/2) * jv.x;
-            }
-        }
-        gameState.moveTarget = null; // FPS never uses click-to-move
-        if (mx !== 0 || mz !== 0) {
-            const len = Math.sqrt(mx*mx + mz*mz);
-            mx /= len; mz /= len;
-            const speed = gameState.player.speed * deltaTime;
-            const nx = gameState.player.position.x + mx * speed;
-            const nz = gameState.player.position.z + mz * speed;
-            // Local collision check
-            if (!gameState.player.checkCollision(new THREE.Vector3(nx, 0, nz))) {
-                gameState.player.position.x = nx;
-                gameState.player.position.z = nz;
-                gameState.player.position.y = Math.sin(nx * 0.1) * Math.cos(nz * 0.1) * 2 + 0.6;
-            }
-            // Send position to server at 30hz
-            if (_ws && _ws.readyState === 1) {
-                const now3 = performance.now();
-                if (!gameState._lastFpsMoveTime || now3 - gameState._lastFpsMoveTime > 33) {
-                    _ws.send(JSON.stringify({ t: 'fps_move', x: gameState.player.position.x, z: gameState.player.position.z }));
-                    gameState._lastFpsMoveTime = now3;
-                }
-            }
-        }
-    }
+    const camSpeed = 15;
+    if (gameState.keys['w'] && !gameState.keys['s']) gameState.cameraTarget.z -= camSpeed * deltaTime;
+    if (gameState.keys['s'] && !gameState.keys['w']) gameState.cameraTarget.z += camSpeed * deltaTime;
+    if (gameState.keys['a'] && !gameState.keys['d']) gameState.cameraTarget.x -= camSpeed * deltaTime;
+    if (gameState.keys['d'] && !gameState.keys['a']) gameState.cameraTarget.x += camSpeed * deltaTime;
 
     // Spacebar to center on player
     if (gameState.keys[' '] && gameState.player) {
@@ -3359,166 +3272,11 @@ function animate() {
     gameState.cameraTarget.x = THREE.MathUtils.clamp(gameState.cameraTarget.x, -mapBound, mapBound);
     gameState.cameraTarget.z = THREE.MathUtils.clamp(gameState.cameraTarget.z, -mapBound, mapBound);
 
-    // Smooth FPS transition
-    if (gameState.fpsMode && gameState.fpsTransition < 1) {
-        gameState.fpsTransition = Math.min(1, gameState.fpsTransition + deltaTime * 1.8);
-    } else if (!gameState.fpsMode && gameState.fpsTransition > 0) {
-        gameState.fpsTransition = Math.max(0, gameState.fpsTransition - deltaTime * 1.8);
-    }
-    const fpst = gameState.fpsTransition;
-
-    // Scope zoom lerp
-    const scopeTarget = (gameState.fpsMode && gameState.fpsScoped) ? 1 : 0;
-    gameState.fpsScopeZoom += (scopeTarget - gameState.fpsScopeZoom) * Math.min(1, deltaTime * 12);
-    if (Math.abs(gameState.fpsScopeZoom - scopeTarget) < 0.001) gameState.fpsScopeZoom = scopeTarget;
-
-    // Scope overlay
-    let scopeOverlay = document.getElementById('scopeOverlay');
-    if (!scopeOverlay) {
-        scopeOverlay = document.createElement('div');
-        scopeOverlay.id = 'scopeOverlay';
-        scopeOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50;transition:opacity 0.1s;opacity:0;background:radial-gradient(circle at center, transparent 25%, rgba(0,0,0,0.7) 50%, rgba(0,0,0,0.95) 70%);';
-        document.body.appendChild(scopeOverlay);
-        // Scope crosshair lines
-        const scopeH = document.createElement('div');
-        scopeH.style.cssText = 'position:absolute;top:50%;left:20%;width:60%;height:1px;background:rgba(255,255,255,0.3);';
-        scopeOverlay.appendChild(scopeH);
-        const scopeV = document.createElement('div');
-        scopeV.style.cssText = 'position:absolute;left:50%;top:20%;height:60%;width:1px;background:rgba(255,255,255,0.3);';
-        scopeOverlay.appendChild(scopeV);
-    }
-    scopeOverlay.style.opacity = gameState.fpsScopeZoom > 0.1 ? gameState.fpsScopeZoom : 0;
-
-    if (fpst < 0.01) {
-        // Pure top-down
-        camera.position.x = THREE.MathUtils.lerp(camera.position.x, gameState.cameraTarget.x + gameState.cameraOffset.x, 0.06);
-        camera.position.y = gameState.cameraOffset.y;
-        camera.position.z = THREE.MathUtils.lerp(camera.position.z, gameState.cameraTarget.z + gameState.cameraOffset.z, 0.06);
-        camera.lookAt(gameState.cameraTarget.x, 0, gameState.cameraTarget.z);
-        camera.fov = TOPDOWN_FOV;
-    } else if (fpst > 0.99) {
-        // Pure FPS
-        const p = gameState.player;
-        if (p) {
-            const ey = p.position.y + FPS_EYE_HEIGHT;
-            camera.position.set(p.position.x, ey, p.position.z);
-            // Look direction from yaw + pitch
-            const lookX = Math.sin(gameState.fpsYaw) * Math.cos(gameState.fpsPitch);
-            const lookY = Math.sin(gameState.fpsPitch);
-            const lookZ = Math.cos(gameState.fpsYaw) * Math.cos(gameState.fpsPitch);
-            camera.lookAt(p.position.x + lookX * 10, ey + lookY * 10, p.position.z + lookZ * 10);
-        }
-        camera.fov = THREE.MathUtils.lerp(FPS_FOV, FPS_SCOPE_FOV, gameState.fpsScopeZoom);
-    } else {
-        // Transition — lerp between top-down and FPS
-        const p = gameState.player;
-        if (p) {
-            const tdX = gameState.cameraTarget.x + gameState.cameraOffset.x;
-            const tdY = gameState.cameraOffset.y;
-            const tdZ = gameState.cameraTarget.z + gameState.cameraOffset.z;
-            const fpsX = p.position.x;
-            const fpsY = p.position.y + FPS_EYE_HEIGHT;
-            const fpsZ = p.position.z;
-            camera.position.x = THREE.MathUtils.lerp(tdX, fpsX, fpst);
-            camera.position.y = THREE.MathUtils.lerp(tdY, fpsY, fpst);
-            camera.position.z = THREE.MathUtils.lerp(tdZ, fpsZ, fpst);
-            // Lerp look target
-            const lookX = Math.sin(gameState.fpsYaw) * Math.cos(gameState.fpsPitch);
-            const lookY = Math.sin(gameState.fpsPitch);
-            const lookZ = Math.cos(gameState.fpsYaw) * Math.cos(gameState.fpsPitch);
-            const tdLookX = gameState.cameraTarget.x;
-            const tdLookZ = gameState.cameraTarget.z;
-            const lx = THREE.MathUtils.lerp(tdLookX, fpsX + lookX * 10, fpst);
-            const ly = THREE.MathUtils.lerp(0, fpsY + lookY * 10, fpst);
-            const lz = THREE.MathUtils.lerp(tdLookZ, fpsZ + lookZ * 10, fpst);
-            camera.lookAt(lx, ly, lz);
-        }
-        const fpsFov = THREE.MathUtils.lerp(FPS_FOV, FPS_SCOPE_FOV, gameState.fpsScopeZoom);
-        camera.fov = THREE.MathUtils.lerp(TOPDOWN_FOV, fpsFov, fpst);
-    }
-    camera.updateProjectionMatrix();
-
-    // FPS: hide own mesh, show crosshair, show viewmodel gun
-    if (gameState.player) {
-        gameState.player.mesh.visible = gameState.fpsTransition < 0.5 && gameState.player.health > 0;
-    }
-
-    // FPS viewmodel gun (built from gun builder data)
-    if (!window._fpsViewmodel && gameState.player) {
-        const vmGun = buildGunMesh(_localGunData);
-        vmGun.traverse(child => {
-            if (child.isMesh) { child.castShadow = false; child.receiveShadow = false; }
-        });
-        const vmGroup = new THREE.Group();
-        vmGroup.add(vmGun);
-        vmGroup.position.set(0.95, -0.2, -1.2);
-        vmGroup.rotation.y = Math.PI; // Barrel points forward (into screen)
-        vmGroup.visible = false;
-        vmGroup.renderOrder = 99999;
-        camera.add(vmGroup);
-        if (!camera.parent) scene.add(camera);
-        window._fpsViewmodel = vmGroup;
-    }
-    if (!window._fpsRecoilTimer) window._fpsRecoilTimer = 0;
-    if (window._fpsRecoilTimer > 0) window._fpsRecoilTimer -= deltaTime;
-
-    if (window._fpsViewmodel) {
-        window._fpsViewmodel.visible = gameState.fpsTransition > 0.5 && gameState.player && gameState.player.health > 0 && gameState.fpsScopeZoom < 0.3;
-        // Scope: pull gun to center when scoped
-        const vm = window._fpsViewmodel;
-        const scopeT = gameState.fpsScopeZoom;
-        const baseX = THREE.MathUtils.lerp(0.95, 0.0, scopeT);
-        const baseY = THREE.MathUtils.lerp(-0.2, 0.0, scopeT);
-        const baseZ = THREE.MathUtils.lerp(-1.2, -0.4, scopeT);
-
-        // Gun sway when moving
-        const isMoving = gameState.keys && (gameState.keys['w'] || gameState.keys['a'] || gameState.keys['s'] || gameState.keys['d']);
-        const t = performance.now() * 0.001;
-        const swayAmt = isMoving ? 1.0 : 0.2;
-        const swaySpeed = isMoving ? 5.0 : 1.5;
-        const swayX = Math.sin(t * swaySpeed) * 0.012 * swayAmt;
-        const swayY = Math.sin(t * swaySpeed * 2) * 0.008 * swayAmt;
-        const swayRot = Math.sin(t * swaySpeed * 0.7) * 0.015 * swayAmt;
-
-        // Procedural recoil kick
-        const recoilT = Math.max(0, window._fpsRecoilTimer) / 0.4;
-        const recoilKick = Math.sin(recoilT * Math.PI) * 0.15; // kick back
-        const recoilUp = Math.sin(recoilT * Math.PI) * 0.08;   // kick up
-        const recoilRot = Math.sin(recoilT * Math.PI) * -0.12;  // rotate up
-
-        vm.position.x = baseX + swayX;
-        vm.position.y = baseY + swayY + recoilUp;
-        vm.position.z = baseZ + recoilKick;
-        vm.rotation.z = swayRot;
-        vm.rotation.x = recoilRot;
-    }
-    let crosshair = document.getElementById('fpsCrosshair');
-    if (!crosshair) {
-        crosshair = document.createElement('div');
-        crosshair.id = 'fpsCrosshair';
-        crosshair.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:9995;display:none;';
-        crosshair.innerHTML = '<div style="width:2px;height:16px;background:#fff;opacity:0.7;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);"></div><div style="width:16px;height:2px;background:#fff;opacity:0.7;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);"></div>';
-        document.body.appendChild(crosshair);
-    }
-    crosshair.style.display = (gameState.fpsTransition > 0.5 && gameState.fpsScopeZoom < 0.5) ? 'block' : 'none';
-    if (!document.getElementById('fpsToggleBtn')) {
-        const btn = document.createElement('button');
-        btn.id = 'fpsToggleBtn';
-        btn.textContent = 'FPS';
-        btn.style.cssText = 'position:fixed;top:50px;right:max(env(safe-area-inset-right),8px);z-index:9996;background:rgba(0,0,0,0.6);border:1px solid #fff4;color:#fff;font-family:monospace;font-size:0.7rem;padding:6px 12px;border-radius:4px;pointer-events:all;';
-        btn.addEventListener('click', () => {
-            if (!gameState.player || gameState.player.health <= 0) return;
-            gameState.fpsMode = !gameState.fpsMode;
-            if (gameState.fpsMode) {
-                gameState.fpsYaw = gameState.player.mesh.rotation.y || 0;
-                gameState.fpsPitch = 0;
-            }
-            if (_ws && _ws.readyState === 1) {
-                _ws.send(JSON.stringify({ t: 'vmode', fps: gameState.fpsMode ? 1 : 0 }));
-            }
-        });
-        document.body.appendChild(btn);
-    }
+    // Smooth camera movement
+    camera.position.x = THREE.MathUtils.lerp(camera.position.x, gameState.cameraTarget.x + gameState.cameraOffset.x, 0.06);
+    camera.position.y = gameState.cameraOffset.y;
+    camera.position.z = THREE.MathUtils.lerp(camera.position.z, gameState.cameraTarget.z + gameState.cameraOffset.z, 0.06);
+    camera.lookAt(gameState.cameraTarget);
 
     // Update player movement (click to move)
     if (gameState.player && gameState.player.health > 0) {
@@ -3587,109 +3345,6 @@ function animate() {
     }
 
     fogOfWar.update(gameState.player, allUnits, farsightPositions);
-
-    // Hide fog planes in FPS mode (camera is below them)
-    // Instead use a fog cylinder centered on player for FPS volumetric fog
-    if (fogOfWar.fogLayers) {
-        fogOfWar.fogLayers.forEach(layer => {
-            layer.visible = gameState.fpsTransition < 0.5;
-        });
-    }
-
-    // FPS fog cylinder — dark wall at vision edge
-    if (!window._fpsFogCylinder) {
-        const fogCylGeo = new THREE.CylinderGeometry(1, 1, 20, 64, 1, true);
-        const fogCylMat = new THREE.ShaderMaterial({
-            vertexShader: `
-                varying vec3 vWorldPos;
-                varying float vHeight;
-                void main() {
-                    vec4 wp = modelMatrix * vec4(position, 1.0);
-                    vWorldPos = wp.xyz;
-                    vHeight = position.y / 10.0 + 0.5; // 0 at bottom, 1 at top
-                    gl_Position = projectionMatrix * viewMatrix * wp;
-                }
-            `,
-            fragmentShader: `
-                uniform float uRadius;
-                uniform vec3 uCenter;
-                uniform float uTime;
-                varying vec3 vWorldPos;
-                varying float vHeight;
-
-                float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-                float noise(vec2 p) {
-                    vec2 i = floor(p), f = fract(p), u = f*f*(3.0-2.0*f);
-                    return mix(mix(hash(i), hash(i+vec2(1,0)), u.x),
-                               mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y);
-                }
-                float fbm(vec2 p) {
-                    float v = 0.0, a = 0.5;
-                    mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
-                    for (int i = 0; i < 4; i++) { v += a * noise(p); p = rot * p * 2.0; a *= 0.5; }
-                    return v;
-                }
-
-                void main() {
-                    // Distance from center on XZ plane
-                    float dist = length(vWorldPos.xz - uCenter.xz);
-                    float normDist = dist / uRadius;
-
-                    // Wispy density — domain-warped noise on the cylinder surface
-                    vec2 np = vec2(atan(vWorldPos.x - uCenter.x, vWorldPos.z - uCenter.z) * 3.0, vHeight * 4.0);
-                    float density = fbm(np + uTime * vec2(0.08, 0.03));
-                    float detail = fbm(np * 2.0 - uTime * vec2(0.05, 0.07));
-                    density = density * 0.6 + detail * 0.4;
-
-                    // Fade: transparent at inner edge, opaque at outer
-                    float alpha = smoothstep(0.7, 1.0, normDist);
-                    alpha *= 0.6 + density * 0.4;
-
-                    // Fade at top and bottom
-                    alpha *= smoothstep(0.0, 0.15, vHeight) * smoothstep(1.0, 0.85, vHeight);
-
-                    // Color — dark blue-black with subtle blue wisps
-                    vec3 fogCol = vec3(0.02, 0.03, 0.06) + vec3(0.02, 0.02, 0.05) * density;
-
-                    gl_FragColor = vec4(fogCol, alpha);
-                }
-            `,
-            transparent: true, depthWrite: false, side: THREE.BackSide,
-            uniforms: {
-                uRadius: { value: VISION_RADIUS },
-                uCenter: { value: new THREE.Vector3() },
-                uTime: { value: 0 }
-            }
-        });
-        const fogCyl = new THREE.Mesh(fogCylGeo, fogCylMat);
-        fogCyl.renderOrder = 9998;
-        fogCyl.visible = false;
-        scene.add(fogCyl);
-        window._fpsFogCylinder = fogCyl;
-    }
-
-    // Update FPS fog cylinder
-    const fpsFogCyl = window._fpsFogCylinder;
-    if (gameState.fpsTransition > 0.5 && gameState.player) {
-        fpsFogCyl.visible = true;
-        const r = VISION_RADIUS;
-        fpsFogCyl.scale.set(r, 1, r);
-        fpsFogCyl.position.set(gameState.player.position.x, 5, gameState.player.position.z);
-        fpsFogCyl.material.uniforms.uCenter.value.set(gameState.player.position.x, 0, gameState.player.position.z);
-        fpsFogCyl.material.uniforms.uRadius.value = r;
-        fpsFogCyl.material.uniforms.uTime.value = performance.now() * 0.001;
-    } else {
-        fpsFogCyl.visible = false;
-    }
-
-    // Also darken everything beyond vision in FPS with scene fog
-    if (gameState.fpsTransition > 0.5) {
-        scene.fog = new THREE.Fog(0x020308, VISION_RADIUS * 0.6, VISION_RADIUS * 1.2);
-        scene.background = new THREE.Color(0x020308);
-    } else {
-        scene.fog = new THREE.Fog(0x1a1030, 120, 350);
-        scene.background = new THREE.Color(0x1a0a2e);
-    }
 
     // Vision light follows player
     if (gameState.player) {
@@ -3801,7 +3456,6 @@ if (isMobile) {
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault();
         if (_shopOpen()) return;
-        if (gameState.fpsMode) return; // FPS uses nipplejs controls
         camVelX = 0;
         camVelZ = 0;
 
@@ -3823,7 +3477,6 @@ if (isMobile) {
     canvas.addEventListener('touchmove', (e) => {
         e.preventDefault();
         if (_shopOpen()) return;
-        if (gameState.fpsMode) return;
 
         if (e.touches.length >= 1) {
             const t = e.touches[0];
@@ -3869,7 +3522,6 @@ if (isMobile) {
     canvas.addEventListener('touchend', (e) => {
         e.preventDefault();
         if (_shopOpen()) { touches.clear(); return; }
-        if (gameState.fpsMode) return;
 
         for (const t of e.changedTouches) {
             const data = touches.get(t.identifier);
@@ -3908,195 +3560,6 @@ if (isMobile) {
     applyMomentum();
 }
 
-// ─── FPS MOBILE CONTROLS (nipplejs joystick + shoot button) ────────
-let _fpsMobileControls = null;
-function createFpsMobileControls() {
-    if (_fpsMobileControls) return;
-    if (typeof nipplejs === 'undefined') return;
-
-    const container = document.createElement('div');
-    container.id = 'fpsMobileControls';
-    container.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:60;pointer-events:none;display:none;';
-    document.body.appendChild(container);
-
-    // Left zone — movement joystick
-    const leftZone = document.createElement('div');
-    leftZone.id = 'fpsMoveZone';
-    leftZone.style.cssText = 'position:absolute;left:0;bottom:0;width:40%;height:50%;pointer-events:all;';
-    container.appendChild(leftZone);
-
-    // Right zone — look/aim (touch drag)
-    const rightZone = document.createElement('div');
-    rightZone.id = 'fpsLookZone';
-    rightZone.style.cssText = 'position:absolute;right:0;top:0;width:60%;height:100%;pointer-events:all;';
-    container.appendChild(rightZone);
-
-    // Shoot button
-    const shootBtn = document.createElement('div');
-    shootBtn.id = 'fpsShootBtn';
-    shootBtn.style.cssText = 'position:absolute;right:20px;bottom:80px;width:80px;height:80px;border-radius:50%;background:rgba(255,50,50,0.6);border:3px solid rgba(255,100,100,0.8);pointer-events:all;display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:0.7rem;color:#fff;font-weight:bold;user-select:none;-webkit-user-select:none;';
-    shootBtn.textContent = 'FIRE';
-    container.appendChild(shootBtn);
-
-    // Scope button
-    const scopeBtn = document.createElement('div');
-    scopeBtn.id = 'fpsScopeBtn';
-    scopeBtn.style.cssText = 'position:absolute;right:120px;bottom:80px;width:60px;height:60px;border-radius:50%;background:rgba(50,100,255,0.5);border:2px solid rgba(100,150,255,0.7);pointer-events:all;display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:0.6rem;color:#fff;user-select:none;-webkit-user-select:none;';
-    scopeBtn.textContent = 'SCOPE';
-    container.appendChild(scopeBtn);
-
-    // Toggle FPS button
-    const toggleBtn = document.createElement('div');
-    toggleBtn.id = 'fpsToggleMobile';
-    toggleBtn.style.cssText = 'position:absolute;left:20px;top:20px;padding:8px 14px;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.3);border-radius:4px;pointer-events:all;font-family:monospace;font-size:0.7rem;color:#fff;user-select:none;-webkit-user-select:none;';
-    toggleBtn.textContent = 'EXIT FPS';
-    container.appendChild(toggleBtn);
-
-    // Create nipplejs joystick
-    const moveJoystick = nipplejs.create({
-        zone: leftZone,
-        mode: 'static',
-        position: { left: '80px', bottom: '80px' },
-        color: 'rgba(255,255,255,0.3)',
-        size: 120,
-    });
-
-    let moveVec = { x: 0, y: 0 };
-    moveJoystick.on('move', (evt, data) => {
-        if (data.vector) {
-            // nipplejs vector: x = right(+)/left(-), y = up(+)/down(-)
-            // But y is inverted in nipplejs (up on screen = negative y in their coords)
-            // data.vector is already -1 to 1
-            moveVec.x = data.vector.x || 0;
-            moveVec.y = data.vector.y || 0;
-        }
-    });
-    moveJoystick.on('end', () => {
-        moveVec.x = 0;
-        moveVec.y = 0;
-    });
-
-    // Right zone: touch drag for look + double tap to shoot
-    let lookTouchId = null;
-    let lookLastX = 0, lookLastY = 0;
-    let _lastLookTap = 0;
-
-    rightZone.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const t = e.changedTouches[0];
-
-        // Double tap detection
-        const now = Date.now();
-        if (now - _lastLookTap < 300) {
-            // Double tap — shoot
-            if (gameState.fpsMode && gameState.player && gameState.player.health > 0 && window._fpsRecoilTimer <= 0) {
-                if (_ws && _ws.readyState === 1) {
-                    gameState.fpsScoped = false;
-                    _ws.send(JSON.stringify({ t: 'fps_shoot', yaw: gameState.fpsYaw, pitch: gameState.fpsPitch }));
-                    if (gameState.player.createShootingEffect) {
-                        const lookDir = new THREE.Vector3(Math.sin(gameState.fpsYaw), 0, Math.cos(gameState.fpsYaw));
-                        const target = gameState.player.position.clone().add(lookDir.multiplyScalar(25));
-                        gameState.player.createShootingEffect(target);
-                    }
-                    window._fpsRecoilTimer = 0.4;
-                    audioManager.play('sniperFire');
-                }
-            }
-            _lastLookTap = 0;
-            return;
-        }
-        _lastLookTap = now;
-
-        if (lookTouchId !== null) return;
-        lookTouchId = t.identifier;
-        lookLastX = t.clientX;
-        lookLastY = t.clientY;
-    }, { passive: false });
-
-    rightZone.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        for (const t of e.changedTouches) {
-            if (t.identifier === lookTouchId) {
-                const dx = t.clientX - lookLastX;
-                const dy = t.clientY - lookLastY;
-                const sens = gameState.fpsScoped ? FPS_SENSITIVITY * 0.35 * 3 : FPS_SENSITIVITY * 3;
-                gameState.fpsYaw -= dx * sens;
-                gameState.fpsPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, gameState.fpsPitch - dy * sens));
-                lookLastX = t.clientX;
-                lookLastY = t.clientY;
-            }
-        }
-    }, { passive: false });
-
-    rightZone.addEventListener('touchend', (e) => {
-        for (const t of e.changedTouches) {
-            if (t.identifier === lookTouchId) lookTouchId = null;
-        }
-    });
-
-    // Shoot button
-    shootBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!gameState.fpsMode || !gameState.player || gameState.player.health <= 0) return;
-        if (window._fpsRecoilTimer > 0) return;
-        if (_ws && _ws.readyState === 1) {
-            gameState.fpsScoped = false;
-            _ws.send(JSON.stringify({ t: 'fps_shoot', yaw: gameState.fpsYaw, pitch: gameState.fpsPitch }));
-            if (gameState.player.createShootingEffect) {
-                const lookDir = new THREE.Vector3(Math.sin(gameState.fpsYaw), 0, Math.cos(gameState.fpsYaw));
-                const target = gameState.player.position.clone().add(lookDir.multiplyScalar(25));
-                gameState.player.createShootingEffect(target);
-            }
-            window._fpsRecoilTimer = 0.4;
-            audioManager.play('sniperFire');
-        }
-    }, { passive: false });
-
-    // Scope button
-    scopeBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (window._fpsRecoilTimer > 0) return;
-        gameState.fpsScoped = !gameState.fpsScoped;
-    }, { passive: false });
-
-    // Toggle FPS off
-    toggleBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        gameState.fpsMode = false;
-        gameState.fpsScoped = false;
-        gameState.fpsScopeZoom = 0;
-        document.body.style.cursor = '';
-        if (_ws && _ws.readyState === 1) {
-            _ws.send(JSON.stringify({ t: 'vmode', fps: 0 }));
-        }
-    }, { passive: false });
-
-    _fpsMobileControls = {
-        container,
-        moveJoystick,
-        getMoveVec: () => moveVec,
-        destroy: () => {
-            moveJoystick.destroy();
-            container.remove();
-            _fpsMobileControls = null;
-        }
-    };
-}
-
-function updateFpsMobileVisibility() {
-    if (!isMobile) return;
-    if (gameState.fpsMode && !_fpsMobileControls) createFpsMobileControls();
-    if (_fpsMobileControls) {
-        _fpsMobileControls.container.style.display = gameState.fpsMode ? 'block' : 'none';
-    }
-    // Hide chat in FPS on mobile
-    const chatBox = document.getElementById('chatBox');
-    if (chatBox) chatBox.style.display = (gameState.fpsMode && isMobile) ? 'none' : '';
-}
-
 // Ability buttons — works on both mobile and desktop via touch/click
 document.querySelectorAll('.ability').forEach(btn => {
     btn.addEventListener('touchstart', (e) => {
@@ -4128,41 +3591,6 @@ document.querySelectorAll('.ability').forEach(btn => {
             }
         }
     });
-});
-
-// FPS toggle button (mobile + desktop)
-document.getElementById('fpsBtn')?.addEventListener('touchstart', (e) => {
-    e.stopPropagation();
-    if (!gameState.player || gameState.player.health <= 0) return;
-    gameState.fpsMode = !gameState.fpsMode;
-    gameState.fpsScoped = false;
-    gameState.fpsScopeZoom = 0;
-    if (gameState.fpsMode) {
-        gameState.fpsYaw = gameState.player.mesh.rotation.y || 0;
-        gameState.fpsPitch = 0;
-    }
-    if (_ws && _ws.readyState === 1) {
-        _ws.send(JSON.stringify({ t: 'vmode', fps: gameState.fpsMode ? 1 : 0 }));
-    }
-}, { passive: false });
-document.getElementById('fpsBtn')?.addEventListener('click', () => {
-    if (!gameState.player || gameState.player.health <= 0) return;
-    gameState.fpsMode = !gameState.fpsMode;
-    gameState.fpsScoped = false;
-    gameState.fpsScopeZoom = 0;
-    const canvas = document.getElementById('gameCanvas');
-    if (gameState.fpsMode) {
-        gameState.fpsYaw = gameState.player.mesh.rotation.y || 0;
-        gameState.fpsPitch = 0;
-        canvas.requestPointerLock?.();
-        document.body.style.cursor = 'none';
-    } else {
-        document.exitPointerLock?.();
-        document.body.style.cursor = '';
-    }
-    if (_ws && _ws.readyState === 1) {
-        _ws.send(JSON.stringify({ t: 'vmode', fps: gameState.fpsMode ? 1 : 0 }));
-    }
 });
 
 if (!isMobile) {
@@ -4397,10 +3825,8 @@ function handleBinaryState(buf) {
                         gameState.player.position.x = x;
                         gameState.player.position.z = z;
                     } else if (drift > 0.1) {
-                        // FPS mode: gentle correction (client-predicted), top-down: stronger snap
-                        const lerpFactor = gameState.fpsMode ? 0.1 : 0.4;
-                        gameState.player.position.x += cdx * lerpFactor;
-                        gameState.player.position.z += cdz * lerpFactor;
+                        gameState.player.position.x += cdx * 0.4;
+                        gameState.player.position.z += cdz * 0.4;
                     }
                     gameState.player.position.y = Math.sin(gameState.player.position.x * 0.1) * Math.cos(gameState.player.position.z * 0.1) * 2 + 0.6;
                 }
@@ -4686,15 +4112,6 @@ function handleJsonMessage(msg) {
             handleNewMatch(msg);
             break;
         }
-        case 'miss': {
-            // FPS shot missed — play fire sound, show tracer
-            if (msg.id === _myServerId) {
-                // Already played locally
-            } else {
-                audioManager.play('sniperFire');
-            }
-            break;
-        }
     }
 }
 
@@ -4955,8 +4372,6 @@ function updateRemotePlayers(dt) {
             if (p.rightArm) p.rightArm.rotation.x = Math.sin(time * 2 + 0.5) * 0.05;
             if (p.cape) p.cape.rotation.x = 0.1 + Math.sin(time * 1.5) * 0.05;
         }
-
-        // Update animation mixer (GLB shoot/reload anim)
     }
 
     // Send player rotation to server for FOV-based auto-aim
@@ -4964,9 +4379,7 @@ function updateRemotePlayers(dt) {
         const now2 = performance.now();
         if (now2 - _lastSendTime > 33) { // 30hz rotation updates
             let rot;
-            if (gameState.fpsMode) {
-                rot = gameState.fpsYaw;
-            } else if (_isMobileDevice) {
+            if (_isMobileDevice) {
                 // Mobile: aim toward move target (positioning is the skill)
                 if (gameState.moveTarget) {
                     const dx = gameState.moveTarget.x - gameState.player.position.x;
