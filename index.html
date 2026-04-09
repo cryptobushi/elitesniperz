@@ -2107,8 +2107,8 @@
         renderer.setClearColor(0x0a0a0f, 1);
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0a0a0f);
-        scene.fog = new THREE.Fog(0x0a0a0f, 80, 160);
+        scene.background = new THREE.Color(0x1a0a2e);
+        scene.fog = new THREE.Fog(0x1a0a2e, 60, 140);
         const camera = new THREE.PerspectiveCamera(50, 2, 0.1, 500);
 
         // Lights
@@ -2121,7 +2121,7 @@
         scene.add(visionLight);
 
         // Ground
-        const groundMat = new THREE.MeshStandardMaterial({ color: 0x2a5a1a, roughness: 0.95 });
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x25551a, roughness: 0.9 });
         const ground = new THREE.Mesh(new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE), groundMat);
         ground.rotation.x = -Math.PI / 2;
         scene.add(ground);
@@ -2131,7 +2131,7 @@
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 3, 5), new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 0.9 }));
             trunk.position.set(x, 1.5, z);
             scene.add(trunk);
-            const leaves = new THREE.Mesh(new THREE.ConeGeometry(2, 4, 6), new THREE.MeshStandardMaterial({ color: 0x1a5510, roughness: 0.9 }));
+            const leaves = new THREE.Mesh(new THREE.ConeGeometry(2, 4, 6), new THREE.MeshStandardMaterial({ color: 0x1a6612, roughness: 0.85 }));
             leaves.position.set(x, 4.5, z);
             scene.add(leaves);
         }
@@ -2160,37 +2160,58 @@
             if (data.rocks) data.rocks.forEach(r => addRock(r.x, r.z, r.s || 1));
         }).catch(() => {});
 
-        // Build mini character for spectator view
+        // Character builder — normal game size
         function buildChar(team) {
             const g = new THREE.Group();
             const col = team === 'red' ? 0xcc2222 : 0x2244cc;
             const dark = team === 'red' ? 0x881515 : 0x152288;
             const light = team === 'red' ? 0xff4444 : 0x4466ff;
-            // Use MeshBasicMaterial for guaranteed visibility (no lighting dependency)
-            // Robe body
-            const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.9, 2.2, 6), new THREE.MeshBasicMaterial({ color: col }));
-            robe.position.y = 0.9; g.add(robe);
+            const bm = (c) => new THREE.MeshBasicMaterial({ color: c });
+            // Legs
+            const legGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.7, 4);
+            const ll = new THREE.Mesh(legGeo, bm(0x222222)); ll.position.set(-0.12, -0.15, 0); g.add(ll);
+            const rl = new THREE.Mesh(legGeo, bm(0x222222)); rl.position.set(0.12, -0.15, 0); g.add(rl);
+            // Shoes
+            const shoeGeo = new THREE.ConeGeometry(0.1, 0.35, 4);
+            const ls = new THREE.Mesh(shoeGeo, bm(dark)); ls.position.set(-0.12, -0.55, 0.08); ls.rotation.x = -Math.PI/2; g.add(ls);
+            const rs = new THREE.Mesh(shoeGeo, bm(dark)); rs.position.set(0.12, -0.55, 0.08); rs.rotation.x = -Math.PI/2; g.add(rs);
+            // Robe
+            g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.45, 1.1, 6), bm(col)), { position: {x:0,y:0.45,z:0} }));
             // Belt
-            const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.15, 6), new THREE.MeshBasicMaterial({ color: 0x886622 }));
-            belt.position.y = 0.4; g.add(belt);
+            const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.08, 6), bm(0x886622));
+            belt.position.y = 0.2; g.add(belt);
             // Hat brim
-            const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.1, 8), new THREE.MeshBasicMaterial({ color: dark }));
-            brim.position.y = 2.05; g.add(brim);
+            const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.06, 8), bm(dark));
+            brim.position.y = 1.0; g.add(brim);
             // Hat cone
-            const hat = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.8, 6), new THREE.MeshBasicMaterial({ color: dark }));
-            hat.position.set(0, 2.9, 0); hat.rotation.z = 0.15; g.add(hat);
-            // Hat tip glow
-            const tip = new THREE.Mesh(new THREE.SphereGeometry(0.12, 4, 4), new THREE.MeshBasicMaterial({ color: light }));
-            tip.position.set(0.2, 3.75, 0); g.add(tip);
+            const hat = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.9, 6), bm(dark));
+            hat.position.y = 1.45; hat.rotation.z = 0.15; g.add(hat);
+            // Hat tip
+            const tip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), bm(light));
+            tip.position.set(0.12, 1.9, 0); g.add(tip);
             // Eyes
             const eyeCol = team === 'red' ? 0xff6666 : 0x66aaff;
-            const le = new THREE.Mesh(new THREE.SphereGeometry(0.1, 4, 4), new THREE.MeshBasicMaterial({ color: eyeCol }));
-            le.position.set(-0.2, 1.85, 0.4); g.add(le);
-            const re = new THREE.Mesh(new THREE.SphereGeometry(0.1, 4, 4), new THREE.MeshBasicMaterial({ color: eyeCol }));
-            re.position.set(0.2, 1.85, 0.4); g.add(re);
+            const le = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), bm(eyeCol));
+            le.position.set(-0.1, 0.93, 0.2); g.add(le);
+            const re = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), bm(eyeCol));
+            re.position.set(0.1, 0.93, 0.2); g.add(re);
+            // Arms
+            const armGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.6, 4);
+            g.add(Object.assign(new THREE.Mesh(armGeo, bm(col)), { position: {x:-0.32,y:0.5,z:0}, rotation: {x:0,y:0,z:0.4} }));
+            g.add(Object.assign(new THREE.Mesh(armGeo, bm(col)), { position: {x:0.32,y:0.5,z:0}, rotation: {x:0,y:0,z:-0.4} }));
             // Rifle
-            const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 4, 4), new THREE.MeshBasicMaterial({ color: 0x222222 }));
-            gun.rotation.x = Math.PI / 2; gun.position.set(0.5, 1, 1.5); g.add(gun);
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.8, 6), bm(0x1a1a1a));
+            barrel.rotation.x = Math.PI/2; barrel.position.set(0.3, 0.5, 1.5); g.add(barrel);
+            const recv = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.8), bm(0x1a1a1a));
+            recv.position.set(0.3, 0.52, 0.4); g.add(recv);
+            const stock = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 0.7), bm(0x4a2a10));
+            stock.position.set(0.3, 0.5, -0.1); g.add(stock);
+            const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6, 6), bm(0x0a0a0a));
+            scope.rotation.x = Math.PI/2; scope.position.set(0.3, 0.72, 0.7); g.add(scope);
+            // Muzzle flash (hidden)
+            const flash = new THREE.Mesh(new THREE.SphereGeometry(0.5, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffdd00, transparent: true, opacity: 0 }));
+            flash.position.set(0.3, 0.5, 3.0); g.add(flash);
+            g._flash = flash;
             return g;
         }
 
@@ -2201,7 +2222,7 @@
             if (playerMeshes.has(id)) return playerMeshes.get(id);
             const char = buildChar(team);
             scene.add(char);
-            const entry = { mesh: char, x: 0, z: 0, alive: true, team, firstUpdate: true };
+            const entry = { mesh: char, x: 0, z: 0, prevX: 0, prevZ: 0, alive: true, team, firstUpdate: true, flashTimer: 0 };
             playerMeshes.set(id, entry);
             return entry;
         }
@@ -2231,12 +2252,15 @@
         }
         pollPlayers();
 
-        // Terrain height
+        // Terrain height (matches game)
         function terrainY(x, z) { return Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2; }
 
-        // Camera orbit target — follows action
-        let camTarget = new THREE.Vector3(0, 0, 0);
+        // Fixed camera orbit — smooth track around map center, no player influence
         let camAngle = 0;
+        const CAM_ORBIT_R = 55;
+        const CAM_HEIGHT = 40;
+        const CAM_LOOK = new THREE.Vector3(0, 0, 0);
+        const CAM_SPEED = 0.0006;
 
         // Resize
         function resize() {
@@ -2251,42 +2275,66 @@
 
         // Render loop
         let running = true;
+        let lastTime = performance.now();
         function animate() {
             if (!running) return;
             requestAnimationFrame(animate);
-            const t = performance.now() * 0.001;
+            const now = performance.now();
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+            const t = now * 0.001;
 
-            // Update player meshes
-            let sumX = 0, sumZ = 0, count = 0;
+            // Update player meshes — smooth interpolation + rotation from movement
             playerMeshes.forEach((p) => {
                 if (p.firstUpdate && (p.x !== 0 || p.z !== 0)) {
                     p.mesh.position.x = p.x;
                     p.mesh.position.z = p.z;
+                    p.prevX = p.x;
+                    p.prevZ = p.z;
                     p.firstUpdate = false;
                 } else {
-                    p.mesh.position.x += (p.x - p.mesh.position.x) * 0.12;
-                    p.mesh.position.z += (p.z - p.mesh.position.z) * 0.12;
+                    // Smooth lerp (frame-rate independent)
+                    const smoothing = 1 - Math.pow(0.001, dt);
+                    p.mesh.position.x += (p.x - p.mesh.position.x) * smoothing;
+                    p.mesh.position.z += (p.z - p.mesh.position.z) * smoothing;
                 }
                 p.mesh.position.y = terrainY(p.mesh.position.x, p.mesh.position.z) + 0.6;
+
+                // Rotation from movement direction
+                const dx = p.x - p.prevX;
+                const dz = p.z - p.prevZ;
+                if (dx * dx + dz * dz > 0.01) {
+                    const targetRot = Math.atan2(dx, dz);
+                    // Smooth rotation
+                    let diff = targetRot - p.mesh.rotation.y;
+                    while (diff > Math.PI) diff -= 2 * Math.PI;
+                    while (diff < -Math.PI) diff += 2 * Math.PI;
+                    p.mesh.rotation.y += diff * 0.08;
+                }
+                p.prevX = p.x;
+                p.prevZ = p.z;
+
                 p.mesh.visible = p.alive;
-                if (p.alive) { sumX += p.x; sumZ += p.z; count++; }
+
+                // Random muzzle flash
+                if (p.flashTimer > 0) {
+                    p.flashTimer -= dt;
+                    p.mesh._flash.material.opacity = p.flashTimer > 0.05 ? 1 : 0;
+                } else if (p.alive && Math.random() < 0.003) {
+                    // ~0.3% chance per frame = roughly every 5-6 seconds per player
+                    p.flashTimer = 0.12;
+                    p.mesh._flash.material.opacity = 1;
+                }
             });
 
-            // Camera orbits around the action center
-            if (count > 0) {
-                camTarget.x += (sumX / count - camTarget.x) * 0.02;
-                camTarget.z += (sumZ / count - camTarget.z) * 0.02;
-            }
-            camAngle += 0.0008;
-            const orbitR = 45;
-            const camH = 35;
+            // Fixed camera orbit around map center
+            camAngle += CAM_SPEED;
             camera.position.set(
-                camTarget.x + Math.sin(camAngle) * orbitR,
-                camH,
-                camTarget.z + Math.cos(camAngle) * orbitR
+                Math.sin(camAngle) * CAM_ORBIT_R,
+                CAM_HEIGHT,
+                Math.cos(camAngle) * CAM_ORBIT_R
             );
-            camera.lookAt(camTarget.x, 0, camTarget.z);
-            visionLight.position.set(camTarget.x, 15, camTarget.z);
+            camera.lookAt(CAM_LOOK);
 
             renderer.render(scene, camera);
         }
