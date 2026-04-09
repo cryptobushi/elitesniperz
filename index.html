@@ -33,12 +33,16 @@
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        html, body {
+        html {
             font-family: var(--font-body);
             background: var(--base-darkest);
             color: var(--text-primary);
-            width: 100%;
-            height: 100%;
+        }
+        body {
+            font-family: var(--font-body);
+            background: var(--base-darkest);
+            color: var(--text-primary);
+            min-height: 100vh;
         }
 
         /* When game is active, lock body */
@@ -2223,7 +2227,7 @@
             if (playerMeshes.has(id)) return playerMeshes.get(id);
             const char = buildChar(team);
             scene.add(char);
-            const entry = { mesh: char, x: 0, z: 0, prevX: 0, prevZ: 0, alive: true, team, firstUpdate: true, flashTimer: 0 };
+            const entry = { mesh: char, fromX: 0, fromZ: 0, toX: 0, toZ: 0, alive: true, team, firstUpdate: true, flashTimer: 0, lerpStart: 0 };
             playerMeshes.set(id, entry);
             return entry;
         }
@@ -2237,12 +2241,18 @@
                 const players = await res.json();
                 if (Array.isArray(players)) {
                     const seen = new Set();
+                    const now = performance.now();
                     players.forEach(p => {
                         seen.add(p.id);
                         const entry = getOrCreatePlayer(p.id, p.team);
-                        entry.x = p.x;
-                        entry.z = p.z;
+                        // Shift current target to "from", set new "to"
+                        entry.fromX = entry.firstUpdate ? p.x : entry.toX;
+                        entry.fromZ = entry.firstUpdate ? p.z : entry.toZ;
+                        entry.toX = p.x;
+                        entry.toZ = p.z;
+                        entry.lerpStart = now;
                         entry.alive = p.alive;
+                        if (entry.firstUpdate) entry.firstUpdate = false;
                     });
                     playerMeshes.forEach((entry, id) => {
                         if (!seen.has(id)) { scene.remove(entry.mesh); playerMeshes.delete(id); }
@@ -2285,35 +2295,28 @@
             lastTime = now;
             const t = now * 0.001;
 
-            // Update player meshes — smooth interpolation + rotation from movement
+            // Update player meshes — linear interpolation between poll snapshots
+            const POLL_MS = 500;
             playerMeshes.forEach((p) => {
-                if (p.firstUpdate && (p.x !== 0 || p.z !== 0)) {
-                    p.mesh.position.x = p.x;
-                    p.mesh.position.z = p.z;
-                    p.prevX = p.x;
-                    p.prevZ = p.z;
-                    p.firstUpdate = false;
-                } else {
-                    // Smooth lerp (frame-rate independent)
-                    const smoothing = 1 - Math.pow(0.001, dt);
-                    p.mesh.position.x += (p.x - p.mesh.position.x) * smoothing;
-                    p.mesh.position.z += (p.z - p.mesh.position.z) * smoothing;
-                }
-                p.mesh.position.y = terrainY(p.mesh.position.x, p.mesh.position.z) + 0.6;
+                // Linear interpolation: smoothly move from→to over 500ms
+                const elapsed = now - p.lerpStart;
+                const t = Math.min(elapsed / POLL_MS, 1);
+                const ix = p.fromX + (p.toX - p.fromX) * t;
+                const iz = p.fromZ + (p.toZ - p.fromZ) * t;
+                p.mesh.position.x = ix;
+                p.mesh.position.z = iz;
+                p.mesh.position.y = terrainY(ix, iz) + 0.6;
 
                 // Rotation from movement direction
-                const dx = p.x - p.prevX;
-                const dz = p.z - p.prevZ;
-                if (dx * dx + dz * dz > 0.01) {
+                const dx = p.toX - p.fromX;
+                const dz = p.toZ - p.fromZ;
+                if (dx * dx + dz * dz > 0.1) {
                     const targetRot = Math.atan2(dx, dz);
-                    // Smooth rotation
                     let diff = targetRot - p.mesh.rotation.y;
                     while (diff > Math.PI) diff -= 2 * Math.PI;
                     while (diff < -Math.PI) diff += 2 * Math.PI;
-                    p.mesh.rotation.y += diff * 0.08;
+                    p.mesh.rotation.y += diff * 0.1;
                 }
-                p.prevX = p.x;
-                p.prevZ = p.z;
 
                 p.mesh.visible = p.alive;
 
