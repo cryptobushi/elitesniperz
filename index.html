@@ -111,54 +111,15 @@
             max-width: 720px;
         }
 
-        /* Sniper characters in hero */
-        .hero-snipers {
-            position: absolute;
-            bottom: 80px;
-            left: 0; right: 0;
-            pointer-events: none;
-            z-index: 0;
-            overflow: hidden;
-            height: 200px;
-        }
-        .sniper-fig {
+        /* Hero 3D scene */
+        #heroCanvas {
             position: absolute;
             bottom: 0;
-        }
-        .sniper-fig.left { left: 8%; }
-        .sniper-fig.right { right: 8%; transform: scaleX(-1); }
-        @media (max-width: 900px) {
-            .sniper-fig.left { left: 2%; }
-            .sniper-fig.right { right: 2%; }
-        }
-        @media (max-width: 600px) {
-            .hero-snipers { height: 140px; bottom: 70px; }
-            .sniper-fig svg { width: 80px; height: 120px; }
-        }
-
-        /* Muzzle flash animation */
-        @keyframes muzzleFlash {
-            0%, 90%, 100% { opacity: 0; transform: scale(0.3); }
-            92% { opacity: 1; transform: scale(1.2); }
-            95% { opacity: 0.8; transform: scale(1); }
-        }
-        @keyframes recoilKick {
-            0%, 89%, 100% { transform: translateX(0); }
-            91% { transform: translateX(-4px); }
-            94% { transform: translateX(2px); }
-        }
-        .sniper-fig.right .sniper-recoil {
-            animation: recoilKick 4s ease-in-out infinite;
-        }
-        .sniper-fig.left .sniper-recoil {
-            animation: recoilKick 5.5s ease-in-out 1.5s infinite;
-        }
-        .muzzle-flash {
-            animation: muzzleFlash 4s ease-in-out infinite;
-        }
-        .sniper-fig.left .muzzle-flash {
-            animation-duration: 5.5s;
-            animation-delay: 1.5s;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
         }
 
         .hero-tag {
@@ -1575,96 +1536,8 @@
 
         <!-- HERO -->
         <section class="hero">
-            <!-- Animated sniper figures -->
-            <div class="hero-snipers">
-                <!-- Left sniper (red team) -->
-                <div class="sniper-fig left">
-                    <div class="sniper-recoil">
-                        <svg width="100" height="160" viewBox="0 0 100 160" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <!-- Legs -->
-                            <rect x="42" y="120" width="4" height="28" fill="#1a1a1a" rx="1"/>
-                            <rect x="54" y="120" width="4" height="28" fill="#1a1a1a" rx="1"/>
-                            <!-- Shoes -->
-                            <polygon points="38,148 46,148 48,155 36,155" fill="#661515"/>
-                            <polygon points="50,148 58,148 60,155 48,155" fill="#661515"/>
-                            <!-- Robe body -->
-                            <path d="M35 65 L50 50 L65 65 L62 125 L38 125 Z" fill="#cc2222"/>
-                            <!-- Belt -->
-                            <rect x="40" y="100" width="20" height="4" fill="#886622" rx="1"/>
-                            <!-- Cape -->
-                            <path d="M40 68 L38 120 L32 118 L36 65 Z" fill="#881515" opacity="0.8"/>
-                            <!-- Hat brim -->
-                            <ellipse cx="50" cy="52" rx="18" ry="3" fill="#881515"/>
-                            <!-- Hat cone -->
-                            <polygon points="50,15 38,52 62,52" fill="#881515"/>
-                            <!-- Hat tip bend -->
-                            <circle cx="54" cy="18" r="3" fill="#ff4444" opacity="0.6"/>
-                            <!-- Eyes -->
-                            <circle cx="45" cy="48" r="2" fill="#ff6666"/>
-                            <circle cx="55" cy="48" r="2" fill="#ff6666"/>
-                            <!-- Arms -->
-                            <rect x="30" y="68" width="4" height="22" fill="#cc2222" rx="1" transform="rotate(20 32 68)"/>
-                            <rect x="66" y="68" width="4" height="22" fill="#cc2222" rx="1" transform="rotate(-25 68 68)"/>
-                            <!-- Rifle -->
-                            <rect x="68" y="70" width="40" height="3" fill="#1a1a1a" rx="1"/>
-                            <!-- Barrel -->
-                            <rect x="100" y="69" width="3" height="5" fill="#333" rx="1"/>
-                            <!-- Scope -->
-                            <rect x="78" y="66" width="12" height="3" fill="#0a0a0a" rx="1"/>
-                            <circle cx="91" cy="67.5" r="2" fill="#2244aa" opacity="0.5"/>
-                            <!-- Stock -->
-                            <rect x="60" y="69" width="10" height="5" fill="#4a2a10" rx="1"/>
-                            <!-- Muzzle flash -->
-                            <g class="muzzle-flash">
-                                <circle cx="106" cy="71" r="8" fill="#ffdd00" opacity="0.9"/>
-                                <circle cx="108" cy="71" r="12" fill="#ff8800" opacity="0.3"/>
-                            </g>
-                        </svg>
-                    </div>
-                </div>
-                <!-- Right sniper (blue team) -->
-                <div class="sniper-fig right">
-                    <div class="sniper-recoil">
-                        <svg width="100" height="160" viewBox="0 0 100 160" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <!-- Legs -->
-                            <rect x="42" y="120" width="4" height="28" fill="#1a1a1a" rx="1"/>
-                            <rect x="54" y="120" width="4" height="28" fill="#1a1a1a" rx="1"/>
-                            <!-- Shoes -->
-                            <polygon points="38,148 46,148 48,155 36,155" fill="#152288"/>
-                            <polygon points="50,148 58,148 60,155 48,155" fill="#152288"/>
-                            <!-- Robe body -->
-                            <path d="M35 65 L50 50 L65 65 L62 125 L38 125 Z" fill="#2244cc"/>
-                            <!-- Belt -->
-                            <rect x="40" y="100" width="20" height="4" fill="#886622" rx="1"/>
-                            <!-- Cape -->
-                            <path d="M40 68 L38 120 L32 118 L36 65 Z" fill="#152288" opacity="0.8"/>
-                            <!-- Hat brim -->
-                            <ellipse cx="50" cy="52" rx="18" ry="3" fill="#152288"/>
-                            <!-- Hat cone -->
-                            <polygon points="50,15 38,52 62,52" fill="#152288"/>
-                            <!-- Hat tip -->
-                            <circle cx="54" cy="18" r="3" fill="#4466ff" opacity="0.6"/>
-                            <!-- Eyes -->
-                            <circle cx="45" cy="48" r="2" fill="#66aaff"/>
-                            <circle cx="55" cy="48" r="2" fill="#66aaff"/>
-                            <!-- Arms -->
-                            <rect x="30" y="68" width="4" height="22" fill="#2244cc" rx="1" transform="rotate(20 32 68)"/>
-                            <rect x="66" y="68" width="4" height="22" fill="#2244cc" rx="1" transform="rotate(-25 68 68)"/>
-                            <!-- Rifle -->
-                            <rect x="68" y="70" width="40" height="3" fill="#1a1a1a" rx="1"/>
-                            <rect x="100" y="69" width="3" height="5" fill="#333" rx="1"/>
-                            <rect x="78" y="66" width="12" height="3" fill="#0a0a0a" rx="1"/>
-                            <circle cx="91" cy="67.5" r="2" fill="#2244aa" opacity="0.5"/>
-                            <rect x="60" y="69" width="10" height="5" fill="#4a2a10" rx="1"/>
-                            <!-- Muzzle flash -->
-                            <g class="muzzle-flash">
-                                <circle cx="106" cy="71" r="8" fill="#ffdd00" opacity="0.9"/>
-                                <circle cx="108" cy="71" r="12" fill="#ff8800" opacity="0.3"/>
-                            </g>
-                        </svg>
-                    </div>
-                </div>
-            </div>
+            <!-- 3D Sniper characters -->
+            <canvas id="heroCanvas"></canvas>
             <div class="hero-content">
                 <div class="hero-tag">WC3-Inspired Arena Combat</div>
                 <h1>Skill-based<br>sniper <span>duels.</span></h1>
@@ -2217,6 +2090,190 @@
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
         }
     }
+    </script>
+
+    <!-- Hero 3D scene — renders actual game characters -->
+    <script type="module">
+    import * as THREE from 'three';
+    (function() {
+        const canvas = document.getElementById('heroCanvas');
+        if (!canvas) return;
+        const hero = canvas.parentElement;
+
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setClearColor(0x000000, 0);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(40, 2, 0.1, 100);
+        camera.position.set(0, 2, 8);
+        camera.lookAt(0, 0.5, 0);
+
+        // Lights
+        scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+        const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+        dir.position.set(3, 5, 3);
+        scene.add(dir);
+
+        // Ground plane (subtle)
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(20, 20),
+            new THREE.MeshStandardMaterial({ color: 0x0a0a0f, roughness: 1 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.6;
+        scene.add(ground);
+
+        // Build character (same as game.js Player.createMesh)
+        function buildChar(team) {
+            const g = new THREE.Group();
+            const robeColor = team === 'red' ? 0xcc2222 : 0x2244cc;
+            const robeDark = team === 'red' ? 0x881515 : 0x152288;
+            const robeLight = team === 'red' ? 0xff4444 : 0x4466ff;
+            const cloth = new THREE.MeshStandardMaterial({ color: robeColor, roughness: 0.9 });
+            const clothDark = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.9 });
+            const legMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+
+            // Legs
+            const legGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.7, 4);
+            const ll = new THREE.Mesh(legGeo, legMat); ll.position.set(-0.12, -0.15, 0); g.add(ll);
+            const rl = new THREE.Mesh(legGeo, legMat); rl.position.set(0.12, -0.15, 0); g.add(rl);
+            g._ll = ll; g._rl = rl;
+
+            // Shoes
+            const shoeGeo = new THREE.ConeGeometry(0.1, 0.35, 4);
+            const shoeMat = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.8 });
+            const ls = new THREE.Mesh(shoeGeo, shoeMat); ls.position.set(-0.12, -0.55, 0.08); ls.rotation.x = -Math.PI/2; g.add(ls);
+            const rs = new THREE.Mesh(shoeGeo, shoeMat); rs.position.set(0.12, -0.55, 0.08); rs.rotation.x = -Math.PI/2; g.add(rs);
+
+            // Robe
+            const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.45, 1.1, 6), cloth);
+            robe.position.y = 0.45; g.add(robe);
+
+            // Belt
+            const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.08, 6), new THREE.MeshStandardMaterial({ color: 0x886622, roughness: 0.7, metalness: 0.3 }));
+            belt.position.y = 0.2; g.add(belt);
+
+            // Hat
+            const hatG = new THREE.Group(); hatG.position.y = 1.05;
+            hatG.add(new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.06, 8), clothDark)); // brim
+            const cone = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.9, 6), clothDark);
+            cone.position.y = 0.4; cone.rotation.z = 0.15; hatG.add(cone);
+            const tip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), new THREE.MeshStandardMaterial({ color: robeLight, emissive: robeLight, emissiveIntensity: 0.3 }));
+            tip.position.set(0.12, 0.85, 0); hatG.add(tip);
+            // Eyes
+            const eyeMat = new THREE.MeshBasicMaterial({ color: team === 'red' ? 0xff6666 : 0x66aaff });
+            const le = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), eyeMat); le.position.set(-0.1, -0.12, 0.2); hatG.add(le);
+            const re = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), eyeMat); re.position.set(0.1, -0.12, 0.2); hatG.add(re);
+            g.add(hatG);
+
+            // Arms
+            const armGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.6, 4);
+            const la = new THREE.Mesh(armGeo, cloth); la.position.set(-0.32, 0.5, 0); la.rotation.z = 0.4; g.add(la);
+            const ra = new THREE.Mesh(armGeo, cloth); ra.position.set(0.32, 0.5, 0); ra.rotation.z = -0.4; g.add(ra);
+
+            // Rifle
+            const rifleG = new THREE.Group();
+            const gunMetal = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3, metalness: 0.9 });
+            const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2a10, roughness: 0.8 });
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.8, 6), gunMetal);
+            barrel.rotation.x = Math.PI/2; barrel.position.z = 1.2; rifleG.add(barrel);
+            const recv = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.8), gunMetal);
+            recv.position.set(0, 0.02, 0.1); rifleG.add(recv);
+            const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.8, 6), new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.3, metalness: 0.9 }));
+            scope.rotation.x = Math.PI/2; scope.position.set(0, 0.2, 0.5); rifleG.add(scope);
+            const stock = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 0.7), woodMat);
+            stock.position.set(0, 0, -0.4); rifleG.add(stock);
+            rifleG.position.set(0.3, 0.5, 0.3);
+            rifleG.rotation.y = Math.PI + 0.1;
+            g.add(rifleG);
+            g._rifle = rifleG;
+
+            // Cape
+            const capeShape = new THREE.Shape();
+            capeShape.moveTo(-0.3, 0); capeShape.lineTo(0.3, 0); capeShape.lineTo(0.35, -1.4);
+            capeShape.lineTo(0.1, -1.6); capeShape.lineTo(-0.1, -1.6); capeShape.lineTo(-0.35, -1.4); capeShape.closePath();
+            const cape = new THREE.Mesh(new THREE.ShapeGeometry(capeShape), new THREE.MeshStandardMaterial({ color: robeDark, side: THREE.DoubleSide, roughness: 0.9 }));
+            cape.position.set(0, 0.95, -0.22); cape.rotation.x = 0.1; g.add(cape);
+            g._cape = cape;
+
+            // Muzzle flash (hidden by default)
+            const flash = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffdd00, transparent: true, opacity: 0 }));
+            flash.position.set(0.3, 0.5, 2.9);
+            g.add(flash);
+            g._flash = flash;
+
+            return g;
+        }
+
+        const redChar = buildChar('red');
+        redChar.position.set(-2.5, 0, 0);
+        redChar.rotation.y = 0.4;
+        scene.add(redChar);
+
+        const blueChar = buildChar('blue');
+        blueChar.position.set(2.5, 0, 0);
+        blueChar.rotation.y = -0.4 + Math.PI;
+        scene.add(blueChar);
+
+        // Shoot animation
+        function shoot(char) {
+            char._flash.material.opacity = 1;
+            const origZ = char._rifle.position.z;
+            char._rifle.position.z -= 0.15;
+            setTimeout(() => { char._flash.material.opacity = 0.5; }, 50);
+            setTimeout(() => { char._flash.material.opacity = 0; char._rifle.position.z = origZ; }, 150);
+        }
+
+        // Schedule shooting
+        setInterval(() => shoot(redChar), 3500);
+        setTimeout(() => setInterval(() => shoot(blueChar), 4200), 1800);
+
+        // Resize
+        function resize() {
+            const w = hero.clientWidth;
+            const h = hero.clientHeight;
+            renderer.setSize(w, h);
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Render loop
+        let running = true;
+        function animate() {
+            if (!running) return;
+            requestAnimationFrame(animate);
+            const t = performance.now() * 0.001;
+
+            // Idle sway
+            [redChar, blueChar].forEach(c => {
+                c._ll.rotation.x = Math.sin(t * 2) * 0.05;
+                c._rl.rotation.x = Math.sin(t * 2 + 0.5) * 0.05;
+                c._cape.rotation.x = 0.1 + Math.sin(t * 1.5) * 0.05;
+                c.position.y = Math.sin(t * 2) * 0.01;
+            });
+
+            // Slow orbit
+            camera.position.x = Math.sin(t * 0.15) * 1.5;
+            camera.lookAt(0, 0.5, 0);
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Stop when game starts
+        const obs = new MutationObserver(() => {
+            const landing = document.getElementById('landingPage');
+            if (landing && landing.classList.contains('hidden')) {
+                running = false;
+                renderer.dispose();
+            }
+        });
+        const lp = document.getElementById('landingPage');
+        if (lp) obs.observe(lp, { attributes: true, attributeFilter: ['class'] });
+    })();
     </script>
 
     <!-- Landing page interaction logic -->
