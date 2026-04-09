@@ -2109,6 +2109,24 @@
         camera.position.set(0, 2, 8);
         camera.lookAt(0, 0.5, 0);
 
+        // Adjust for portrait screens
+        function updateCamera() {
+            const aspect = hero.clientWidth / hero.clientHeight;
+            if (aspect < 0.8) {
+                // Portrait mobile — zoom out and lower
+                camera.fov = 55;
+                camera.position.set(0, 1.5, 10);
+            } else if (aspect < 1.2) {
+                camera.fov = 45;
+                camera.position.set(0, 1.8, 9);
+            } else {
+                camera.fov = 40;
+                camera.position.set(0, 2, 8);
+            }
+            camera.lookAt(0, 0.5, 0);
+            camera.updateProjectionMatrix();
+        }
+
         // Lights
         scene.add(new THREE.AmbientLight(0xffffff, 0.4));
         const dir = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -2185,7 +2203,7 @@
             const stock = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 0.7), woodMat);
             stock.position.set(0, 0, -0.4); rifleG.add(stock);
             rifleG.position.set(0.3, 0.5, 0.3);
-            rifleG.rotation.y = Math.PI + 0.1;
+            rifleG.rotation.y = 0.1;
             g.add(rifleG);
             g._rifle = rifleG;
 
@@ -2199,7 +2217,7 @@
 
             // Muzzle flash (hidden by default)
             const flash = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffdd00, transparent: true, opacity: 0 }));
-            flash.position.set(0.3, 0.5, 2.9);
+            flash.position.set(0.3, 0.5, 3.0);
             g.add(flash);
             g._flash = flash;
 
@@ -2208,12 +2226,12 @@
 
         const redChar = buildChar('red');
         redChar.position.set(-2.5, 0, 0);
-        redChar.rotation.y = 0.4;
+        redChar.rotation.y = 0.6;
         scene.add(redChar);
 
         const blueChar = buildChar('blue');
         blueChar.position.set(2.5, 0, 0);
-        blueChar.rotation.y = -0.4 + Math.PI;
+        blueChar.rotation.y = -0.6;
         scene.add(blueChar);
 
         // Shoot animation
@@ -2235,7 +2253,7 @@
             const h = hero.clientHeight;
             renderer.setSize(w, h);
             camera.aspect = w / h;
-            camera.updateProjectionMatrix();
+            updateCamera();
         }
         resize();
         window.addEventListener('resize', resize);
