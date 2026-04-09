@@ -1448,7 +1448,9 @@ async function pollWaitingRoom(matchId) {
             stakeToken: wrToken,
             killTarget: m.kill_target || 7,
             creatorTwitter: m.creator_twitter,
+            creatorPfp: m.creator_pfp,
             joinerTwitter: m.joiner_twitter,
+            joinerPfp: m.joiner_pfp,
             opponentTwitter: amCreator ? m.joiner_twitter : m.creator_twitter,
         };
         els.wrInfo.innerHTML = `${wrAmt} ${wrToken} &bull; FIRST TO ${m.kill_target || 7}`;
@@ -1484,8 +1486,13 @@ async function pollWaitingRoom(matchId) {
         els.wrCreatorRecord.textContent = `${m.creator_wins || 0}W - ${m.creator_losses || 0}L \u2022 ELO ${m.creator_elo || 1000}`;
         const creatorAvatarEl = document.getElementById('wrCreatorAvatar');
         if (creatorAvatarEl) {
-            creatorAvatarEl.style.background = avatarColor(creatorHandle);
-            creatorAvatarEl.textContent = avatarInitial(creatorHandle);
+            if (m.creator_pfp) {
+                creatorAvatarEl.textContent = '';
+                creatorAvatarEl.style.background = `url(${m.creator_pfp}) center/cover`;
+            } else {
+                creatorAvatarEl.style.background = avatarColor(creatorHandle);
+                creatorAvatarEl.textContent = avatarInitial(creatorHandle);
+            }
         }
         els.wrCreator.classList.remove('funded', 'awaiting', 'not-deposited');
         if (creatorFunded) {
@@ -1508,9 +1515,15 @@ async function pollWaitingRoom(matchId) {
             els.wrJoinerName.textContent = '@' + joinerHandle;
             els.wrJoinerRecord.textContent = `${m.joiner_wins || 0}W - ${m.joiner_losses || 0}L \u2022 ELO ${m.joiner_elo || 1000}`;
             if (joinerAvatarEl) {
-                joinerAvatarEl.style.background = avatarColor(joinerHandle);
-                joinerAvatarEl.style.color = '#0a0a0f';
-                joinerAvatarEl.textContent = avatarInitial(joinerHandle);
+                if (m.joiner_pfp) {
+                    joinerAvatarEl.textContent = '';
+                    joinerAvatarEl.style.color = 'transparent';
+                    joinerAvatarEl.style.background = `url(${m.joiner_pfp}) center/cover`;
+                } else {
+                    joinerAvatarEl.style.background = avatarColor(joinerHandle);
+                    joinerAvatarEl.style.color = '#0a0a0f';
+                    joinerAvatarEl.textContent = avatarInitial(joinerHandle);
+                }
             }
             if (joinerFunded) {
                 els.wrJoiner.classList.add('funded');

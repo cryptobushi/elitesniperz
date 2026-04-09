@@ -45,6 +45,9 @@ router.post('/auth/verify', authMiddleware, (req, res) => {
         ) || {};
         const walletAddress = wallet.address || linkedSolWallet.address || null;
 
+        // Profile picture from Twitter
+        const profilePicture = twitter.profile_picture_url || linkedTwitter.profile_picture_url || null;
+
         const now = Date.now();
         const user = db.upsertUser({
             id: req.privyUserId,
@@ -52,6 +55,7 @@ router.post('/auth/verify', authMiddleware, (req, res) => {
             twitter_id: twitterId,
             privy_wallet: walletAddress,
             display_name: displayName,
+            profile_picture: profilePicture,
             last_seen: now,
         });
 
@@ -165,6 +169,7 @@ router.get('/matches', (req, res) => {
                 ...rest,
                 passwordProtected: !!password_hash,
                 creator_twitter: creator?.twitter_handle || null,
+                creator_pfp: creator?.profile_picture || null,
                 creator_wins: creator?.wins || 0,
                 creator_losses: creator?.losses || 0,
                 creator_elo: creator?.elo || 1000,
@@ -193,10 +198,12 @@ router.get('/matches/:id', (req, res) => {
             ...rest,
             passwordProtected: !!password_hash,
             creator_twitter: creator?.twitter_handle || null,
+            creator_pfp: creator?.profile_picture || null,
             creator_wins: creator?.wins || 0,
             creator_losses: creator?.losses || 0,
             creator_elo: creator?.elo || 1000,
             joiner_twitter: joiner?.twitter_handle || null,
+            joiner_pfp: joiner?.profile_picture || null,
             joiner_wins: joiner?.wins || 0,
             joiner_losses: joiner?.losses || 0,
             joiner_elo: joiner?.elo || 1000,

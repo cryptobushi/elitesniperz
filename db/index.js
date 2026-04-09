@@ -13,18 +13,22 @@ db.pragma('foreign_keys = ON');
 const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
 db.exec(schema);
 
+// Migrations
+try { db.exec('ALTER TABLE users ADD COLUMN profile_picture TEXT'); } catch(e) { /* already exists */ }
+
 // --- Prepared statements ---
 
 // Users
 const _getUser = db.prepare('SELECT * FROM users WHERE id = ?');
 const _upsertUser = db.prepare(`
-  INSERT INTO users (id, twitter_handle, twitter_id, privy_wallet, display_name, created_at, last_seen)
-  VALUES (@id, @twitter_handle, @twitter_id, @privy_wallet, @display_name, @created_at, @last_seen)
+  INSERT INTO users (id, twitter_handle, twitter_id, privy_wallet, display_name, profile_picture, created_at, last_seen)
+  VALUES (@id, @twitter_handle, @twitter_id, @privy_wallet, @display_name, @profile_picture, @created_at, @last_seen)
   ON CONFLICT(id) DO UPDATE SET
     twitter_handle = excluded.twitter_handle,
     twitter_id = COALESCE(excluded.twitter_id, users.twitter_id),
     privy_wallet = COALESCE(excluded.privy_wallet, users.privy_wallet),
     display_name = COALESCE(excluded.display_name, users.display_name),
+    profile_picture = COALESCE(excluded.profile_picture, users.profile_picture),
     last_seen = excluded.last_seen
 `);
 const _updateUserStats = db.prepare(`
@@ -77,7 +81,7 @@ function getUser(id) {
   return _getUser.get(id) || null;
 }
 
-function upsertUser({ id, twitter_handle, twitter_id, privy_wallet, display_name }) {
+function upsertUser({ id, twitter_handle, twitter_id, privy_wallet, display_name, profile_picture }) {
   const now = Date.now();
   _upsertUser.run({
     id,
@@ -85,6 +89,7 @@ function upsertUser({ id, twitter_handle, twitter_id, privy_wallet, display_name
     twitter_id: twitter_id || null,
     privy_wallet: privy_wallet || null,
     display_name: display_name || twitter_handle,
+    profile_picture: profile_picture || null,
     created_at: now,
     last_seen: now,
   });
