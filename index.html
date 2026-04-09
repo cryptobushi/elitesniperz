@@ -2186,7 +2186,7 @@
             if (playerMeshes.has(id)) return playerMeshes.get(id);
             const char = buildChar(team);
             scene.add(char);
-            const entry = { mesh: char, x: 0, z: 0, rot: 0, alive: true, team };
+            const entry = { mesh: char, x: 0, z: 0, rot: 0, alive: true, team, firstUpdate: true };
             playerMeshes.set(id, entry);
             return entry;
         }
@@ -2204,10 +2204,12 @@
                 // So we need to join as a ghost player
                 ws.send(JSON.stringify({ t: 'join', n: 'spectator', m: 'red' }));
             };
+            let _specMsgCount = 0;
             ws.onmessage = (evt) => {
                 if (!(evt.data instanceof ArrayBuffer)) return;
                 const view = new DataView(evt.data);
                 const count = view.getUint16(0, true);
+                if (_specMsgCount++ < 3) console.log('[Spectator] Binary state:', count, 'players,', evt.data.byteLength, 'bytes');
                 for (let i = 0; i < count; i++) {
                     const off = 2 + i * BYTES_PER_PLAYER;
                     if (off + BYTES_PER_PLAYER > evt.data.byteLength) break;
@@ -2257,8 +2259,14 @@
             // Update player meshes
             let sumX = 0, sumZ = 0, count = 0;
             playerMeshes.forEach((p) => {
-                p.mesh.position.x += (p.x - p.mesh.position.x) * 0.1;
-                p.mesh.position.z += (p.z - p.mesh.position.z) * 0.1;
+                if (p.firstUpdate && (p.x !== 0 || p.z !== 0)) {
+                    p.mesh.position.x = p.x;
+                    p.mesh.position.z = p.z;
+                    p.firstUpdate = false;
+                } else {
+                    p.mesh.position.x += (p.x - p.mesh.position.x) * 0.12;
+                    p.mesh.position.z += (p.z - p.mesh.position.z) * 0.12;
+                }
                 p.mesh.position.y = terrainY(p.mesh.position.x, p.mesh.position.z) + 0.6;
                 p.mesh.rotation.y = p.rot;
                 p.mesh.visible = p.alive;
