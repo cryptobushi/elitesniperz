@@ -48,7 +48,7 @@ const STYLES = `
 
 .wl-topbar {
     width: 100%;
-    max-width: 600px;
+    max-width: 640px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -57,15 +57,23 @@ const STYLES = `
     background: #12121a;
     flex-shrink: 0;
 }
+.wl-topbar .wl-user-group {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
 .wl-topbar .wl-user {
     color: #00ff66;
     font-size: 0.75rem;
     font-weight: 600;
 }
 .wl-topbar .wl-balance {
-    color: #00ff66;
-    font-size: 0.75rem;
-    font-weight: 600;
+    color: #888894;
+    font-size: 0.65rem;
+    font-weight: 500;
+    background: #1a1a25;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid #1e1e2a;
 }
 .wl-topbar .wl-btn {
     background: #1a1a25;
@@ -82,42 +90,63 @@ const STYLES = `
 .wl-topbar .wl-btn:hover { background: #2a2a3a; color: #e8e8ec; border-color: #00ff66; }
 .wl-topbar .wl-btn:active { opacity: 0.8; }
 
+.wl-header {
+    width: 100%;
+    max-width: 640px;
+    padding: 1.2rem 1rem 0.6rem;
+    flex-shrink: 0;
+}
 .wl-title {
     color: #e8e8ec;
     font-family: 'Oswald', sans-serif;
-    font-size: clamp(1.2rem, 5vw, 1.8rem);
-    letter-spacing: 0.08em;
+    font-size: clamp(1.4rem, 5vw, 2rem);
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    margin: 0.6rem 0 0.3rem;
-    flex-shrink: 0;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.wl-title .wl-pulse {
+    width: 8px;
+    height: 8px;
+    background: #00ff66;
+    border-radius: 50%;
+    display: inline-block;
+    animation: wlPulse 2s ease-in-out infinite;
+    box-shadow: 0 0 6px rgba(0,255,102,0.5);
+}
+@keyframes wlPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
 }
 
 .wl-subtitle {
     color: #55555f;
-    font-size: 0.6rem;
-    font-style: italic;
-    margin-bottom: 0.6rem;
+    font-size: 0.7rem;
+    margin-top: 0.3rem;
     flex-shrink: 0;
 }
 
 /* Match table */
 .wl-table-wrap {
     width: 100%;
-    max-width: 600px;
+    max-width: 640px;
     flex: 1;
     overflow-y: auto;
     padding: 0 0.5rem;
 }
 .wl-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0 2px;
 }
 .wl-table th {
     color: #55555f;
     font-size: 0.55rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    padding: 6px 8px;
+    padding: 8px 10px;
     border-bottom: 1px solid #1e1e2a;
     text-align: left;
     position: sticky;
@@ -126,17 +155,34 @@ const STYLES = `
     font-weight: 500;
 }
 .wl-table td {
-    padding: 8px;
-    font-size: 0.7rem;
-    border-bottom: 1px solid #1e1e2a;
+    padding: 10px;
+    font-size: 0.72rem;
     color: #e8e8ec;
+    background: #12121a;
+    border-bottom: 1px solid #1e1e2a;
+    transition: background 0.15s;
 }
-.wl-table tr:hover { background: rgba(0,255,102,0.03); }
+.wl-table tr:hover td { background: #1a1a25; }
 .wl-table .wl-creator { color: #00ff66; font-weight: 600; }
 .wl-table .wl-record { color: #888894; }
 .wl-table .wl-stake { color: #00ff66; font-weight: 600; }
 .wl-table .wl-target { color: #e8e8ec; }
 .wl-table .wl-lock { font-size: 0.8rem; }
+
+.wl-status-badge {
+    display: inline-block;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-radius: 2px;
+}
+.wl-status-badge.open { background: rgba(0,255,102,0.1); color: #00ff66; border: 1px solid rgba(0,255,102,0.25); }
+.wl-status-badge.live { background: rgba(255,51,68,0.1); color: #ff3344; border: 1px solid rgba(255,51,68,0.25); animation: wlPulse 1.5s ease-in-out infinite; }
+.wl-status-badge.hot { background: rgba(255,136,0,0.1); color: #ff8800; border: 1px solid rgba(255,136,0,0.25); }
+.wl-status-badge.new { background: rgba(68,136,255,0.1); color: #4488ff; border: 1px solid rgba(68,136,255,0.25); }
+
 .wl-join-btn {
     background: #00ff66;
     border: 1px solid #00ff66;
@@ -156,15 +202,14 @@ const STYLES = `
 .wl-empty {
     color: #55555f;
     text-align: center;
-    padding: 2rem;
-    font-size: 0.75rem;
-    font-style: italic;
+    padding: 3rem 1rem;
+    font-size: 0.8rem;
 }
 
 .wl-bottom {
     width: 100%;
-    max-width: 600px;
-    padding: 0.6rem 1rem;
+    max-width: 640px;
+    padding: 0.8rem 1rem;
     border-top: 1px solid #1e1e2a;
     display: flex;
     justify-content: center;
@@ -174,8 +219,8 @@ const STYLES = `
     background: #00ff66;
     border: 1px solid #00ff66;
     color: #0a0a0f;
-    padding: 0.6rem 2rem;
-    font-size: 0.9rem;
+    padding: 0.7rem 2.5rem;
+    font-size: 0.95rem;
     font-weight: 700;
     font-family: 'Oswald', sans-serif;
     cursor: pointer;
@@ -195,25 +240,25 @@ const STYLES = `
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0,0,0,0.8);
+    background: rgba(0,0,0,0.85);
 }
 #createMatchModal.hidden { display: none !important; }
 
 .cm-panel {
     background: #12121a;
     border: 1px solid #2a2a3a;
-    padding: 1.2rem;
-    width: min(92%, 380px);
+    padding: 1.5rem;
+    width: min(92%, 400px);
     font-family: 'Inter', system-ui, sans-serif;
     text-align: center;
 }
 .cm-panel h2 {
     color: #e8e8ec;
     font-family: 'Oswald', sans-serif;
-    font-size: 1.2rem;
-    letter-spacing: 0.08em;
+    font-size: 1.3rem;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    margin-bottom: 0.8rem;
+    margin-bottom: 1rem;
 }
 .cm-label {
     color: #888894;
@@ -236,6 +281,7 @@ const STYLES = `
     -webkit-appearance: none;
     border-radius: 0;
     transition: border-color 0.15s;
+    box-sizing: border-box;
 }
 .cm-input:focus { outline: none; border-color: #00ff66; }
 .cm-input::placeholder { color: #55555f; font-style: italic; }
@@ -271,14 +317,14 @@ const STYLES = `
     background: #00ff66;
     border: 1px solid #00ff66;
     color: #0a0a0f;
-    padding: 0.6rem;
-    font-size: 0.85rem;
+    padding: 0.7rem;
+    font-size: 0.9rem;
     font-weight: 700;
     font-family: 'Oswald', sans-serif;
     cursor: pointer;
     width: 100%;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     transition: all 0.15s;
 }
 .cm-submit:hover { background: #00cc52; border-color: #00cc52; }
@@ -291,8 +337,8 @@ const STYLES = `
 .cm-cancel {
     margin-top: 0.5rem;
     background: none;
-    border: 1px solid #2a2a3a;
-    color: #888894;
+    border: none;
+    color: #55555f;
     padding: 0.4rem 1rem;
     font-size: 0.65rem;
     font-family: 'Inter', system-ui, sans-serif;
@@ -300,7 +346,7 @@ const STYLES = `
     text-transform: uppercase;
     transition: all 0.15s;
 }
-.cm-cancel:hover { color: #e8e8ec; border-color: #55555f; }
+.cm-cancel:hover { color: #888894; }
 
 /* === WAITING ROOM === */
 #waitingRoom {
@@ -314,62 +360,84 @@ const STYLES = `
     align-items: center;
     justify-content: center;
     font-family: 'Inter', system-ui, sans-serif;
+    padding: 2rem 1rem;
 }
 #waitingRoom.hidden { display: none !important; }
 
 .wr-title {
     color: #e8e8ec;
     font-family: 'Oswald', sans-serif;
-    font-size: clamp(1rem, 4vw, 1.5rem);
-    letter-spacing: 0.08em;
+    font-size: clamp(1.2rem, 5vw, 1.8rem);
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.5rem;
 }
 .wr-info {
-    color: #888894;
-    font-size: 0.7rem;
-    margin-bottom: 1.2rem;
+    color: #00ff66;
+    font-family: 'Oswald', sans-serif;
+    font-size: clamp(1rem, 3.5vw, 1.4rem);
+    letter-spacing: 0.06em;
+    margin-bottom: 0.4rem;
+}
+.wr-helper {
+    color: #55555f;
+    font-size: 0.65rem;
+    margin-bottom: 1.5rem;
+    font-style: italic;
 }
 .wr-players {
     display: flex;
-    gap: 1.5rem;
+    gap: 1.8rem;
     align-items: center;
     margin-bottom: 1.5rem;
 }
 .wr-card {
     background: #12121a;
-    border: 1px solid #2a2a3a;
-    padding: 1rem 1.5rem;
-    min-width: 140px;
+    border: 2px solid #2a2a3a;
+    padding: 1.2rem 1.8rem;
+    min-width: 150px;
     text-align: center;
+    transition: border-color 0.3s, background 0.3s;
 }
 .wr-card.funded { border-color: #00ff66; background: rgba(0,255,102,0.04); }
+.wr-card.awaiting { border-color: #ff8800; background: rgba(255,136,0,0.03); }
+.wr-card.not-deposited { border-color: rgba(255,51,68,0.3); }
 .wr-card.empty {
     border-style: dashed;
     border-color: #1e1e2a;
 }
 .wr-card .wr-name {
-    color: #e8e8ec;
-    font-size: 0.8rem;
+    color: #00ff66;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.95rem;
     font-weight: 600;
+    letter-spacing: 0.04em;
     margin-bottom: 0.3rem;
 }
 .wr-card .wr-record {
     color: #888894;
     font-size: 0.6rem;
+    margin-bottom: 0.4rem;
 }
 .wr-card .wr-status {
-    margin-top: 0.4rem;
-    font-size: 0.65rem;
+    margin-top: 0.3rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
 }
 .wr-card .wr-status.ok { color: #00ff66; }
 .wr-card .wr-status.pending { color: #ff8800; }
-.wr-card.empty .wr-name { color: #55555f; }
+.wr-card .wr-status.not-locked { color: rgba(255,51,68,0.7); }
+.wr-card.empty .wr-name { color: #55555f; font-family: 'Inter', system-ui, sans-serif; font-size: 0.75rem; }
 
 .wr-vs {
-    color: #00ff66;
+    color: #e8e8ec;
     font-family: 'Oswald', sans-serif;
-    font-size: 1.5rem;
+    font-size: clamp(1.6rem, 5vw, 2.4rem);
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 20px rgba(0,255,102,0.3);
 }
 
 .wr-dots {
@@ -379,13 +447,37 @@ const STYLES = `
     animation: blink2k 1s step-end infinite;
 }
 
+.wr-deposit-btn {
+    margin: 0.5rem auto;
+    padding: 0.7rem 2rem;
+    background: #00ff66;
+    border: 1px solid #00ff66;
+    color: #0a0a0f;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: all 0.15s;
+}
+.wr-deposit-btn:hover { background: #00cc52; border-color: #00cc52; }
+.wr-deposit-btn:disabled { opacity: 0.4; cursor: default; }
+
+.wr-note {
+    color: #55555f;
+    font-size: 0.6rem;
+    margin-top: 1rem;
+    font-style: italic;
+}
+
 .wr-cancel {
     background: none;
-    border: 1px solid rgba(255,51,68,0.3);
-    color: #ff3344;
-    padding: 0.5rem 1.5rem;
+    border: 1px solid rgba(255,51,68,0.2);
+    color: rgba(255,51,68,0.6);
+    padding: 0.4rem 1.2rem;
     font-family: 'Inter', system-ui, sans-serif;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -621,8 +713,10 @@ const STYLES = `
 /* === Mobile responsive === */
 @media (max-width: 768px), (max-height: 500px) {
     .wl-topbar { padding: 0.4rem 0.6rem; }
-    .wl-topbar .wl-user, .wl-topbar .wl-balance { font-size: 0.6rem; }
+    .wl-topbar .wl-user { font-size: 0.6rem; }
+    .wl-topbar .wl-balance { font-size: 0.55rem; }
     .wl-topbar .wl-btn { font-size: 0.55rem; padding: 0.2rem 0.5rem; }
+    .wl-header { padding: 0.8rem 0.6rem 0.4rem; }
     .wl-title { font-size: clamp(1rem, 4vw, 1.3rem); }
     .wl-table td { font-size: 0.6rem; padding: 6px; }
     .wl-table th { font-size: 0.5rem; }
@@ -632,10 +726,10 @@ const STYLES = `
     .cm-panel { padding: 0.8rem; }
     .cm-panel h2 { font-size: 1rem; }
 
-    .wr-card { padding: 0.6rem 0.8rem; min-width: 110px; }
-    .wr-card .wr-name { font-size: 0.7rem; }
+    .wr-card { padding: 0.8rem 1rem; min-width: 110px; }
+    .wr-card .wr-name { font-size: 0.8rem; }
     .wr-players { gap: 0.8rem; }
-    .wr-vs { font-size: 1.1rem; }
+    .wr-vs { font-size: clamp(1.2rem, 4vw, 1.8rem); }
 
     /* Result screen mobile */
     .wr-result-title { font-size: clamp(2rem, 12vw, 4rem) !important; }
@@ -673,7 +767,7 @@ function buildDOM() {
     if (startBtn && !document.getElementById('wagerBtn')) {
         const btn = document.createElement('button');
         btn.id = 'wagerBtn';
-        btn.textContent = '>> WAGER 1v1 <<';
+        btn.textContent = 'WAGER 1v1';
         startBtn.parentNode.insertBefore(btn, startBtn.nextSibling);
     }
 
@@ -683,18 +777,20 @@ function buildDOM() {
     lobby.className = 'hidden';
     lobby.innerHTML = `
         <div class="wl-topbar">
-            <span class="wl-user" id="wlUser">---</span>
-            <span class="wl-balance" id="wlBalance">-- SOL | -- USDC</span>
+            <div class="wl-user-group">
+                <span class="wl-user" id="wlUser">---</span>
+                <span class="wl-balance" id="wlBalance">-- SOL | -- USDC</span>
+            </div>
             <div style="display:flex;gap:0.3rem;">
+                <button class="wl-btn" id="wlWithdrawBtn">WITHDRAW</button>
                 <button class="wl-btn" id="wlBack">BACK</button>
                 <button class="wl-btn" id="wlLogout">LOGOUT</button>
             </div>
         </div>
-        <div id="wlWalletBox" style="display:none;margin:0.5rem auto;max-width:500px;background:#12121a;border:1px solid #1e1e2a;padding:0.8rem;text-align:center;">
-            <div style="color:#888894;font-size:0.65rem;margin-bottom:0.4rem;font-family:'Inter',system-ui,sans-serif;">YOUR SOLANA WALLET — Send SOL or USDC here to fund wagers</div>
-            <div id="wlWalletAddr" style="background:#0a0a0f;border:1px solid #2a2a3a;padding:0.6rem;font-family:'Inter',system-ui,sans-serif;font-size:clamp(0.6rem,2.5vw,0.85rem);color:#00ff66;word-break:break-all;cursor:pointer;user-select:all;-webkit-user-select:all;" title="Click to copy"></div>
-            <div id="wlWalletCopied" style="color:#00ff66;font-size:0.6rem;margin-top:0.3rem;min-height:1em;"></div>
-            <button id="wlWithdrawBtn" style="margin-top:0.5rem;padding:6px 16px;background:#1a1a25;border:1px solid #2a2a3a;color:#00ff66;font-family:'Inter',system-ui,sans-serif;font-size:0.7rem;cursor:pointer;">WITHDRAW</button>
+        <div id="wlWalletBox" style="display:none;margin:0.5rem auto;max-width:560px;background:#12121a;border:1px solid #1e1e2a;padding:0.6rem 0.8rem;text-align:center;">
+            <div style="color:#55555f;font-size:0.6rem;margin-bottom:0.3rem;font-family:'Inter',system-ui,sans-serif;text-transform:uppercase;letter-spacing:0.06em;">Your Solana Wallet</div>
+            <div id="wlWalletAddr" style="background:#0a0a0f;border:1px solid #2a2a3a;padding:0.5rem;font-family:'Inter',system-ui,sans-serif;font-size:clamp(0.55rem,2vw,0.75rem);color:#00ff66;word-break:break-all;cursor:pointer;user-select:all;-webkit-user-select:all;" title="Click to copy"></div>
+            <div id="wlWalletCopied" style="color:#00ff66;font-size:0.55rem;margin-top:0.2rem;min-height:1em;"></div>
         </div>
         <div id="wlWithdrawModal" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10001;display:flex;align-items:center;justify-content:center;">
             <div style="background:#12121a;border:1px solid #2a2a3a;padding:1.5rem;width:min(90%,360px);font-family:'Inter',system-ui,sans-serif;">
@@ -715,12 +811,14 @@ function buildDOM() {
                     </div>
                 </div>
                 <div id="wdStatus" style="color:#888894;font-size:0.65rem;min-height:1.2em;margin-bottom:0.5rem;text-align:center;"></div>
-                <button id="wdSubmit" style="width:100%;padding:10px;background:#00ff66;border:1px solid #00ff66;color:#0a0a0f;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;font-size:0.85rem;margin-bottom:0.5rem;text-transform:uppercase;">WITHDRAW</button>
+                <button id="wdSubmit" style="width:100%;padding:10px;background:#00ff66;border:1px solid #00ff66;color:#0a0a0f;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;font-size:0.85rem;margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.06em;">WITHDRAW</button>
                 <button id="wdCancel" style="width:100%;padding:6px;background:none;border:none;color:#55555f;font-family:inherit;font-size:0.7rem;cursor:pointer;">Cancel</button>
             </div>
         </div>
-        <div class="wl-title">WAGER 1v1</div>
-        <div class="wl-subtitle">:: put your money where your crosshair is ::</div>
+        <div class="wl-header">
+            <div class="wl-title"><span class="wl-pulse"></span> OPEN DUELS</div>
+            <div class="wl-subtitle">Accept a challenge or post your own</div>
+        </div>
         <div class="wl-table-wrap">
             <table class="wl-table">
                 <thead>
@@ -728,17 +826,17 @@ function buildDOM() {
                         <th>Player</th>
                         <th>Record</th>
                         <th>Stake</th>
-                        <th>Target</th>
+                        <th>Status</th>
                         <th></th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody id="wlMatches"></tbody>
             </table>
-            <div class="wl-empty hidden" id="wlEmpty">No open matches. Create one!</div>
+            <div class="wl-empty hidden" id="wlEmpty">No open duels. Be the first to post a challenge.</div>
         </div>
         <div class="wl-bottom">
-            <button class="wl-create-btn" id="wlCreateBtn">>> CREATE MATCH <<</button>
+            <button class="wl-create-btn" id="wlCreateBtn">POST DUEL</button>
         </div>
     `;
     document.body.appendChild(lobby);
@@ -749,9 +847,9 @@ function buildDOM() {
     createModal.className = 'hidden';
     createModal.innerHTML = `
         <div class="cm-panel">
-            <h2>Create Match</h2>
+            <h2>POST A DUEL</h2>
             <div class="cm-label">Stake Amount</div>
-            <input type="number" class="cm-input" id="cmStake" placeholder="e.g. 5" min="0.1" step="any">
+            <input type="number" class="cm-input" id="cmStake" placeholder="e.g. 0.05" min="0.1" step="any">
             <div class="cm-label">Token</div>
             <div class="cm-toggle-group" id="cmTokenGroup">
                 <button class="cm-toggle selected" data-token="SOL">SOL</button>
@@ -765,8 +863,8 @@ function buildDOM() {
             </div>
             <div class="cm-label">Password (optional)</div>
             <input type="text" class="cm-input" id="cmPassword" placeholder="Leave empty for public" maxlength="32">
-            <button class="cm-submit" id="cmSubmit">>> CREATE MATCH <<</button>
-            <button class="cm-cancel" id="cmCancel">CANCEL</button>
+            <button class="cm-submit" id="cmSubmit">POST DUEL</button>
+            <button class="cm-cancel" id="cmCancel">Cancel</button>
         </div>
     `;
     document.body.appendChild(createModal);
@@ -777,13 +875,14 @@ function buildDOM() {
     waiting.className = 'hidden';
     waiting.innerHTML = `
         <div class="wr-title">MATCH LOBBY</div>
-        <div class="wr-info" id="wrInfo">5 USDC | First to 7</div>
-        <div id="wrStatus" style="color:#888894;font-size:0.85rem;margin:0.5rem 0;text-align:center;font-family:'Inter',system-ui,sans-serif;">Waiting for opponent...</div>
+        <div class="wr-info" id="wrInfo">0.01 SOL &bull; First to 5</div>
+        <div class="wr-helper">Winner takes the pot. Reputation is on the line.</div>
+        <div id="wrStatus" style="color:#888894;font-size:0.75rem;margin:0.3rem 0 1rem;text-align:center;font-family:'Inter',system-ui,sans-serif;">Waiting for opponent...</div>
         <div class="wr-players">
-            <div class="wr-card" id="wrCreator">
+            <div class="wr-card not-deposited" id="wrCreator">
                 <div class="wr-name" id="wrCreatorName">---</div>
                 <div class="wr-record" id="wrCreatorRecord">0W - 0L</div>
-                <div class="wr-status pending" id="wrCreatorStatus">Not deposited</div>
+                <div class="wr-status not-locked" id="wrCreatorStatus">NOT LOCKED</div>
             </div>
             <div class="wr-vs">VS</div>
             <div class="wr-card empty" id="wrJoiner">
@@ -792,8 +891,9 @@ function buildDOM() {
                 <div class="wr-status pending" id="wrJoinerStatus"></div>
             </div>
         </div>
-        <button id="wrDepositBtn" style="display:none;margin:1rem auto;padding:10px 24px;background:#00ff66;border:1px solid #00ff66;color:#0a0a0f;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;font-size:0.9rem;text-transform:uppercase;">DEPOSIT</button>
-        <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:0.5rem;">
+        <button class="wr-deposit-btn" id="wrDepositBtn" style="display:none;">LOCK IN 0.01 SOL</button>
+        <div class="wr-note">Match starts when both players lock in</div>
+        <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:1rem;">
             <button class="wr-cancel" id="wrCancel">CANCEL MATCH</button>
         </div>
     `;
@@ -828,7 +928,7 @@ function buildDOM() {
             <div class="wr-result-score" id="wrResultScore">7 - 3</div>
             <div class="wr-result-payout" id="wrResultPayout">+9.5 USDC</div>
             <div class="wr-result-tx" id="wrResultTx"></div>
-            <button class="wr-result-back" id="wrResultBack">>> BACK TO LOBBY <<</button>
+            <button class="wr-result-back" id="wrResultBack">BACK TO LOBBY</button>
         </div>
     `;
     document.body.appendChild(result);
@@ -848,6 +948,7 @@ function buildDOM() {
         wrJoinerName: document.getElementById('wrJoinerName'),
         wrJoinerRecord: document.getElementById('wrJoinerRecord'),
         wrJoinerStatus: document.getElementById('wrJoinerStatus'),
+        wrCreatorStatus: document.getElementById('wrCreatorStatus'),
     };
 }
 
@@ -1043,7 +1144,7 @@ async function handleCreateMatch() {
         alert('Failed to create match: ' + err.message);
     } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = '>> CREATE MATCH <<';
+        submitBtn.textContent = 'POST DUEL';
     }
 }
 
@@ -1143,20 +1244,25 @@ function renderMatches(matches) {
     }
 
     empty.classList.add('hidden');
-    tbody.innerHTML = openMatches.map(m => {
+    tbody.innerHTML = openMatches.map((m, i) => {
         const creator = m.creator_twitter ? '@' + m.creator_twitter : 'Anon';
         const record = `${m.creator_wins || 0}W-${m.creator_losses || 0}L`;
         const token = m.stake_token || 'USDC';
         const amt = token === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
         const stake = `${amt} ${token}`;
-        const target = `FT${m.kill_target || 7}`;
-        const lock = m.passwordProtected ? '<span class="wl-lock">&#x1f512;</span>' : '';
+        const lock = m.passwordProtected ? ' <span class="wl-lock">&#x1f512;</span>' : '';
+        // Status badge logic
+        let badgeClass = 'open';
+        let badgeText = 'OPEN';
+        if (m.status === 'in_progress') { badgeClass = 'live'; badgeText = 'LIVE'; }
+        else if (amt >= 1) { badgeClass = 'hot'; badgeText = 'HOT'; }
+        else if (i === 0) { badgeClass = 'new'; badgeText = 'NEW'; }
         return `<tr>
-            <td class="wl-creator">${esc(creator)}</td>
+            <td class="wl-creator">${esc(creator)}${lock}</td>
             <td class="wl-record">${esc(record)}</td>
             <td class="wl-stake">${esc(stake)}</td>
-            <td class="wl-target">${esc(target)}</td>
-            <td>${lock}</td>
+            <td><span class="wl-status-badge ${badgeClass}">${badgeText}</span></td>
+            <td></td>
             <td><button class="wl-join-btn" data-match-id="${esc(m.id || m.matchId)}">JOIN</button></td>
         </tr>`;
     }).join('');
@@ -1246,7 +1352,7 @@ async function pollWaitingRoom(matchId) {
             joinerTwitter: m.joiner_twitter,
             opponentTwitter: amCreator ? m.joiner_twitter : m.creator_twitter,
         };
-        els.wrInfo.textContent = `${wrAmt} ${wrToken} | First to ${m.kill_target || 7}`;
+        els.wrInfo.innerHTML = `${wrAmt} ${wrToken} &bull; First to ${m.kill_target || 7}`;
 
         // Determine who has deposited
         const creatorFunded = ['funded_creator', 'funded_both'].includes(m.status);
@@ -1267,25 +1373,36 @@ async function pollWaitingRoom(matchId) {
         // Creator card
         els.wrCreatorName.textContent = '@' + (m.creator_twitter || 'unknown');
         els.wrCreatorRecord.textContent = `${m.creator_wins || 0}W - ${m.creator_losses || 0}L | ELO ${m.creator_elo || 1000}`;
-        els.wrCreator.classList.toggle('funded', creatorFunded);
+        els.wrCreator.classList.remove('funded', 'awaiting', 'not-deposited');
+        if (creatorFunded) {
+            els.wrCreator.classList.add('funded');
+        } else if (m.joiner_id) {
+            els.wrCreator.classList.add('awaiting');
+        } else {
+            els.wrCreator.classList.add('not-deposited');
+        }
         if (els.wrCreatorStatus) {
-            els.wrCreatorStatus.textContent = creatorFunded ? '\u2713 DEPOSITED' : 'Awaiting deposit';
-            els.wrCreatorStatus.className = 'wr-status ' + (creatorFunded ? 'ok' : 'pending');
+            els.wrCreatorStatus.textContent = creatorFunded ? 'LOCKED IN \u2713' : (m.joiner_id ? 'AWAITING' : 'NOT LOCKED');
+            els.wrCreatorStatus.className = 'wr-status ' + (creatorFunded ? 'ok' : (m.joiner_id ? 'pending' : 'not-locked'));
         }
 
         // Joiner card
         if (m.joiner_id) {
-            els.wrJoiner.classList.remove('empty');
+            els.wrJoiner.classList.remove('empty', 'funded', 'awaiting', 'not-deposited');
             els.wrJoinerName.textContent = '@' + (m.joiner_twitter || 'unknown');
             els.wrJoinerRecord.textContent = `${m.joiner_wins || 0}W - ${m.joiner_losses || 0}L | ELO ${m.joiner_elo || 1000}`;
-            els.wrJoiner.classList.toggle('funded', joinerFunded);
+            if (joinerFunded) {
+                els.wrJoiner.classList.add('funded');
+            } else {
+                els.wrJoiner.classList.add('awaiting');
+            }
             if (els.wrJoinerStatus) {
-                els.wrJoinerStatus.textContent = joinerFunded ? '\u2713 DEPOSITED' : 'Awaiting deposit';
+                els.wrJoinerStatus.textContent = joinerFunded ? 'LOCKED IN \u2713' : 'AWAITING';
                 els.wrJoinerStatus.className = 'wr-status ' + (joinerFunded ? 'ok' : 'pending');
             }
         } else {
+            els.wrJoiner.classList.remove('funded', 'awaiting', 'not-deposited');
             els.wrJoiner.classList.add('empty');
-            els.wrJoiner.classList.remove('funded');
             els.wrJoinerName.textContent = 'Waiting for opponent...';
             els.wrJoinerRecord.textContent = '';
             if (els.wrJoinerStatus) {
@@ -1300,7 +1417,7 @@ async function pollWaitingRoom(matchId) {
             const hasOpponent = !!m.joiner_id;
             const showDeposit = hasOpponent && !myDeposited && m.status !== 'funded_both';
             depositBtn.style.display = showDeposit ? 'block' : 'none';
-            depositBtn.textContent = `DEPOSIT ${wrAmt} ${wrToken}`;
+            depositBtn.textContent = `LOCK IN ${wrAmt} ${wrToken}`;
             depositBtn.disabled = false;
             depositBtn.style.background = '#00ff66';
         }
