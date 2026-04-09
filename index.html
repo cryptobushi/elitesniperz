@@ -2259,7 +2259,7 @@
                     });
                 }
             } catch(e) {}
-            if (_pollActive) setTimeout(pollPlayers, 300);
+            if (_pollActive) setTimeout(pollPlayers, 500);
         }
         pollPlayers();
 
@@ -2295,15 +2295,14 @@
             lastTime = now;
             const t = now * 0.001;
 
-            // Update player meshes — eased interpolation between poll snapshots
-            const POLL_MS = 300;
+            // Update player meshes — smooth lerp toward target
             playerMeshes.forEach((p) => {
-                // Ease-in-out interpolation for smooth acceleration/deceleration
-                const elapsed = now - p.lerpStart;
-                const raw = Math.min(elapsed / POLL_MS, 1);
-                const t = raw < 0.5 ? 2 * raw * raw : 1 - Math.pow(-2 * raw + 2, 2) / 2; // ease-in-out quad
-                const ix = p.fromX + (p.toX - p.fromX) * t;
-                const iz = p.fromZ + (p.toZ - p.fromZ) * t;
+                // Exponential lerp toward target (always smooth, no hard transitions)
+                const speed = 3.0 * dt; // ~3 units per second convergence
+                p.mesh.position.x += (p.toX - p.mesh.position.x) * speed;
+                p.mesh.position.z += (p.toZ - p.mesh.position.z) * speed;
+                const ix = p.mesh.position.x;
+                const iz = p.mesh.position.z;
                 p.mesh.position.x = ix;
                 p.mesh.position.z = iz;
                 p.mesh.position.y = terrainY(ix, iz) + 0.6;

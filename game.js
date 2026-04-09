@@ -2889,8 +2889,9 @@ document.addEventListener('contextmenu', (e) => {
     e.preventDefault(); // Prevent right-click menu
 });
 
-// Scroll wheel zoom
+// Scroll wheel zoom (only when game is active)
 document.addEventListener('wheel', (e) => {
+    if (!gameState.gameStarted) return; // Allow normal page scroll on landing
     e.preventDefault();
     const zoomSpeed = 1.5;
     const delta = e.deltaY > 0 ? zoomSpeed : -zoomSpeed;
