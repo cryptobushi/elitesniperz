@@ -2112,16 +2112,16 @@
         const camera = new THREE.PerspectiveCamera(50, 2, 0.1, 500);
 
         // Lights
-        scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
         dirLight.position.set(50, 80, 30);
         scene.add(dirLight);
-        const visionLight = new THREE.PointLight(0x00ff66, 0.3, 60);
+        const visionLight = new THREE.PointLight(0x00ff66, 0.5, 80);
         visionLight.position.set(0, 15, 0);
         scene.add(visionLight);
 
         // Ground
-        const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a3a12, roughness: 0.95 });
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x2a5a1a, roughness: 0.95 });
         const ground = new THREE.Mesh(new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE), groundMat);
         ground.rotation.x = -Math.PI / 2;
         scene.add(ground);
@@ -2143,16 +2143,22 @@
             scene.add(wall);
         }
 
+        // Simple rocks
+        function addRock(x, z, s) {
+            const rock = new THREE.Mesh(
+                new THREE.DodecahedronGeometry(s * 1.5, 0),
+                new THREE.MeshStandardMaterial({ color: 0x5a5048, roughness: 0.9 })
+            );
+            rock.position.set(x, s * 0.7, z);
+            scene.add(rock);
+        }
+
         // Load map data
         fetch('/map-data.json').then(r => r.json()).then(data => {
-            if (data.trees) data.trees.forEach(([x,z]) => addTree(x, z));
-            if (data.walls) data.walls.forEach(w => addWall(w[0], w[1], w[2], w[3]));
-        }).catch(() => {
-            // Fallback: add some trees manually
-            for (let i = 0; i < 20; i++) {
-                addTree((Math.random() - 0.5) * 120, (Math.random() - 0.5) * 120);
-            }
-        });
+            if (data.trees) data.trees.forEach(t => addTree(t.x, t.z));
+            if (data.walls) data.walls.forEach(w => addWall(w.x, w.z, w.w, w.d));
+            if (data.rocks) data.rocks.forEach(r => addRock(r.x, r.z, r.s || 1));
+        }).catch(() => {});
 
         // Build mini character for spectator view
         function buildChar(team) {
@@ -2185,6 +2191,7 @@
         function getOrCreatePlayer(id, team) {
             if (playerMeshes.has(id)) return playerMeshes.get(id);
             const char = buildChar(team);
+            char.scale.set(2, 2, 2);
             scene.add(char);
             const entry = { mesh: char, x: 0, z: 0, rot: 0, alive: true, team, firstUpdate: true };
             playerMeshes.set(id, entry);
