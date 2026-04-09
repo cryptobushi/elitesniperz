@@ -2259,7 +2259,7 @@
                     });
                 }
             } catch(e) {}
-            if (_pollActive) setTimeout(pollPlayers, 500);
+            if (_pollActive) setTimeout(pollPlayers, 300);
         }
         pollPlayers();
 
@@ -2295,12 +2295,13 @@
             lastTime = now;
             const t = now * 0.001;
 
-            // Update player meshes — linear interpolation between poll snapshots
-            const POLL_MS = 500;
+            // Update player meshes — eased interpolation between poll snapshots
+            const POLL_MS = 300;
             playerMeshes.forEach((p) => {
-                // Linear interpolation: smoothly move from→to over 500ms
+                // Ease-in-out interpolation for smooth acceleration/deceleration
                 const elapsed = now - p.lerpStart;
-                const t = Math.min(elapsed / POLL_MS, 1);
+                const raw = Math.min(elapsed / POLL_MS, 1);
+                const t = raw < 0.5 ? 2 * raw * raw : 1 - Math.pow(-2 * raw + 2, 2) / 2; // ease-in-out quad
                 const ix = p.fromX + (p.toX - p.fromX) * t;
                 const iz = p.fromZ + (p.toZ - p.fromZ) * t;
                 p.mesh.position.x = ix;
