@@ -2184,8 +2184,7 @@
             return g;
         }
 
-        // Player tracking
-        const BYTES_PER_PLAYER = 28;
+        // Player tracking via /spectate (30s delayed, no cheating risk)
         const playerMeshes = new Map();
 
         function getOrCreatePlayer(id, team) {
@@ -2193,50 +2192,35 @@
             const char = buildChar(team);
             char.scale.set(2, 2, 2);
             scene.add(char);
-            const entry = { mesh: char, x: 0, z: 0, rot: 0, alive: true, team, firstUpdate: true };
+            const entry = { mesh: char, x: 0, z: 0, alive: true, team, firstUpdate: true };
             playerMeshes.set(id, entry);
             return entry;
         }
 
-        // Connect spectator WebSocket
-        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        let ws = null;
-        function connectSpectator() {
-            ws = new WebSocket(proto + '//' + location.host);
-            ws.binaryType = 'arraybuffer';
-            ws.onopen = () => {
-                // Send a spectator join (no actual join — just receive state)
-                // The server broadcasts to all clients including those without playerId
-                // Actually the server skips clients without playerId for binary state
-                // So we need to join as a ghost player
-                ws.send(JSON.stringify({ t: 'join', n: 'spectator', m: 'red' }));
-            };
-            let _specMsgCount = 0;
-            ws.onmessage = (evt) => {
-                if (!(evt.data instanceof ArrayBuffer)) return;
-                const view = new DataView(evt.data);
-                const count = view.getUint16(0, true);
-                if (_specMsgCount++ < 3) console.log('[Spectator] Binary state:', count, 'players,', evt.data.byteLength, 'bytes');
-                for (let i = 0; i < count; i++) {
-                    const off = 2 + i * BYTES_PER_PLAYER;
-                    if (off + BYTES_PER_PLAYER > evt.data.byteLength) break;
-                    const id = view.getUint16(off, true);
-                    const x = view.getFloat32(off + 2, true);
-                    const z = view.getFloat32(off + 6, true);
-                    const rot = view.getFloat32(off + 10, true);
-                    const alive = view.getUint8(off + 14);
-                    const flags = view.getUint8(off + 25);
-                    const isBlue = !!(flags & 8);
-                    const inFog = !!(flags & 16);
-                    const team = isBlue ? 'blue' : 'red';
-                    const p = getOrCreatePlayer(id, team);
-                    p.x = x; p.z = z; p.rot = rot; p.alive = !!alive;
+        // Poll delayed spectator feed
+        let _pollActive = true;
+        async function pollPlayers() {
+            if (!_pollActive) return;
+            try {
+                const res = await fetch('/spectate');
+                const players = await res.json();
+                if (Array.isArray(players)) {
+                    const seen = new Set();
+                    players.forEach(p => {
+                        seen.add(p.id);
+                        const entry = getOrCreatePlayer(p.id, p.team);
+                        entry.x = p.x;
+                        entry.z = p.z;
+                        entry.alive = p.alive;
+                    });
+                    playerMeshes.forEach((entry, id) => {
+                        if (!seen.has(id)) { scene.remove(entry.mesh); playerMeshes.delete(id); }
+                    });
                 }
-            };
-            ws.onclose = () => { setTimeout(connectSpectator, 5000); };
-            ws.onerror = () => {};
+            } catch(e) {}
+            if (_pollActive) setTimeout(pollPlayers, 500);
         }
-        connectSpectator();
+        pollPlayers();
 
         // Terrain height
         function terrainY(x, z) { return Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2; }
@@ -2305,7 +2289,7 @@
             const landing = document.getElementById('landingPage');
             if (landing && landing.classList.contains('hidden')) {
                 running = false;
-                if (ws) ws.close();
+                _pollActive = false;
                 renderer.dispose();
             }
         });

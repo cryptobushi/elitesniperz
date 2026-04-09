@@ -56,6 +56,33 @@ app.get('/debug', (req, res) => {
     res.json({ players: list, total: players.size, clients: wss.clients.size });
 });
 
+// === DELAYED SPECTATOR FEED (30s delay, safe for hero background) ===
+const SPECTATOR_DELAY = 30; // seconds
+const _spectatorBuffer = []; // ring buffer of snapshots
+const SPECTATOR_SNAPSHOT_RATE = 500; // ms between snapshots
+
+setInterval(() => {
+    const snapshot = [];
+    players.forEach((p, id) => {
+        snapshot.push({ id, team: p.team, x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10, alive: p.health > 0 });
+    });
+    _spectatorBuffer.push({ t: Date.now(), players: snapshot });
+    // Trim buffer to keep only last 60 seconds
+    const cutoff = Date.now() - 60000;
+    while (_spectatorBuffer.length > 0 && _spectatorBuffer[0].t < cutoff) _spectatorBuffer.shift();
+}, SPECTATOR_SNAPSHOT_RATE);
+
+app.get('/spectate', (req, res) => {
+    // Return the snapshot from 30 seconds ago
+    const targetTime = Date.now() - SPECTATOR_DELAY * 1000;
+    let best = null;
+    for (let i = _spectatorBuffer.length - 1; i >= 0; i--) {
+        if (_spectatorBuffer[i].t <= targetTime) { best = _spectatorBuffer[i]; break; }
+    }
+    if (!best && _spectatorBuffer.length > 0) best = _spectatorBuffer[0];
+    res.json(best ? best.players : []);
+});
+
 console.log('Collision walls loaded from shared/collision.js');
 
 // === TEST MODE ===
