@@ -349,11 +349,20 @@ const STYLES = `
 .cm-cancel:hover { color: #888894; }
 
 /* === WAITING ROOM === */
+@keyframes wrPulse {
+    0%, 100% { border-color: #2a2a3a; }
+    50% { border-color: #3a3a4a; }
+}
+
 #waitingRoom {
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
     background: #0a0a0f;
+    background-image:
+        linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 40px 40px;
     z-index: 520;
     display: flex;
     flex-direction: column;
@@ -365,79 +374,132 @@ const STYLES = `
 #waitingRoom.hidden { display: none !important; }
 
 .wr-title {
-    color: #e8e8ec;
-    font-family: 'Oswald', sans-serif;
-    font-size: clamp(1.2rem, 5vw, 1.8rem);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-}
-.wr-info {
     color: #00ff66;
     font-family: 'Oswald', sans-serif;
-    font-size: clamp(1rem, 3.5vw, 1.4rem);
-    letter-spacing: 0.06em;
+    font-size: clamp(1.8rem, 6vw, 2.6rem);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
     margin-bottom: 0.4rem;
+    text-shadow: 0 0 30px rgba(0,255,102,0.2);
+}
+.wr-info {
+    color: #e8e8ec;
+    font-family: 'Oswald', sans-serif;
+    font-size: clamp(1.1rem, 4vw, 1.6rem);
+    letter-spacing: 0.08em;
+    margin-bottom: 0.3rem;
+    text-transform: uppercase;
 }
 .wr-helper {
     color: #55555f;
-    font-size: 0.65rem;
-    margin-bottom: 1.5rem;
+    font-size: 0.7rem;
+    margin-bottom: 1.8rem;
     font-style: italic;
+}
+.wr-challenge-text {
+    color: #ff8800;
+    font-family: 'Oswald', sans-serif;
+    font-size: clamp(0.7rem, 2.5vw, 0.85rem);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    opacity: 0.9;
 }
 .wr-players {
     display: flex;
-    gap: 1.8rem;
-    align-items: center;
-    margin-bottom: 1.5rem;
+    gap: 2rem;
+    align-items: stretch;
+    margin-bottom: 1.8rem;
 }
 .wr-card {
     background: #12121a;
-    border: 2px solid #2a2a3a;
-    padding: 1.2rem 1.8rem;
-    min-width: 150px;
+    border: 1px solid #2a2a3a;
+    padding: 1.4rem 2rem;
+    min-width: 200px;
     text-align: center;
-    transition: border-color 0.3s, background 0.3s;
+    transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
 }
-.wr-card.funded { border-color: #00ff66; background: rgba(0,255,102,0.04); }
+.wr-card.funded {
+    border-color: #00ff66;
+    background: rgba(0,255,102,0.04);
+    box-shadow: 0 0 20px rgba(0,255,102,0.08), inset 0 0 20px rgba(0,255,102,0.02);
+}
 .wr-card.awaiting { border-color: #ff8800; background: rgba(255,136,0,0.03); }
 .wr-card.not-deposited { border-color: rgba(255,51,68,0.3); }
 .wr-card.empty {
-    border-style: dashed;
-    border-color: #1e1e2a;
+    border: 2px dashed #2a2a3a;
+    animation: wrPulse 2.5s ease-in-out infinite;
+    background: rgba(18,18,26,0.6);
+}
+.wr-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #0a0a0f;
+    margin-bottom: 0.3rem;
+    flex-shrink: 0;
 }
 .wr-card .wr-name {
     color: #00ff66;
     font-family: 'Oswald', sans-serif;
-    font-size: 0.95rem;
+    font-size: 1.05rem;
     font-weight: 600;
     letter-spacing: 0.04em;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.15rem;
 }
 .wr-card .wr-record {
     color: #888894;
-    font-size: 0.6rem;
-    margin-bottom: 0.4rem;
+    font-size: 0.65rem;
+    margin-bottom: 0.2rem;
+    letter-spacing: 0.02em;
 }
 .wr-card .wr-status {
-    margin-top: 0.3rem;
-    font-size: 0.6rem;
+    margin-top: 0.25rem;
+    font-size: 0.65rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
+    padding: 0.2rem 0.6rem;
 }
+.wr-card .wr-status.locked { color: #00ff66; border: 1px solid rgba(0,255,102,0.2); background: rgba(0,255,102,0.06); }
+.wr-card .wr-status.waiting { color: #ff8800; border: 1px solid rgba(255,136,0,0.2); background: rgba(255,136,0,0.06); }
+.wr-card .wr-status.not-locked { color: rgba(255,51,68,0.7); border: 1px solid rgba(255,51,68,0.15); background: rgba(255,51,68,0.04); }
+/* legacy class compat */
 .wr-card .wr-status.ok { color: #00ff66; }
 .wr-card .wr-status.pending { color: #ff8800; }
-.wr-card .wr-status.not-locked { color: rgba(255,51,68,0.7); }
-.wr-card.empty .wr-name { color: #55555f; font-family: 'Inter', system-ui, sans-serif; font-size: 0.75rem; }
+.wr-card.empty .wr-name {
+    color: #00ff66;
+    font-family: 'Oswald', sans-serif;
+    font-size: 1rem;
+    opacity: 0.9;
+}
+.wr-card.empty .wr-record {
+    color: #55555f;
+    font-size: 0.65rem;
+    font-style: italic;
+}
 
 .wr-vs {
-    color: #e8e8ec;
+    color: #00ff66;
     font-family: 'Oswald', sans-serif;
-    font-size: clamp(1.6rem, 5vw, 2.4rem);
+    font-size: clamp(2rem, 6vw, 3rem);
     font-weight: 900;
-    letter-spacing: 0.1em;
-    text-shadow: 0 0 20px rgba(0,255,102,0.3);
+    letter-spacing: 0.12em;
+    text-shadow: 0 0 30px rgba(0,255,102,0.35), 0 0 60px rgba(0,255,102,0.15);
+    display: flex;
+    align-items: center;
+    align-self: center;
 }
 
 .wr-dots {
@@ -449,39 +511,58 @@ const STYLES = `
 
 .wr-deposit-btn {
     margin: 0.5rem auto;
-    padding: 0.7rem 2rem;
+    padding: 0.8rem 2.5rem;
     background: #00ff66;
     border: 1px solid #00ff66;
     color: #0a0a0f;
     font-weight: 700;
     cursor: pointer;
     font-family: 'Oswald', sans-serif;
-    font-size: 0.95rem;
+    font-size: 1rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     transition: all 0.15s;
+    box-shadow: 0 0 20px rgba(0,255,102,0.2);
 }
-.wr-deposit-btn:hover { background: #00cc52; border-color: #00cc52; }
-.wr-deposit-btn:disabled { opacity: 0.4; cursor: default; }
+.wr-deposit-btn:hover { background: #00cc52; border-color: #00cc52; box-shadow: 0 0 30px rgba(0,255,102,0.3); }
+.wr-deposit-btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+
+.wr-share-btn {
+    margin: 0.6rem auto;
+    padding: 0.5rem 1.8rem;
+    background: transparent;
+    border: 1px solid #00ff66;
+    color: #00ff66;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: all 0.15s;
+    display: block;
+}
+.wr-share-btn:hover { background: rgba(0,255,102,0.08); box-shadow: 0 0 15px rgba(0,255,102,0.15); }
 
 .wr-note {
     color: #55555f;
-    font-size: 0.6rem;
-    margin-top: 1rem;
+    font-size: 0.65rem;
+    margin-top: 1.2rem;
     font-style: italic;
 }
 
 .wr-cancel {
     background: none;
-    border: 1px solid rgba(255,51,68,0.2);
-    color: rgba(255,51,68,0.6);
-    padding: 0.4rem 1.2rem;
+    border: 1px solid rgba(255,51,68,0.15);
+    color: rgba(255,51,68,0.5);
+    padding: 0.35rem 1rem;
     font-family: 'Inter', system-ui, sans-serif;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     transition: all 0.2s;
+    margin-top: 0.5rem;
 }
 .wr-cancel:hover { border-color: #ff3344; color: #ff3344; }
 
@@ -726,10 +807,13 @@ const STYLES = `
     .cm-panel { padding: 0.8rem; }
     .cm-panel h2 { font-size: 1rem; }
 
-    .wr-card { padding: 0.8rem 1rem; min-width: 110px; }
-    .wr-card .wr-name { font-size: 0.8rem; }
-    .wr-players { gap: 0.8rem; }
-    .wr-vs { font-size: clamp(1.2rem, 4vw, 1.8rem); }
+    .wr-card { padding: 1rem 1.2rem; min-width: 130px; }
+    .wr-card .wr-name { font-size: 0.85rem; }
+    .wr-avatar { width: 38px; height: 38px; font-size: 1.1rem; }
+    .wr-players { gap: 1rem; }
+    .wr-vs { font-size: clamp(1.4rem, 5vw, 2rem); }
+    .wr-title { font-size: clamp(1.4rem, 5vw, 2rem); }
+    .wr-share-btn { font-size: 0.7rem; padding: 0.4rem 1.2rem; }
 
     /* Result screen mobile */
     .wr-result-title { font-size: clamp(2rem, 12vw, 4rem) !important; }
@@ -875,27 +959,28 @@ function buildDOM() {
     waiting.className = 'hidden';
     waiting.innerHTML = `
         <div class="wr-title">MATCH LOBBY</div>
-        <div class="wr-info" id="wrInfo">0.01 SOL &bull; First to 5</div>
+        <div class="wr-info" id="wrInfo">0.01 SOL &bull; FIRST TO 5</div>
         <div class="wr-helper">Winner takes the pot. Reputation is on the line.</div>
-        <div id="wrStatus" style="color:#888894;font-size:0.75rem;margin:0.3rem 0 1rem;text-align:center;font-family:'Inter',system-ui,sans-serif;">Waiting for opponent...</div>
+        <div id="wrStatus" class="wr-challenge-text">OPEN CHALLENGE &mdash; WAITING FOR OPPONENT</div>
         <div class="wr-players">
             <div class="wr-card not-deposited" id="wrCreator">
+                <div class="wr-avatar" id="wrCreatorAvatar" style="background:#00ff66;">?</div>
                 <div class="wr-name" id="wrCreatorName">---</div>
-                <div class="wr-record" id="wrCreatorRecord">0W - 0L</div>
-                <div class="wr-status not-locked" id="wrCreatorStatus">NOT LOCKED</div>
+                <div class="wr-record" id="wrCreatorRecord">0W - 0L &bull; ELO 1000</div>
+                <div class="wr-status not-locked" id="wrCreatorStatus">STAKE NOT LOCKED</div>
             </div>
             <div class="wr-vs">VS</div>
             <div class="wr-card empty" id="wrJoiner">
-                <div class="wr-name" id="wrJoinerName">Waiting for opponent...</div>
-                <div class="wr-record" id="wrJoinerRecord"></div>
-                <div class="wr-status pending" id="wrJoinerStatus"></div>
+                <div class="wr-avatar" id="wrJoinerAvatar" style="background:#2a2a3a;color:#55555f;">?</div>
+                <div class="wr-name" id="wrJoinerName">OPEN CHALLENGE</div>
+                <div class="wr-record" id="wrJoinerRecord">No one has taken this yet</div>
+                <div class="wr-status" id="wrJoinerStatus"></div>
             </div>
         </div>
         <button class="wr-deposit-btn" id="wrDepositBtn" style="display:none;">LOCK IN 0.01 SOL</button>
-        <div class="wr-note">Match starts when both players lock in</div>
-        <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:1rem;">
-            <button class="wr-cancel" id="wrCancel">CANCEL MATCH</button>
-        </div>
+        <button class="wr-share-btn" id="wrShareBtn">CHALLENGE ON X</button>
+        <div class="wr-note">Match begins when both players lock in.</div>
+        <button class="wr-cancel" id="wrCancel">Cancel Match</button>
     `;
     document.body.appendChild(waiting);
 
@@ -1005,6 +1090,20 @@ function bindEvents() {
             btn.style.background = '#ff3344';
             btn.disabled = false;
         }
+    });
+
+    // Waiting room share on X
+    document.getElementById('wrShareBtn')?.addEventListener('click', () => {
+        const info = currentMatchInfo || {};
+        const user = getUser();
+        const handle = user?.twitter_handle || 'someone';
+        const stake = info.stakeAmount || '?';
+        const token = info.stakeToken || 'SOL';
+        const target = info.killTarget || 5;
+        const text = encodeURIComponent(
+            `I just posted a ${stake} ${token} duel on sNiPeRz.\nFirst to ${target}. Winner takes all.\n\nWho's taking this?\n\nhttps://sniperz.fun`
+        );
+        window.open('https://twitter.com/intent/tweet?text=' + text, '_blank');
     });
 
     // Result back button
@@ -1352,7 +1451,7 @@ async function pollWaitingRoom(matchId) {
             joinerTwitter: m.joiner_twitter,
             opponentTwitter: amCreator ? m.joiner_twitter : m.creator_twitter,
         };
-        els.wrInfo.innerHTML = `${wrAmt} ${wrToken} &bull; First to ${m.kill_target || 7}`;
+        els.wrInfo.innerHTML = `${wrAmt} ${wrToken} &bull; FIRST TO ${m.kill_target || 7}`;
 
         // Determine who has deposited
         const creatorFunded = ['funded_creator', 'funded_both'].includes(m.status);
@@ -1361,18 +1460,33 @@ async function pollWaitingRoom(matchId) {
 
         // Status message
         let statusMsg = m.status;
-        if (m.status === 'open') statusMsg = 'Waiting for opponent...';
-        else if (m.status === 'matched') statusMsg = 'Opponent joined! Both players deposit to start.';
-        else if (m.status === 'funded_creator') statusMsg = amCreator ? 'You deposited. Waiting for opponent to deposit...' : 'Opponent deposited. Your turn to deposit!';
-        else if (m.status === 'funded_joiner') statusMsg = amCreator ? 'Opponent deposited. Your turn to deposit!' : 'You deposited. Waiting for opponent to deposit...';
-        else if (m.status === 'funded_both') statusMsg = 'Both deposited! Starting match...';
-        else if (m.status === 'in_progress') statusMsg = 'Match in progress!';
+        if (m.status === 'open') statusMsg = 'OPEN CHALLENGE \u2014 WAITING FOR OPPONENT';
+        else if (m.status === 'matched') statusMsg = 'OPPONENT JOINED \u2014 LOCK IN TO START';
+        else if (m.status === 'funded_creator') statusMsg = amCreator ? 'YOU\'RE LOCKED IN \u2014 WAITING ON OPPONENT' : 'OPPONENT LOCKED IN \u2014 YOUR MOVE';
+        else if (m.status === 'funded_joiner') statusMsg = amCreator ? 'OPPONENT LOCKED IN \u2014 YOUR MOVE' : 'YOU\'RE LOCKED IN \u2014 WAITING ON OPPONENT';
+        else if (m.status === 'funded_both') statusMsg = 'BOTH LOCKED \u2014 STARTING MATCH...';
+        else if (m.status === 'in_progress') statusMsg = 'MATCH IN PROGRESS';
         const statusEl = document.getElementById('wrStatus');
         if (statusEl) statusEl.textContent = statusMsg;
 
+        // Helper: generate avatar initial + color
+        const avatarColor = (name) => {
+            const colors = ['#00ff66','#ff8800','#00bbff','#ff3366','#aa66ff','#ffcc00','#00ffcc'];
+            let hash = 0;
+            for (let i = 0; i < (name||'').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            return colors[Math.abs(hash) % colors.length];
+        };
+        const avatarInitial = (name) => (name || '?')[0].toUpperCase();
+
         // Creator card
-        els.wrCreatorName.textContent = '@' + (m.creator_twitter || 'unknown');
-        els.wrCreatorRecord.textContent = `${m.creator_wins || 0}W - ${m.creator_losses || 0}L | ELO ${m.creator_elo || 1000}`;
+        const creatorHandle = m.creator_twitter || 'unknown';
+        els.wrCreatorName.textContent = '@' + creatorHandle;
+        els.wrCreatorRecord.textContent = `${m.creator_wins || 0}W - ${m.creator_losses || 0}L \u2022 ELO ${m.creator_elo || 1000}`;
+        const creatorAvatarEl = document.getElementById('wrCreatorAvatar');
+        if (creatorAvatarEl) {
+            creatorAvatarEl.style.background = avatarColor(creatorHandle);
+            creatorAvatarEl.textContent = avatarInitial(creatorHandle);
+        }
         els.wrCreator.classList.remove('funded', 'awaiting', 'not-deposited');
         if (creatorFunded) {
             els.wrCreator.classList.add('funded');
@@ -1382,32 +1496,44 @@ async function pollWaitingRoom(matchId) {
             els.wrCreator.classList.add('not-deposited');
         }
         if (els.wrCreatorStatus) {
-            els.wrCreatorStatus.textContent = creatorFunded ? 'LOCKED IN \u2713' : (m.joiner_id ? 'AWAITING' : 'NOT LOCKED');
-            els.wrCreatorStatus.className = 'wr-status ' + (creatorFunded ? 'ok' : (m.joiner_id ? 'pending' : 'not-locked'));
+            els.wrCreatorStatus.textContent = creatorFunded ? 'LOCKED IN \u2713' : (m.joiner_id ? 'AWAITING LOCK-IN' : 'STAKE NOT LOCKED');
+            els.wrCreatorStatus.className = 'wr-status ' + (creatorFunded ? 'locked' : (m.joiner_id ? 'waiting' : 'not-locked'));
         }
 
         // Joiner card
+        const joinerAvatarEl = document.getElementById('wrJoinerAvatar');
         if (m.joiner_id) {
+            const joinerHandle = m.joiner_twitter || 'unknown';
             els.wrJoiner.classList.remove('empty', 'funded', 'awaiting', 'not-deposited');
-            els.wrJoinerName.textContent = '@' + (m.joiner_twitter || 'unknown');
-            els.wrJoinerRecord.textContent = `${m.joiner_wins || 0}W - ${m.joiner_losses || 0}L | ELO ${m.joiner_elo || 1000}`;
+            els.wrJoinerName.textContent = '@' + joinerHandle;
+            els.wrJoinerRecord.textContent = `${m.joiner_wins || 0}W - ${m.joiner_losses || 0}L \u2022 ELO ${m.joiner_elo || 1000}`;
+            if (joinerAvatarEl) {
+                joinerAvatarEl.style.background = avatarColor(joinerHandle);
+                joinerAvatarEl.style.color = '#0a0a0f';
+                joinerAvatarEl.textContent = avatarInitial(joinerHandle);
+            }
             if (joinerFunded) {
                 els.wrJoiner.classList.add('funded');
             } else {
                 els.wrJoiner.classList.add('awaiting');
             }
             if (els.wrJoinerStatus) {
-                els.wrJoinerStatus.textContent = joinerFunded ? 'LOCKED IN \u2713' : 'AWAITING';
-                els.wrJoinerStatus.className = 'wr-status ' + (joinerFunded ? 'ok' : 'pending');
+                els.wrJoinerStatus.textContent = joinerFunded ? 'LOCKED IN \u2713' : 'AWAITING LOCK-IN';
+                els.wrJoinerStatus.className = 'wr-status ' + (joinerFunded ? 'locked' : 'waiting');
             }
         } else {
             els.wrJoiner.classList.remove('funded', 'awaiting', 'not-deposited');
             els.wrJoiner.classList.add('empty');
-            els.wrJoinerName.textContent = 'Waiting for opponent...';
-            els.wrJoinerRecord.textContent = '';
+            els.wrJoinerName.textContent = 'OPEN CHALLENGE';
+            els.wrJoinerRecord.textContent = 'No one has taken this yet';
+            if (joinerAvatarEl) {
+                joinerAvatarEl.style.background = '#2a2a3a';
+                joinerAvatarEl.style.color = '#55555f';
+                joinerAvatarEl.textContent = '?';
+            }
             if (els.wrJoinerStatus) {
                 els.wrJoinerStatus.textContent = '';
-                els.wrJoinerStatus.className = 'wr-status pending';
+                els.wrJoinerStatus.className = 'wr-status';
             }
         }
 
