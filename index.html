@@ -2165,22 +2165,27 @@
             const g = new THREE.Group();
             const col = team === 'red' ? 0xcc2222 : 0x2244cc;
             const dark = team === 'red' ? 0x881515 : 0x152288;
-            const cloth = new THREE.MeshStandardMaterial({ color: col, roughness: 0.9 });
-            // Robe
-            g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.45, 1.1, 6), cloth), { position: new THREE.Vector3(0, 0.45, 0) }));
-            // Hat
-            const hat = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.9, 6), new THREE.MeshStandardMaterial({ color: dark, roughness: 0.8 }));
-            hat.position.y = 1.45; hat.rotation.z = 0.15; g.add(hat);
-            const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.06, 8), new THREE.MeshStandardMaterial({ color: dark }));
-            brim.position.y = 1; g.add(brim);
-            // Eyes
-            const eyeCol = team === 'red' ? 0xff6666 : 0x66aaff;
+            // Big bright sphere as base (guaranteed visible for debugging + looks like a player dot)
+            const body = new THREE.Mesh(
+                new THREE.SphereGeometry(1.5, 8, 6),
+                new THREE.MeshBasicMaterial({ color: col })
+            );
+            body.position.y = 1.5;
+            g.add(body);
+            // Hat cone on top
+            const hat = new THREE.Mesh(
+                new THREE.ConeGeometry(1, 2.5, 6),
+                new THREE.MeshBasicMaterial({ color: dark })
+            );
+            hat.position.y = 4;
+            g.add(hat);
+            // Eyes (emissive so always visible)
+            const eyeCol = team === 'red' ? 0xff4444 : 0x4488ff;
             const eyeMat = new THREE.MeshBasicMaterial({ color: eyeCol });
-            const le = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), eyeMat); le.position.set(-0.1, 0.93, 0.2); g.add(le);
-            const re = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), eyeMat); re.position.set(0.1, 0.93, 0.2); g.add(re);
-            // Rifle
-            const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.5, 4), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.8 }));
-            gun.rotation.x = Math.PI / 2; gun.position.set(0.3, 0.5, 1); g.add(gun);
+            const le = new THREE.Mesh(new THREE.SphereGeometry(0.3, 4, 4), eyeMat);
+            le.position.set(-0.5, 2.2, 1.2); g.add(le);
+            const re = new THREE.Mesh(new THREE.SphereGeometry(0.3, 4, 4), eyeMat);
+            re.position.set(0.5, 2.2, 1.2); g.add(re);
             return g;
         }
 
@@ -2190,8 +2195,8 @@
         function getOrCreatePlayer(id, team) {
             if (playerMeshes.has(id)) return playerMeshes.get(id);
             const char = buildChar(team);
-            char.scale.set(2, 2, 2);
             scene.add(char);
+            console.log('[Spectator] Created player', id, team);
             const entry = { mesh: char, x: 0, z: 0, alive: true, team, firstUpdate: true };
             playerMeshes.set(id, entry);
             return entry;
