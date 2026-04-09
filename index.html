@@ -2259,7 +2259,6 @@
                     p.mesh.position.z += (p.z - p.mesh.position.z) * 0.12;
                 }
                 p.mesh.position.y = terrainY(p.mesh.position.x, p.mesh.position.z) + 0.6;
-                p.mesh.rotation.y = p.rot;
                 p.mesh.visible = p.alive;
                 if (p.alive) { sumX += p.x; sumZ += p.z; count++; }
             });
