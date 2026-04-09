@@ -2107,7 +2107,7 @@
         const MAP_SIZE = 200;
 
         const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1)); // Lower res for perf
         renderer.setClearColor(0x0a0a0f, 1);
 
         const scene = new THREE.Scene();
@@ -2159,9 +2159,9 @@
 
         // Load map data
         fetch('/map-data.json').then(r => r.json()).then(data => {
-            if (data.trees) data.trees.forEach(t => addTree(t.x, t.z));
+            if (data.trees) data.trees.forEach((t, i) => { if (i % 2 === 0) addTree(t.x, t.z); });
             if (data.walls) data.walls.forEach(w => addWall(w.x, w.z, w.w, w.d));
-            if (data.rocks) data.rocks.forEach(r => addRock(r.x, r.z, r.s || 1));
+            if (data.rocks) data.rocks.forEach((r, i) => { if (i % 2 === 0) addRock(r.x, r.z, r.s || 1); });
         }).catch(() => {});
 
         // Character builder — normal game size
@@ -2287,12 +2287,17 @@
         // Render loop
         let running = true;
         let lastTime = performance.now();
+        let lastRender = 0;
+        const RENDER_INTERVAL = 1000 / 24; // Cap at 24fps
         function animate() {
             if (!running) return;
             requestAnimationFrame(animate);
             const now = performance.now();
             const dt = (now - lastTime) / 1000;
             lastTime = now;
+            // Skip render if not enough time passed (24fps cap)
+            if (now - lastRender < RENDER_INTERVAL) return;
+            lastRender = now;
             const t = now * 0.001;
 
             // Update player meshes — smooth lerp toward target
