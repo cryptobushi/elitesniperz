@@ -2176,7 +2176,8 @@
             const ls = new THREE.Mesh(shoeGeo, bm(dark)); ls.position.set(-0.12, -0.55, 0.08); ls.rotation.x = -Math.PI/2; g.add(ls);
             const rs = new THREE.Mesh(shoeGeo, bm(dark)); rs.position.set(0.12, -0.55, 0.08); rs.rotation.x = -Math.PI/2; g.add(rs);
             // Robe
-            g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.45, 1.1, 6), bm(col)), { position: {x:0,y:0.45,z:0} }));
+            const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.45, 1.1, 6), bm(col));
+            robe.position.set(0, 0.45, 0); g.add(robe);
             // Belt
             const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.08, 6), bm(0x886622));
             belt.position.y = 0.2; g.add(belt);
@@ -2197,8 +2198,8 @@
             re.position.set(0.1, 0.93, 0.2); g.add(re);
             // Arms
             const armGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.6, 4);
-            g.add(Object.assign(new THREE.Mesh(armGeo, bm(col)), { position: {x:-0.32,y:0.5,z:0}, rotation: {x:0,y:0,z:0.4} }));
-            g.add(Object.assign(new THREE.Mesh(armGeo, bm(col)), { position: {x:0.32,y:0.5,z:0}, rotation: {x:0,y:0,z:-0.4} }));
+            const la = new THREE.Mesh(armGeo, bm(col)); la.position.set(-0.32, 0.5, 0); la.rotation.z = 0.4; g.add(la);
+            const ra = new THREE.Mesh(armGeo, bm(col)); ra.position.set(0.32, 0.5, 0); ra.rotation.z = -0.4; g.add(ra);
             // Rifle
             const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.8, 6), bm(0x1a1a1a));
             barrel.rotation.x = Math.PI/2; barrel.position.set(0.3, 0.5, 1.5); g.add(barrel);
