@@ -1626,7 +1626,7 @@ async function fetchMatches() {
     }
 }
 
-function renderMatches(matches) {
+async function renderMatches(matches) {
     const tbody = els.wlMatches;
     const empty = els.wlEmpty;
 
