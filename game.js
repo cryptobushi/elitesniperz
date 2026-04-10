@@ -4630,8 +4630,12 @@ window._startWagerGame = function(ws, matchData) {
         }
     });
 
-    // Show game UI
+    // Show game UI — hide landing page, show canvas + HUD
+    document.getElementById('landingPage')?.classList.add('hidden');
     document.getElementById('usernameModal')?.classList.add('hidden');
+    document.getElementById('gameCanvas').style.display = 'block';
+    document.getElementById('ui').style.display = '';
+    document.body.classList.add('game-active');
     document.getElementById('hud')?.classList.remove('hidden');
     document.getElementById('abilities')?.classList.remove('hidden');
     document.querySelector('.minimap')?.classList.remove('hidden');
