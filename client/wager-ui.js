@@ -150,6 +150,8 @@ const STYLES = `
 }
 .wl-my-duel-status.waiting { background: rgba(255,136,0,0.12); color: #ff8800; }
 .wl-my-duel-status.open { background: rgba(0,255,102,0.1); color: #00ff66; }
+.wl-my-duel-status.hot { background: rgba(255,136,0,0.15); color: #ff8800; animation: badgePulse 1.5s ease-in-out infinite; }
+@keyframes badgePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 .wl-my-duel-cancel {
     padding: 4px 12px;
     background: none;
@@ -1639,13 +1641,36 @@ function renderMatches(matches) {
     if (myDuelsEl && myDuelsListEl) {
         if (myDuels.length > 0) {
             myDuelsEl.classList.remove('hidden');
+            // Fetch challenge counts for selective matches
+            const challengeCounts = {};
+            await Promise.all(myDuels.filter(m => m.match_mode === 'selective' && !m.joiner_id).map(async m => {
+                try {
+                    const res = await api(`/matches/${m.id}/challenges`);
+                    challengeCounts[m.id] = (res.data || []).length;
+                } catch(_) { challengeCounts[m.id] = 0; }
+            }));
+
             myDuelsListEl.innerHTML = myDuels.map(m => {
                 const token = m.stake_token || 'SOL';
                 const amt = token === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
                 const target = m.kill_target || 7;
                 const hasJoiner = !!m.joiner_id;
-                const statusClass = hasJoiner ? 'waiting' : 'open';
-                const statusText = hasJoiner ? 'MATCHED' : 'WAITING';
+                const isSelective = m.match_mode === 'selective';
+                const pendingCount = challengeCounts[m.id] || 0;
+
+                let statusClass, statusText;
+                if (hasJoiner) {
+                    statusClass = 'waiting'; statusText = 'MATCHED';
+                } else if (isSelective && pendingCount > 0) {
+                    statusClass = 'hot'; statusText = `${pendingCount} CHALLENGER${pendingCount > 1 ? 'S' : ''}`;
+                } else if (isSelective) {
+                    statusClass = 'open'; statusText = 'SELECTIVE';
+                } else {
+                    statusClass = 'open'; statusText = 'OPEN';
+                }
+
+                const resumeText = isSelective && !hasJoiner && pendingCount > 0 ? 'REVIEW' : 'RESUME';
+
                 return `<div class="wl-my-duel-row">
                     <div class="wl-my-duel-info">
                         <span class="wl-my-duel-stake">${amt} ${token}</span>
@@ -1653,7 +1678,7 @@ function renderMatches(matches) {
                         <span class="wl-my-duel-status ${statusClass}">${statusText}</span>
                     </div>
                     <div style="display:flex;gap:0.4rem;">
-                        ${hasJoiner ? `<button class="wl-my-duel-resume" data-match-id="${m.id}">RESUME</button>` : ''}
+                        <button class="wl-my-duel-resume" data-match-id="${m.id}">${resumeText}</button>
                         <button class="wl-my-duel-cancel" data-match-id="${m.id}">CANCEL</button>
                     </div>
                 </div>`;
