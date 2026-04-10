@@ -63,8 +63,9 @@ export async function requestDeposit(matchId, token) {
         const signatureBase64 = signResult?.signature || signResult;
         console.log('[deposit] Signed, submitting to server...');
 
-        // Step 4: Send signature + original tx to server for reconstruction and submission
-        const submitRes = await fetch(`/api/matches/${matchId}/submit-signed-tx`, {
+        // Step 4: Send signature to server — server HOLDS it until both players lock in
+        console.log('[deposit] Sending signed lock-in to server (held until both ready)...');
+        const submitRes = await fetch(`/api/matches/${matchId}/lock-in`, {
             method: 'POST',
             headers: authHeaders(authToken),
             body: JSON.stringify({
@@ -74,31 +75,12 @@ export async function requestDeposit(matchId, token) {
         });
         const submitBody = await submitRes.json();
         if (!submitRes.ok || !submitBody.success) {
-            return { success: false, error: submitBody.error || 'Failed to submit transaction' };
+            return { success: false, error: submitBody.error || 'Lock-in failed' };
         }
-        const signature = submitBody.data?.txSignature;
-        console.log('[deposit] Transaction confirmed:', signature);
-
-        // Step 4: Confirm with server
-        console.log('[deposit] Confirming deposit on server...');
-        const confirmRes = await fetch(`/api/matches/${matchId}/confirm-deposit`, {
-            method: 'POST',
-            headers: authHeaders(authToken),
-            body: JSON.stringify({ txSignature: signature }),
-        });
-
-        if (!confirmRes.ok) {
-            const body = await confirmRes.json().catch(() => ({}));
-            return { success: false, error: body.error || `Confirmation failed (${confirmRes.status})` };
-        }
-
-        const confirmBody = await confirmRes.json();
-        if (!confirmBody.success) return { success: false, error: confirmBody.error || 'Confirmation failed' };
-
         return {
             success: true,
-            status: confirmBody.data?.status || 'confirmed',
-            txSignature: signature,
+            status: submitBody.data?.status || 'locked',
+            txSignature: submitBody.data?.txSignature || 'pending',
         };
     } catch (e) {
         console.error('[deposit] Error:', e);
@@ -113,10 +95,10 @@ async function _devConfirm(matchId, authToken) {
     for (let i = 0; i < 88; i++) sig += chars[Math.floor(Math.random() * chars.length)];
     console.log(`[deposit] Dev auto-confirm: ${sig.slice(0, 16)}...`);
 
-    const confirmRes = await fetch(`/api/matches/${matchId}/confirm-deposit`, {
+    const confirmRes = await fetch(`/api/matches/${matchId}/lock-in`, {
         method: 'POST',
         headers: authHeaders(authToken),
-        body: JSON.stringify({ txSignature: sig }),
+        body: JSON.stringify({ transaction: 'dev-mock', signature: sig }),
     });
     const body = await confirmRes.json().catch(() => ({}));
     if (!confirmRes.ok || !body.success) {

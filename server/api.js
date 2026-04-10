@@ -273,7 +273,7 @@ router.post('/matches/:id/cancel', authMiddleware, async (req, res) => {
             return res.status(403).json(fail('Not in this match'));
         }
 
-        const cancellable = ['open', 'matched', 'funded_creator'];
+        const cancellable = ['open', 'matched', 'funded_creator', 'funded_joiner'];
         if (!cancellable.includes(match.status)) {
             return res.status(400).json(fail('Match cannot be cancelled in its current state'));
         }
@@ -302,7 +302,8 @@ router.post('/matches/:id/cancel', authMiddleware, async (req, res) => {
         }
 
         db.updateMatch(req.params.id, { status: 'cancelled' });
-        return res.json(success({ cancelled: true, refunded: match.status === 'funded_creator' }));
+        cleanupPendingLockIn(req.params.id);
+        return res.json(success({ cancelled: true }));
     } catch (e) {
         console.error('POST /matches/:id/cancel error:', e);
         return res.status(500).json(fail('Failed to cancel match'));
@@ -362,7 +363,107 @@ router.get('/matches/:id/deposit-tx', authMiddleware, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /matches/:id/submit-signed-tx — receive signed tx, submit to Solana, then confirm
+// In-memory storage for signed transactions pending both lock-ins
+const _pendingLockIns = new Map(); // matchId -> { creator: {tx,sig}, joiner: {tx,sig} }
+
+// POST /matches/:id/lock-in — store signed tx, submit BOTH when both locked
+router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
+    try {
+        const match = db.getMatch(req.params.id);
+        if (!match) return res.status(404).json(fail('Match not found'));
+
+        const userId = req.privyUserId;
+        const isCreator = userId === match.creator_id;
+        const isJoiner = userId === match.joiner_id;
+        if (!isCreator && !isJoiner) return res.status(403).json(fail('Not in this match'));
+
+        const { transaction, signature } = req.body;
+        if (!transaction || !signature) return res.status(400).json(fail('Missing transaction or signature'));
+
+        // Store the signed tx
+        if (!_pendingLockIns.has(match.id)) _pendingLockIns.set(match.id, {});
+        const pending = _pendingLockIns.get(match.id);
+        const role = isCreator ? 'creator' : 'joiner';
+        pending[role] = { transaction, signature };
+
+        // Update match status
+        const currentStatus = db.getMatch(match.id).status;
+        const otherRole = isCreator ? 'joiner' : 'creator';
+        const bothLocked = pending[role] && pending[otherRole];
+
+        if (!bothLocked) {
+            // Only one locked so far
+            if (isCreator) {
+                if (['open', 'matched'].includes(currentStatus)) {
+                    db.updateMatch(match.id, { status: 'funded_creator', funded_at: Date.now() });
+                }
+            } else {
+                if (['open', 'matched'].includes(currentStatus)) {
+                    db.updateMatch(match.id, { status: 'funded_joiner', funded_at: Date.now() });
+                } else if (currentStatus === 'funded_creator') {
+                    // Will be set to funded_both below after submission
+                }
+            }
+            const newStatus = db.getMatch(match.id).status;
+            console.log('[LOCK-IN]', role, 'locked for match', match.id, 'status:', newStatus);
+            return res.json(success({ status: newStatus, locked: role }));
+        }
+
+        // Both locked — submit both transactions to Solana
+        console.log('[LOCK-IN] Both locked for match', match.id, '— submitting to Solana...');
+
+        const token = req.headers.authorization?.replace('Bearer ', '') || '';
+        const isDevToken = (ALLOW_DEV_TOKENS && token.startsWith('dev:')) || pending.creator.transaction === 'dev-mock' || pending.joiner.transaction === 'dev-mock';
+
+        if (!isDevToken) {
+            const { Connection, Transaction, PublicKey } = require('@solana/web3.js');
+            const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
+
+            // Submit creator's tx
+            const creatorUser = db.getUser(match.creator_id);
+            const creatorTx = Transaction.from(Buffer.from(pending.creator.transaction, 'base64'));
+            creatorTx.addSignature(new PublicKey(creatorUser.privy_wallet), Buffer.from(pending.creator.signature, 'base64'));
+            const creatorSig = await conn.sendRawTransaction(creatorTx.serialize(), { skipPreflight: false });
+            console.log('[LOCK-IN] Creator tx submitted:', creatorSig);
+
+            // Submit joiner's tx
+            const joinerUser = db.getUser(match.joiner_id);
+            const joinerTx = Transaction.from(Buffer.from(pending.joiner.transaction, 'base64'));
+            joinerTx.addSignature(new PublicKey(joinerUser.privy_wallet), Buffer.from(pending.joiner.signature, 'base64'));
+            const joinerSig = await conn.sendRawTransaction(joinerTx.serialize(), { skipPreflight: false });
+            console.log('[LOCK-IN] Joiner tx submitted:', joinerSig);
+
+            // Wait for both confirmations
+            await Promise.all([
+                conn.confirmTransaction(creatorSig, 'confirmed'),
+                conn.confirmTransaction(joinerSig, 'confirmed'),
+            ]);
+            console.log('[LOCK-IN] Both confirmed on-chain');
+
+            // Log transactions
+            const { v4: uuidv4 } = require('uuid');
+            db.createTransaction({ id: uuidv4(), match_id: match.id, user_id: match.creator_id, tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token, tx_signature: creatorSig, from_wallet: creatorUser.privy_wallet, to_wallet: 'escrow' });
+            db.createTransaction({ id: uuidv4(), match_id: match.id, user_id: match.joiner_id, tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token, tx_signature: joinerSig, from_wallet: joinerUser.privy_wallet, to_wallet: 'escrow' });
+        }
+
+        // Both funded
+        db.updateMatch(match.id, { status: 'funded_both', funded_at: Date.now() });
+        _pendingLockIns.delete(match.id);
+        console.log('[LOCK-IN] Match', match.id, 'fully funded');
+
+        return res.json(success({ status: 'funded_both', locked: 'both' }));
+    } catch (e) {
+        console.error('POST /matches/:id/lock-in error:', e);
+        return res.status(500).json(fail('Lock-in failed: ' + e.message));
+    }
+});
+
+// Clean up pending lock-ins when matches are cancelled
+function cleanupPendingLockIn(matchId) {
+    _pendingLockIns.delete(matchId);
+}
+
+// POST /matches/:id/submit-signed-tx — LEGACY, kept for compatibility
 // ---------------------------------------------------------------------------
 router.post('/matches/:id/submit-signed-tx', authMiddleware, async (req, res) => {
     try {
