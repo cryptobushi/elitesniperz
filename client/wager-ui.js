@@ -1345,12 +1345,19 @@ function renderMatches(matches) {
 
     empty.classList.add('hidden');
     tbody.innerHTML = openMatches.map((m, i) => {
-        const creator = m.creator_twitter ? '@' + m.creator_twitter : 'Anon';
+        const handle = m.creator_twitter || 'Anon';
         const record = `${m.creator_wins || 0}W-${m.creator_losses || 0}L`;
         const token = m.stake_token || 'USDC';
         const amt = token === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
         const stake = `${amt} ${token}`;
         const lock = m.passwordProtected ? ' <span class="wl-lock">&#x1f512;</span>' : '';
+        const pfp = m.creator_pfp;
+        const avatarHtml = pfp
+            ? `<img src="${esc(pfp)}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
+            : `<div style="width:24px;height:24px;border-radius:50%;background:#2a2a3a;display:flex;align-items:center;justify-content:center;font-size:0.55rem;color:#888894;flex-shrink:0;">${esc(handle[0]?.toUpperCase() || '?')}</div>`;
+        const handleHtml = handle !== 'Anon'
+            ? `<a href="https://x.com/${esc(handle)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;" onclick="event.stopPropagation();">@${esc(handle)}</a>`
+            : 'Anon';
         // Status badge logic
         let badgeClass = 'open';
         let badgeText = 'OPEN';
@@ -1358,7 +1365,7 @@ function renderMatches(matches) {
         else if (amt >= 1) { badgeClass = 'hot'; badgeText = 'HOT'; }
         else if (i === 0) { badgeClass = 'new'; badgeText = 'NEW'; }
         return `<tr>
-            <td class="wl-creator">${esc(creator)}${lock}</td>
+            <td class="wl-creator"><div style="display:flex;align-items:center;gap:8px;">${avatarHtml}<span>${handleHtml}</span>${lock}</div></td>
             <td class="wl-record">${esc(record)}</td>
             <td class="wl-stake">${esc(stake)}</td>
             <td><span class="wl-status-badge ${badgeClass}">${badgeText}</span></td>
