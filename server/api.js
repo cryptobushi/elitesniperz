@@ -45,8 +45,9 @@ router.post('/auth/verify', authMiddleware, (req, res) => {
         ) || {};
         const walletAddress = wallet.address || linkedSolWallet.address || null;
 
-        // Profile picture from Twitter
-        const profilePicture = twitter.profile_picture_url || linkedTwitter.profile_picture_url || null;
+        // Profile picture — server-side Privy doesn't include it, accept from client body
+        const profilePicture = twitter.profile_picture_url || linkedTwitter.profile_picture_url
+            || req.body?.profile_picture || null;
 
         const now = Date.now();
         const user = db.upsertUser({

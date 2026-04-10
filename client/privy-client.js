@@ -101,10 +101,11 @@ function _waitForWalletIframe(timeoutMs = 5000) {
 }
 
 // Register with our server
-async function _registerWithServer(accessToken) {
+async function _registerWithServer(accessToken, profilePicture) {
     const res = await fetch('/api/auth/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken }
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+        body: JSON.stringify({ profile_picture: profilePicture || null }),
     });
     if (!res.ok) return null;
     const body = await res.json();
@@ -306,8 +307,10 @@ export async function handleOAuthCallback() {
 
                 // Extract twitter info from linked accounts
                 const twitterAccount = user.linked_accounts?.find(a => a.type === 'twitter_oauth');
+                const profilePic = twitterAccount?.profile_picture_url || twitterAccount?.profilePictureUrl || null;
+                console.log('[Privy] Twitter pfp:', profilePic ? profilePic.slice(0, 50) + '...' : 'none');
 
-                const serverUser = await _registerWithServer(accessToken);
+                const serverUser = await _registerWithServer(accessToken, profilePic);
                 if (serverUser) {
                     // Enrich with wallet address from Privy
                     if (solanaWallet?.address && !serverUser.privy_wallet) {
