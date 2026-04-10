@@ -34,6 +34,57 @@ app.use('/api', apiRouter);
 // Active wager matches: matchId -> { match: WagerMatch, creatorWs, joinerWs }
 const activeWagerMatches = new Map();
 
+// === CRASH RECOVERY ===
+async function recoverStuckMatches() {
+    try {
+        const stuckMatches = db.getStuckMatches();
+        for (const match of stuckMatches) {
+            const existingRefunds = db.getRefundTransactions(match.id);
+            const refundedUserIds = new Set(existingRefunds.map(r => r.user_id));
+
+            if (match.status === 'in_progress' || match.status === 'funded_both') {
+                const targetStatus = match.status === 'in_progress' ? 'disputed' : 'cancelled';
+                // Refund both players
+                for (const userId of [match.creator_id, match.joiner_id]) {
+                    if (!userId || refundedUserIds.has(userId)) {
+                        console.log('[RECOVERY] Skipping already-refunded user ' + userId + ' for match ' + match.id);
+                        continue;
+                    }
+                    const user = db.getUser(userId);
+                    if (user && user.privy_wallet && escrow.isReady()) {
+                        try {
+                            const result = await escrow.sendPayout(user.privy_wallet, match.stake_amount, match.stake_token);
+                            if (result && result.signature) {
+                                db.createTransaction({
+                                    id: require('uuid').v4(), match_id: match.id, user_id: userId,
+                                    tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
+                                    tx_signature: result.signature, from_wallet: 'escrow', to_wallet: user.privy_wallet
+                                });
+                                console.log('[RECOVERY] Refunded ' + userId + ' for match ' + match.id + ' (' + targetStatus + ') sig=' + result.signature);
+                            }
+                        } catch (e) {
+                            console.error('[RECOVERY] Refund error for user ' + userId + ' match ' + match.id + ':', e.message);
+                        }
+                    }
+                }
+                db.updateMatch(match.id, { status: targetStatus, ended_at: Date.now() });
+                console.log('[RECOVERY] Match ' + match.id + ' set to ' + targetStatus);
+            } else if (match.status === 'submitting') {
+                // Submitting state is transient — treat as cancelled
+                db.updateMatch(match.id, { status: 'cancelled', ended_at: Date.now() });
+                console.log('[RECOVERY] Match ' + match.id + ' (submitting) set to cancelled');
+            }
+        }
+        if (stuckMatches.length > 0) {
+            console.log('[RECOVERY] Processed ' + stuckMatches.length + ' stuck matches');
+        }
+    } catch (e) {
+        console.error('[RECOVERY] Error:', e.message);
+    }
+}
+// Run recovery once at startup
+recoverStuckMatches();
+
 // === TLS (Let's Encrypt) ===
 const CERT_DIR = '/etc/letsencrypt/live/sniperz.fun';
 let server, hasTLS = false;
@@ -751,6 +802,77 @@ function settleWagerMatch(matchId, winnerId, reason, stats) {
     const match = db.getMatch(matchId);
     if (!match || match.status === 'settled') return;
 
+    // === DRAW PATH ===
+    if (winnerId === null) {
+        const creatorStats = stats[match.creator_id] || {};
+        const joinerStats = stats[match.joiner_id] || {};
+
+        // Refund both players (full stake, no rake)
+        const creator = db.getUser(match.creator_id);
+        const joiner = db.getUser(match.joiner_id);
+
+        if (escrow.isReady()) {
+            if (creator && creator.privy_wallet) {
+                escrow.sendPayout(creator.privy_wallet, match.stake_amount, match.stake_token).then(result => {
+                    if (result && result.signature) {
+                        db.createTransaction({
+                            id: require('uuid').v4(), match_id: matchId, user_id: match.creator_id,
+                            tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
+                            tx_signature: result.signature, from_wallet: 'escrow', to_wallet: creator.privy_wallet
+                        });
+                    }
+                }).catch(e => console.error('[WAGER] Draw refund error (creator):', e));
+            }
+            if (joiner && joiner.privy_wallet) {
+                escrow.sendPayout(joiner.privy_wallet, match.stake_amount, match.stake_token).then(result => {
+                    if (result && result.signature) {
+                        db.createTransaction({
+                            id: require('uuid').v4(), match_id: matchId, user_id: match.joiner_id,
+                            tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
+                            tx_signature: result.signature, from_wallet: 'escrow', to_wallet: joiner.privy_wallet
+                        });
+                    }
+                }).catch(e => console.error('[WAGER] Draw refund error (joiner):', e));
+            }
+        }
+
+        db.updateMatch(matchId, {
+            status: 'settled', winner_id: null, win_reason: 'draw',
+            creator_kills: creatorStats.kills || 0, joiner_kills: joinerStats.kills || 0,
+            creator_deaths: creatorStats.deaths || 0, joiner_deaths: joinerStats.deaths || 0,
+            ended_at: Date.now(), rake_amount: 0
+        });
+
+        // Update draw counts
+        db.updateUserStats(match.creator_id, {
+            wins: creator?.wins || 0, losses: creator?.losses || 0,
+            draws: (creator?.draws || 0) + 1, total_earned: creator?.total_earned || 0,
+            total_wagered: creator?.total_wagered || 0
+        });
+        db.updateUserStats(match.joiner_id, {
+            wins: joiner?.wins || 0, losses: joiner?.losses || 0,
+            draws: (joiner?.draws || 0) + 1, total_earned: joiner?.total_earned || 0,
+            total_wagered: joiner?.total_wagered || 0
+        });
+
+        // Write match history for both
+        const now = Date.now();
+        db.createMatchHistory({
+            match_id: matchId, user_id: match.creator_id, opponent_id: match.joiner_id, result: 'draw',
+            kills: creatorStats.kills || 0, deaths: creatorStats.deaths || 0,
+            stake_amount: match.stake_amount, stake_token: match.stake_token, payout: match.stake_amount, played_at: now
+        });
+        db.createMatchHistory({
+            match_id: matchId, user_id: match.joiner_id, opponent_id: match.creator_id, result: 'draw',
+            kills: joinerStats.kills || 0, deaths: joinerStats.deaths || 0,
+            stake_amount: match.stake_amount, stake_token: match.stake_token, payout: match.stake_amount, played_at: now
+        });
+
+        activeWagerMatches.delete(matchId);
+        console.log('[WAGER] Draw settled for match ' + matchId + ' — both players refunded');
+        return;
+    }
+
     const loserId = winnerId === match.creator_id ? match.joiner_id : match.creator_id;
     const totalPot = match.stake_amount * 2;
     const rake = Math.floor(totalPot * 0.05);
@@ -1230,6 +1352,23 @@ setInterval(function() {
         if (now - saved.savedAt > REJOIN_WINDOW * 1000) disconnectedPlayers.delete(name);
     }
 }, 30000);
+
+// Stale match expiry — every 5 minutes
+setInterval(function() {
+    try {
+        // Expire open matches older than 30 minutes
+        const openResult = db.expireStaleMatches(Date.now() - 30 * 60 * 1000);
+        // Expire matched-status matches older than 15 minutes
+        const matchedResult = db.db.prepare("UPDATE matches SET status = 'expired' WHERE status = 'matched' AND created_at < ?")
+            .run(Date.now() - 15 * 60 * 1000);
+        const total = (openResult?.changes || 0) + (matchedResult?.changes || 0);
+        if (total > 0) {
+            console.log('[CLEANUP] Expired ' + total + ' stale matches');
+        }
+    } catch (e) {
+        console.error('[CLEANUP] Stale match expiry error:', e.message);
+    }
+}, 5 * 60 * 1000);
 
 const PORT = process.env.PORT || 3000;
 

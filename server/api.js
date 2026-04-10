@@ -419,6 +419,22 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
             const { Connection, Transaction, PublicKey } = require('@solana/web3.js');
             const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
 
+            // Validate blockhashes before submitting
+            const creatorTxCheck = Transaction.from(Buffer.from(pending.creator.transaction, 'base64'));
+            const joinerTxCheck = Transaction.from(Buffer.from(pending.joiner.transaction, 'base64'));
+
+            const [creatorBhValid, joinerBhValid] = await Promise.all([
+                escrow.isBlockhashValid(creatorTxCheck.recentBlockhash),
+                escrow.isBlockhashValid(joinerTxCheck.recentBlockhash),
+            ]);
+
+            if (!creatorBhValid || !joinerBhValid) {
+                _pendingLockIns.delete(match.id);
+                db.updateMatch(match.id, { status: 'matched' });
+                console.log('[LOCK-IN] Blockhash expired for match', match.id, 'creator:', creatorBhValid, 'joiner:', joinerBhValid);
+                return res.status(400).json(fail('Transaction expired. Please re-lock.'));
+            }
+
             // Submit creator's tx
             const creatorUser = db.getUser(match.creator_id);
             const creatorTx = Transaction.from(Buffer.from(pending.creator.transaction, 'base64'));
@@ -712,5 +728,19 @@ router.post('/wallet/submit-withdraw', authMiddleware, async (req, res) => {
         return res.status(500).json(fail('Withdrawal failed: ' + e.message));
     }
 });
+
+// === LOCK-IN EXPIRY — every 60 seconds ===
+setInterval(() => {
+    try {
+        const stale = db.getStaleFundedMatches(Date.now() - 10 * 60 * 1000);
+        for (const match of stale) {
+            db.updateMatch(match.id, { status: 'cancelled' });
+            _pendingLockIns.delete(match.id);
+            console.log('[CLEANUP] Lock-in expired for match ' + match.id);
+        }
+    } catch (e) {
+        console.error('[CLEANUP] Lock-in expiry error:', e.message);
+    }
+}, 60 * 1000);
 
 module.exports = router;

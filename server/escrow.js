@@ -299,12 +299,29 @@ async function getBalance(walletPubkey, token) {
     }
 }
 
+/**
+ * Check if a blockhash is still valid.
+ * @param {string} blockhash - The blockhash to check
+ * @returns {Promise<boolean>}
+ */
+async function isBlockhashValid(blockhash) {
+    if (!connection) return false;
+    try {
+        const result = await connection.isBlockhashValid(blockhash, { commitment: 'confirmed' });
+        return result.value;
+    } catch (err) {
+        console.error('[escrow] isBlockhashValid error:', err.message);
+        return false;
+    }
+}
+
 module.exports = {
     createDepositTransaction,
     confirmDeposit,
     sendPayout,
     sendRake,
     getBalance,
+    isBlockhashValid,
     USDC_MINT,
     USDC_DECIMALS,
     isReady

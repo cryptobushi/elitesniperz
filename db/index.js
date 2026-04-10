@@ -203,6 +203,24 @@ function getLeaderboard(limit = 50) {
   return _getLeaderboard.all(limit);
 }
 
+// --- Recovery / cleanup queries ---
+
+function getStuckMatches() {
+  return db.prepare("SELECT * FROM matches WHERE status IN ('in_progress', 'funded_both', 'submitting')").all();
+}
+
+function getStaleFundedMatches(cutoffMs) {
+  return db.prepare("SELECT * FROM matches WHERE status IN ('funded_creator', 'funded_joiner') AND funded_at < ?").all(cutoffMs);
+}
+
+function expireStaleMatches(cutoffMs) {
+  return db.prepare("UPDATE matches SET status = 'expired' WHERE status = 'open' AND created_at < ?").run(cutoffMs);
+}
+
+function getRefundTransactions(matchId) {
+  return db.prepare("SELECT * FROM transactions WHERE match_id = ? AND tx_type = 'refund'").all(matchId);
+}
+
 module.exports = {
   db,
   getUser,
@@ -218,4 +236,8 @@ module.exports = {
   createMatchHistory,
   getMatchHistory,
   getLeaderboard,
+  getStuckMatches,
+  getStaleFundedMatches,
+  expireStaleMatches,
+  getRefundTransactions,
 };

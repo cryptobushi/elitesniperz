@@ -28,6 +28,9 @@ let waitingInterval = null;
 let wagerWs = null;
 let currentMatchId = null;
 let currentMatchInfo = null; // { stakeAmount, stakeToken, killTarget, creatorTwitter, joinerTwitter, opponentTwitter }
+let wagerReconnectAttempts = 0;
+const WAGER_MAX_RECONNECTS = 5;
+const WAGER_RECONNECT_DELAY = 2000;
 
 // ── Styles ──────────────────────────────────────────────────────────────────
 const STYLES = `
@@ -1893,6 +1896,7 @@ export function connectWagerMatch(matchId) {
     currentMatchId = matchId;
 
     ws.addEventListener('open', () => {
+        wagerReconnectAttempts = 0;
         ws.send(JSON.stringify({
             t: 'wager_auth',
             token: getToken(),
@@ -1951,6 +1955,27 @@ export function connectWagerMatch(matchId) {
                 showWagerResult(msg);
                 break;
 
+            case 'wager_dc': {
+                // Opponent disconnected — show overlay with countdown
+                let overlay = document.getElementById('wagerDcOverlay');
+                if (!overlay) {
+                    overlay = document.createElement('div');
+                    overlay.id = 'wagerDcOverlay';
+                    overlay.style.cssText = 'position:fixed;top:20%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#ff4444;padding:1rem 2rem;border:1px solid #ff4444;font-family:Inter,system-ui,sans-serif;font-size:0.9rem;z-index:9999;text-align:center;border-radius:4px;';
+                    document.body.appendChild(overlay);
+                }
+                overlay.textContent = 'Opponent disconnected \u2014 ' + msg.remaining + 's to rejoin';
+                overlay.style.display = 'block';
+                break;
+            }
+
+            case 'wager_rc': {
+                // Player reconnected — hide the overlay
+                const dcOverlay = document.getElementById('wagerDcOverlay');
+                if (dcOverlay) dcOverlay.style.display = 'none';
+                break;
+            }
+
             case 'wager_timeout':
                 hideWagerHUD();
                 alert('Match timed out.');
@@ -1965,6 +1990,16 @@ export function connectWagerMatch(matchId) {
 
     ws.addEventListener('close', () => {
         wagerWs = null;
+        // Auto-reconnect if we're in an active wager match
+        if (currentMatchId && wagerReconnectAttempts < WAGER_MAX_RECONNECTS) {
+            wagerReconnectAttempts++;
+            console.log('[wager ws] Disconnected, reconnect attempt ' + wagerReconnectAttempts + '/' + WAGER_MAX_RECONNECTS);
+            setTimeout(() => {
+                if (currentMatchId) {
+                    connectWagerMatch(currentMatchId);
+                }
+            }, WAGER_RECONNECT_DELAY);
+        }
     });
 
     ws.addEventListener('error', (err) => {

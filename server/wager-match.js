@@ -8,8 +8,8 @@ const {
 const { collidesWithWall, hasLineOfSight } = require('../shared/collision');
 
 // === CONSTANTS ===
-const AFK_TIMEOUT = 0;             // 0 = disabled
-const DISCONNECT_TIMEOUT = 0;      // 0 = disabled
+const AFK_TIMEOUT = 120;           // 2 minutes no input = forfeit
+const DISCONNECT_TIMEOUT = 60;     // 60 seconds to reconnect
 const TIME_LIMIT = 10 * 60;       // 10 minutes
 const RESPAWN_DELAY = 3000;       // 3s respawn in 1v1
 const BYTES_PER_PLAYER = 28;      // Same binary format as main server
@@ -98,6 +98,8 @@ class WagerMatch {
         // Clear disconnect timer if reconnecting
         if (this.disconnectTimers.has(userId)) {
             this.disconnectTimers.delete(userId);
+            // Notify both players of reconnection
+            this._broadcast(JSON.stringify({ t: 'wager_rc' }));
         }
 
         // Handle ws close
@@ -429,6 +431,13 @@ class WagerMatch {
                 if (elapsed >= DISCONNECT_TIMEOUT) {
                     const opponent = this._getOpponent(userId);
                     this._endMatch(opponent, 'disconnect_forfeit');
+                } else {
+                    // Grace period still active — notify connected player
+                    const opponent = this._getOpponent(userId);
+                    const opWs = this.wsMap.get(opponent);
+                    if (opWs && opWs.readyState === 1) {
+                        opWs.send(JSON.stringify({ t: 'wager_dc', remaining: Math.ceil(DISCONNECT_TIMEOUT - elapsed) }));
+                    }
                 }
             }
         }
