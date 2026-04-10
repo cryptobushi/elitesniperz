@@ -1380,17 +1380,33 @@ function renderMatches(matches) {
     });
 }
 
-function showPasswordModal() {
+function showErrorModal(message) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,5,10,0.9);z-index:10002;display:flex;align-items:center;justify-content:center;font-family:"Inter",system-ui,sans-serif;';
+    overlay.innerHTML = `
+        <div style="background:#12121a;border:1px solid #ff3344;padding:2rem;width:min(90%,360px);text-align:center;">
+            <div style="font-family:'Oswald',sans-serif;font-size:1.1rem;font-weight:700;color:#ff3344;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.5rem;">ERROR</div>
+            <div style="color:#e8e8ec;font-size:0.8rem;margin-bottom:1.2rem;line-height:1.4;">${message}</div>
+            <button style="padding:10px 24px;background:#1a1a25;border:1px solid #2a2a3a;color:#e8e8ec;font-family:'Inter',system-ui,sans-serif;font-size:0.75rem;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;">DISMISS</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    const dismiss = () => { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); };
+    overlay.querySelector('button').addEventListener('click', dismiss);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) dismiss(); });
+}
+
+function showPasswordModal(errorMsg) {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,5,10,0.9);z-index:10002;display:flex;align-items:center;justify-content:center;font-family:"Inter",system-ui,sans-serif;';
         overlay.innerHTML = `
-            <div style="background:#12121a;border:1px solid #2a2a3a;padding:2rem;width:min(90%,360px);text-align:center;">
+            <div style="background:#12121a;border:1px solid ${errorMsg ? '#ff3344' : '#2a2a3a'};padding:2rem;width:min(90%,360px);text-align:center;transition:border-color 0.3s;">
                 <div style="font-family:'Oswald',sans-serif;font-size:1.2rem;font-weight:700;color:#e8e8ec;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.3rem;">PRIVATE DUEL</div>
                 <div style="color:#888894;font-size:0.7rem;margin-bottom:1.2rem;">This match requires a password to join</div>
                 <input id="pwModalInput" type="password" placeholder="Enter password"
-                    style="width:100%;padding:12px;background:#0a0a0f;border:1px solid #2a2a3a;color:#e8e8ec;font-family:'Inter',system-ui,sans-serif;font-size:0.85rem;text-align:center;box-sizing:border-box;margin-bottom:0.8rem;transition:border-color 0.15s;" />
-                <div id="pwModalError" style="color:#ff3344;font-size:0.65rem;min-height:1em;margin-bottom:0.6rem;"></div>
+                    style="width:100%;padding:12px;background:#0a0a0f;border:1px solid ${errorMsg ? '#ff3344' : '#2a2a3a'};color:#e8e8ec;font-family:'Inter',system-ui,sans-serif;font-size:0.85rem;text-align:center;box-sizing:border-box;margin-bottom:0.8rem;transition:border-color 0.15s;" />
+                <div id="pwModalError" style="color:#ff3344;font-size:0.65rem;min-height:1em;margin-bottom:0.6rem;">${errorMsg || ''}</div>
                 <button id="pwModalSubmit" style="width:100%;padding:12px;background:#00ff66;border:none;color:#0a0a0f;font-family:'Inter',system-ui,sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;transition:opacity 0.15s;">JOIN DUEL</button>
                 <div id="pwModalCancel" style="color:#55555f;font-size:0.65rem;cursor:pointer;transition:color 0.15s;">Cancel</div>
             </div>
@@ -1429,14 +1445,24 @@ async function handleJoin(matchId) {
             body: JSON.stringify({}),
         });
 
-        // If password required, show styled modal and retry
+        // If password required, show styled modal and retry (loop on wrong password)
         if (!res.success && res.error && res.error.toLowerCase().includes('password')) {
-            const password = await showPasswordModal();
-            if (!password) return;
-            res = await api(`/matches/${matchId}/join`, {
-                method: 'POST',
-                body: JSON.stringify({ password }),
-            });
+            let errorMsg = null;
+            while (true) {
+                const password = await showPasswordModal(errorMsg);
+                if (!password) return; // cancelled
+                res = await api(`/matches/${matchId}/join`, {
+                    method: 'POST',
+                    body: JSON.stringify({ password }),
+                });
+                if (res.success) break;
+                if (res.error && res.error.toLowerCase().includes('password')) {
+                    errorMsg = 'Incorrect password. Try again.';
+                } else {
+                    errorMsg = res.error || 'Failed to join';
+                    break;
+                }
+            }
         }
 
         if (!res.success) throw new Error(res.error || 'Failed to join');
@@ -1444,7 +1470,7 @@ async function handleJoin(matchId) {
         currentMatchId = matchId;
         showWaitingRoom(matchId);
     } catch (err) {
-        alert('Failed to join: ' + err.message);
+        showErrorModal(err.message);
     }
 }
 
