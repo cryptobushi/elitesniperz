@@ -961,6 +961,63 @@ const STYLES = `
     text-align: left;
     min-height: 1.2em;
 }
+.cm-tooltip-wrap {
+    position: relative;
+    display: inline-flex;
+}
+.cm-tooltip-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 1px solid #2a2a3a;
+    color: #55555f;
+    font-size: 0.55rem;
+    font-weight: 700;
+    font-style: normal;
+    cursor: help;
+    transition: all 0.15s;
+}
+.cm-tooltip-trigger:hover {
+    border-color: #00ff66;
+    color: #00ff66;
+}
+.cm-tooltip-box {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 260px;
+    background: #1a1a25;
+    border: 1px solid #2a2a3a;
+    padding: 0.7rem;
+    font-size: 0.6rem;
+    font-style: normal;
+    font-weight: 400;
+    color: #888894;
+    line-height: 1.5;
+    text-transform: none;
+    letter-spacing: normal;
+    z-index: 100;
+    pointer-events: none;
+}
+.cm-tooltip-box strong {
+    color: #e8e8ec;
+    font-weight: 600;
+}
+.cm-tooltip-wrap:hover .cm-tooltip-box {
+    display: block;
+}
+@media (max-width: 400px) {
+    .cm-tooltip-box {
+        width: 200px;
+        left: 0;
+        transform: none;
+    }
+}
 
 /* Challengers section in waiting room */
 .wr-challengers {
@@ -1211,7 +1268,7 @@ function buildDOM() {
             </div>
             <div class="cm-label">Password (optional)</div>
             <input type="text" class="cm-input" id="cmPassword" placeholder="Leave empty for public" maxlength="32">
-            <div class="cm-label">Match Mode</div>
+            <div class="cm-label" style="display:flex;align-items:center;gap:6px;">Match Mode <span class="cm-tooltip-wrap"><span class="cm-tooltip-trigger">?</span><span class="cm-tooltip-box"><strong>OPEN</strong> — Anyone can join instantly. First come, first served. Best for low-stakes or quick matches.<br><br><strong>SELECTIVE</strong> — Challengers submit requests. You review their profile, win rate, and reputation before accepting. Best for high-stakes duels where you want to vet your opponent.</span></span></div>
             <div class="cm-toggle-group" id="cmModeGroup">
                 <button class="cm-toggle selected" data-mode="open">OPEN</button>
                 <button class="cm-toggle" data-mode="selective">SELECTIVE</button>
