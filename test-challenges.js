@@ -52,6 +52,14 @@ const matchesToClean = [];
 async function run() {
     console.log('\n========== CHALLENGE REQUEST SYSTEM TESTS ==========\n');
 
+    // Clear stale test data from previous runs
+    try {
+        const db = require('./db/index');
+        db.clearTestChallengeDeclines('did:privy:test-creator', 'did:privy:test-challenger1');
+        db.clearTestChallengeDeclines('did:privy:test-creator', 'did:privy:test-challenger2');
+        console.log('  (Cleared stale test decline data)');
+    } catch(e) { console.log('  (Could not clear test data:', e.message, ')'); }
+
     // --- Setup: Register users ---
     console.log('--- Setup ---');
     const r1 = await api('POST', '/auth/verify', CREATOR_TOKEN, {});
@@ -188,6 +196,46 @@ async function run() {
         if (r.success) cleaned++;
     }
     test('25. Cleanup test matches', true);
+
+    // === Decline Cooldown Tests ===
+    console.log('\n--- Decline Cooldown ---');
+
+    // Clear declines from earlier tests so cooldown starts fresh
+    try {
+        const db = require('./db/index');
+        db.clearTestChallengeDeclines('did:privy:test-creator', 'did:privy:test-challenger1');
+    } catch(e) {}
+
+    // Create a selective match for cooldown testing
+    const cdMatch = await api('POST', '/matches', CREATOR_TOKEN, { stakeAmount: 1000000, stakeToken: 'SOL', killTarget: 5, matchMode: 'selective' });
+    const cdMatchId = cdMatch.data.id;
+    matchesToClean.push(cdMatchId);
+
+    // Challenge #1 → decline
+    const cd1 = await api('POST', '/matches/' + cdMatchId + '/challenge', CHALLENGER1_TOKEN);
+    test('26. First challenge for cooldown test', cd1.success === true);
+    const cd1Id = cd1.data?.id;
+    const dec1 = await api('POST', '/matches/' + cdMatchId + '/challenges/' + cd1Id + '/decline', CREATOR_TOKEN);
+    test('27. First decline', dec1.success === true);
+
+    // Challenge #2 → decline (should work — only 1 decline so far)
+    const cd2 = await api('POST', '/matches/' + cdMatchId + '/challenge', CHALLENGER1_TOKEN);
+    test('28. Second challenge after first decline', cd2.success === true);
+    const cd2Id = cd2.data?.id;
+    const dec2 = await api('POST', '/matches/' + cdMatchId + '/challenges/' + cd2Id + '/decline', CREATOR_TOKEN);
+    test('29. Second decline', dec2.success === true);
+
+    // Challenge #3 → should be BLOCKED (2 declines in 30 min)
+    const cd3 = await api('POST', '/matches/' + cdMatchId + '/challenge', CHALLENGER1_TOKEN);
+    test('30. Third challenge blocked by cooldown', cd3.success === false);
+    test('31. Cooldown error message', (cd3.error || '').includes('declined'));
+
+    // Challenger2 should NOT be affected by challenger1's cooldown
+    const cd4 = await api('POST', '/matches/' + cdMatchId + '/challenge', CHALLENGER2_TOKEN);
+    test('32. Challenger2 not affected by challenger1 cooldown', cd4.success === true);
+
+    // Cleanup cooldown match
+    await api('POST', '/matches/' + cdMatchId + '/cancel', CREATOR_TOKEN, {});
 
     // === Results ===
     console.log('\n========== RESULTS ==========');

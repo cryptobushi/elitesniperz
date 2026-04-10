@@ -261,6 +261,27 @@ function expireChallengeRequests(matchId) {
   return _expireChallengeRequests.run(matchId);
 }
 
+function getRecentDeclineCount(creatorId, challengerId, windowMs) {
+  // Count declines within the time window. Use created_at as proxy for decline time
+  // (challenge_requests doesn't have a declined_at column, but created_at is close enough
+  // since challenges are typically declined shortly after creation)
+  const cutoff = Date.now() - windowMs;
+  return db.prepare(`
+    SELECT COUNT(*) as cnt FROM challenge_requests cr
+    JOIN matches m ON cr.match_id = m.id
+    WHERE m.creator_id = ? AND cr.challenger_id = ? AND cr.status = 'declined'
+    AND cr.created_at > ?
+  `).get(creatorId, challengerId, cutoff)?.cnt || 0;
+}
+
+function clearTestChallengeDeclines(creatorId, challengerId) {
+  // For testing: clear old decline records so tests don't interfere
+  return db.prepare(`
+    DELETE FROM challenge_requests WHERE challenger_id = ? AND status = 'declined'
+    AND match_id IN (SELECT id FROM matches WHERE creator_id = ?)
+  `).run(challengerId, creatorId);
+}
+
 // --- Recovery / cleanup queries ---
 
 function getStuckMatches() {
@@ -305,4 +326,6 @@ module.exports = {
   getMyPendingChallenge,
   getMyChallenge,
   expireChallengeRequests,
+  getRecentDeclineCount,
+  clearTestChallengeDeclines,
 };

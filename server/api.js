@@ -373,6 +373,12 @@ router.post('/matches/:id/challenge', authMiddleware, async (req, res) => {
             return res.status(400).json(fail('You already have a pending challenge for this match'));
         }
 
+        // Cooldown: if creator declined this challenger 2+ times in 30 min, block for 60 min
+        const declineCount = db.getRecentDeclineCount(match.creator_id, req.privyUserId, 30 * 60 * 1000);
+        if (declineCount >= 2) {
+            return res.status(429).json(fail('This player has declined your challenges. You can challenge them again in 60 minutes.'));
+        }
+
         const challenge = db.createChallengeRequest({
             id: uuidv4(),
             match_id: req.params.id,
