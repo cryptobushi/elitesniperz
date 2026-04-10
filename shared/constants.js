@@ -41,7 +41,7 @@ function isNearSpawn(x, z, team) {
 }
 
 // Wager match constants
-const WAGER_KILL_TARGETS = [5, 7, 10];
+const WAGER_KILL_TARGETS = [1, 5, 7, 10];
 const WAGER_TIME_LIMIT = 600; // 10 minutes in seconds
 const WAGER_AFK_TIMEOUT = 30; // Seconds before AFK forfeit
 const WAGER_DISCONNECT_TIMEOUT = 30;

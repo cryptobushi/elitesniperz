@@ -9,7 +9,7 @@ const db = require('../db/index');
 const router = express.Router();
 
 const VALID_TOKENS = ['SOL', 'USDC'];
-const VALID_KILL_TARGETS = [5, 7, 10];
+const VALID_KILL_TARGETS = [1, 5, 7, 10];
 const BCRYPT_ROUNDS = 10;
 
 // ---------------------------------------------------------------------------

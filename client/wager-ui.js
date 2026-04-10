@@ -941,6 +941,7 @@ function buildDOM() {
             </div>
             <div class="cm-label">Kill Target (First To)</div>
             <div class="cm-toggle-group" id="cmTargetGroup">
+                <button class="cm-toggle" data-target="1">1</button>
                 <button class="cm-toggle" data-target="5">5</button>
                 <button class="cm-toggle selected" data-target="7">7</button>
                 <button class="cm-toggle" data-target="10">10</button>
