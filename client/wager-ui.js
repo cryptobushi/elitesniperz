@@ -1414,17 +1414,19 @@ function bindEvents() {
         try {
             const result = await requestDeposit(currentMatchId);
             if (result.success) {
-                btn.textContent = '\u2713 DEPOSITED';
+                btn.textContent = '\u2713 LOCKED IN';
                 btn.style.background = '#00cc52';
                 btn.style.display = 'none';
             } else {
-                btn.textContent = 'DEPOSIT FAILED - RETRY';
-                btn.style.background = '#ff3344';
+                showErrorModal(result.error || 'Lock-in failed. Please try again.');
+                btn.textContent = 'LOCK IN';
+                btn.style.background = '';
                 btn.disabled = false;
             }
         } catch (e) {
-            btn.textContent = 'DEPOSIT FAILED - RETRY';
-            btn.style.background = '#ff3344';
+            showErrorModal(e.message || 'Lock-in failed. Please try again.');
+            btn.textContent = 'LOCK IN';
+            btn.style.background = '';
             btn.disabled = false;
         }
     });
@@ -1562,7 +1564,7 @@ function setupCreateMatchEvents() {
 async function handleCreateMatch() {
     const submitBtn = document.getElementById('cmSubmit');
     const stakeVal = parseFloat(document.getElementById('cmStake')?.value);
-    if (!stakeVal || stakeVal <= 0) return alert('Enter a valid stake amount');
+    if (!stakeVal || stakeVal <= 0) return showErrorModal('Enter a valid stake amount');
 
     const token = document.querySelector('#cmTokenGroup .cm-toggle.selected')?.dataset.token || 'SOL';
     const killTarget = parseInt(document.querySelector('#cmTargetGroup .cm-toggle.selected')?.dataset.target || '7');
@@ -1593,7 +1595,7 @@ async function handleCreateMatch() {
         els.createModal.classList.add('hidden');
         showWaitingRoom(matchId);
     } catch (err) {
-        alert('Failed to create match: ' + err.message);
+        showErrorModal(err.message);
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'POST DUEL';
@@ -1819,13 +1821,40 @@ async function renderMatches(matches) {
 }
 
 function showErrorModal(message) {
+    const isBalance = message && message.toLowerCase().includes('insufficient');
+    const isExpired = message && message.toLowerCase().includes('expired');
+    const isTimeout = message && message.toLowerCase().includes('timed out');
+
+    let title = 'ERROR';
+    let icon = '';
+    let hint = '';
+    let borderColor = '#ff3344';
+
+    if (isBalance) {
+        title = 'INSUFFICIENT FUNDS';
+        icon = '<div style="font-size:2rem;margin-bottom:0.5rem;">⚠️</div>';
+        hint = '<div style="color:#55555f;font-size:0.6rem;margin-top:0.8rem;line-height:1.4;">Deposit SOL or USDC to your wallet from the duel lobby to fund wagers.</div>';
+        borderColor = '#ff8800';
+    } else if (isExpired) {
+        title = 'TRANSACTION EXPIRED';
+        icon = '<div style="font-size:2rem;margin-bottom:0.5rem;">⏱</div>';
+        hint = '<div style="color:#55555f;font-size:0.6rem;margin-top:0.8rem;">Please try locking in again.</div>';
+        borderColor = '#ff8800';
+    } else if (isTimeout) {
+        title = 'MATCH TIMED OUT';
+        icon = '<div style="font-size:2rem;margin-bottom:0.5rem;">⏱</div>';
+        borderColor = '#ff8800';
+    }
+
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,5,10,0.9);z-index:10002;display:flex;align-items:center;justify-content:center;font-family:"Inter",system-ui,sans-serif;';
     overlay.innerHTML = `
-        <div style="background:#12121a;border:1px solid #ff3344;padding:2rem;width:min(90%,360px);text-align:center;">
-            <div style="font-family:'Oswald',sans-serif;font-size:1.1rem;font-weight:700;color:#ff3344;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.5rem;">ERROR</div>
-            <div style="color:#e8e8ec;font-size:0.8rem;margin-bottom:1.2rem;line-height:1.4;">${message}</div>
-            <button style="padding:10px 24px;background:#1a1a25;border:1px solid #2a2a3a;color:#e8e8ec;font-family:'Inter',system-ui,sans-serif;font-size:0.75rem;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;">DISMISS</button>
+        <div style="background:#12121a;border:1px solid ${borderColor};padding:2rem;width:min(90%,380px);text-align:center;">
+            ${icon}
+            <div style="font-family:'Oswald',sans-serif;font-size:1.1rem;font-weight:700;color:${borderColor};letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.5rem;">${title}</div>
+            <div style="color:#e8e8ec;font-size:0.8rem;margin-bottom:0.8rem;line-height:1.5;">${message}</div>
+            ${hint}
+            <button style="margin-top:1rem;padding:10px 24px;background:#1a1a25;border:1px solid #2a2a3a;color:#e8e8ec;font-family:'Inter',system-ui,sans-serif;font-size:0.75rem;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;transition:all 0.15s;">DISMISS</button>
         </div>
     `;
     document.body.appendChild(overlay);
@@ -2457,7 +2486,7 @@ export function connectWagerMatch(matchId) {
 
             case 'wager_timeout':
                 hideWagerHUD();
-                alert('Match timed out.');
+                showErrorModal('Match timed out.');
                 showLobby();
                 break;
 
