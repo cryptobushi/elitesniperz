@@ -448,6 +448,24 @@ router.post('/matches/:id/challenges/:requestId/decline', authMiddleware, (req, 
 });
 
 // ---------------------------------------------------------------------------
+// GET /matches/:id/my-challenge — get the current user's challenge for a match
+// ---------------------------------------------------------------------------
+router.get('/matches/:id/my-challenge', authMiddleware, (req, res) => {
+    try {
+        const match = db.getMatch(req.params.id);
+        if (!match) return res.status(404).json(fail('Match not found'));
+
+        const challenge = db.getMyChallenge(req.params.id, req.privyUserId);
+        if (!challenge) return res.status(404).json(fail('No challenge found'));
+
+        return res.json(success(challenge));
+    } catch (e) {
+        console.error('GET /matches/:id/my-challenge error:', e);
+        return res.status(500).json(fail('Failed to fetch challenge status'));
+    }
+});
+
+// ---------------------------------------------------------------------------
 // GET /leaderboard — top 50 players by wins
 // ---------------------------------------------------------------------------
 router.get('/leaderboard', (req, res) => {

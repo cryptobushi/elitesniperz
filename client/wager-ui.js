@@ -2069,15 +2069,25 @@ async function pollWaitingRoom(matchId) {
             if (challengePollingInterval) { clearInterval(challengePollingInterval); challengePollingInterval = null; }
         }
 
-        // Challenger got declined — check by polling match details
+        // Challenger got declined or expired — poll challenge request status
         if (isSelective && _waitingRoomRole === 'challenger' && !m.joiner_id) {
-            // Check if our challenge was declined
             try {
-                const challengeData = await api(`/matches/${matchId}`);
-                const matchData = challengeData.data || challengeData;
-                // If we're the joiner, we got accepted — handled by matched state below
-                // If match still open and we're not joiner, check if we were declined
-                // We can't easily check from this endpoint, so we rely on status changes
+                const challengeRes = await api(`/matches/${matchId}/my-challenge`);
+                if (challengeRes.success) {
+                    const challengeStatus = (challengeRes.data || {}).status;
+                    if (challengeStatus === 'declined') {
+                        const waitText = document.getElementById('wrChallengeWaitText');
+                        if (waitText) waitText.textContent = 'Your challenge was declined.';
+                        setTimeout(() => { hideWaitingRoom(); showLobby(); }, 2000);
+                        return;
+                    }
+                    if (challengeStatus === 'expired') {
+                        const waitText = document.getElementById('wrChallengeWaitText');
+                        if (waitText) waitText.textContent = 'Challenge expired.';
+                        setTimeout(() => { hideWaitingRoom(); showLobby(); }, 2000);
+                        return;
+                    }
+                }
             } catch(_) {}
         }
 

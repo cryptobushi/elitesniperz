@@ -223,6 +223,9 @@ const _updateChallengeRequest = db.prepare('UPDATE challenge_requests SET status
 const _getMyPendingChallenge = db.prepare(
   "SELECT * FROM challenge_requests WHERE match_id = ? AND challenger_id = ? AND status = 'pending' LIMIT 1"
 );
+const _getMyChallenge = db.prepare(
+  "SELECT * FROM challenge_requests WHERE match_id = ? AND challenger_id = ? ORDER BY created_at DESC LIMIT 1"
+);
 const _expireChallengeRequests = db.prepare(
   "UPDATE challenge_requests SET status = 'expired' WHERE match_id = ? AND status = 'pending'"
 );
@@ -248,6 +251,10 @@ function updateChallengeRequest(id, status) {
 
 function getMyPendingChallenge(matchId, challengerId) {
   return _getMyPendingChallenge.get(matchId, challengerId) || null;
+}
+
+function getMyChallenge(matchId, challengerId) {
+  return _getMyChallenge.get(matchId, challengerId) || null;
 }
 
 function expireChallengeRequests(matchId) {
@@ -296,5 +303,6 @@ module.exports = {
   getChallengeRequest,
   updateChallengeRequest,
   getMyPendingChallenge,
+  getMyChallenge,
   expireChallengeRequests,
 };
