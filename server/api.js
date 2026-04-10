@@ -20,6 +20,21 @@ function success(data) {
     return { success: true, data };
 }
 
+// Check if user has enough balance for a match stake
+async function checkBalance(userId, stakeAmount, stakeToken) {
+    const user = db.getUser(userId);
+    if (!user?.privy_wallet) return { ok: false, error: 'No wallet' };
+    if (!escrow.isReady()) return { ok: true }; // Skip check if escrow not configured (dev mode)
+    const balance = await escrow.getBalance(user.privy_wallet, stakeToken);
+    if (balance === null) return { ok: true }; // Can't verify, allow
+    if (balance < stakeAmount) {
+        const human = stakeToken === 'SOL' ? (stakeAmount / 1e9) : (stakeAmount / 1e6);
+        const has = stakeToken === 'SOL' ? (balance / 1e9) : (balance / 1e6);
+        return { ok: false, error: `Insufficient balance. Need ${human} ${stakeToken}, have ${has.toFixed(4)} ${stakeToken}` };
+    }
+    return { ok: true };
+}
+
 function fail(msg) {
     return { success: false, error: msg };
 }
@@ -130,6 +145,10 @@ router.post('/matches', authMiddleware, async (req, res) => {
             return res.status(400).json(fail('matchMode must be "open" or "selective"'));
         }
 
+        // Balance check — creator must have enough to cover their stake
+        const balCheck = await checkBalance(req.privyUserId, stakeAmount, stakeToken);
+        if (!balCheck.ok) return res.status(400).json(fail(balCheck.error));
+
         let passwordHash = null;
         if (password) {
             passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
@@ -236,6 +255,10 @@ router.post('/matches/:id/join', authMiddleware, async (req, res) => {
             return res.status(400).json(fail('This is a selective duel. Submit a challenge request instead.'));
         }
 
+        // Balance check
+        const balCheck = await checkBalance(req.privyUserId, match.stake_amount, match.stake_token);
+        if (!balCheck.ok) return res.status(400).json(fail(balCheck.error));
+
         if (match.creator_id === req.privyUserId) {
             return res.status(400).json(fail('Cannot join your own match'));
         }
@@ -323,7 +346,7 @@ router.post('/matches/:id/cancel', authMiddleware, async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /matches/:id/challenge — submit a challenge request (selective mode)
 // ---------------------------------------------------------------------------
-router.post('/matches/:id/challenge', authMiddleware, (req, res) => {
+router.post('/matches/:id/challenge', authMiddleware, async (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
         if (!match) return res.status(404).json(fail('Match not found'));
@@ -334,6 +357,10 @@ router.post('/matches/:id/challenge', authMiddleware, (req, res) => {
         if (match.status !== 'open' && match.status !== 'funded_creator') {
             return res.status(400).json(fail('Match is not available for challenges'));
         }
+        // Balance check
+        const balCheck = await checkBalance(req.privyUserId, match.stake_amount, match.stake_token);
+        if (!balCheck.ok) return res.status(400).json(fail(balCheck.error));
+
         if (match.creator_id === req.privyUserId) {
             return res.status(400).json(fail('Cannot challenge your own match'));
         }
@@ -534,6 +561,17 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
 
         const { transaction, signature } = req.body;
         if (!transaction || !signature) return res.status(400).json(fail('Missing transaction or signature'));
+
+        // Balance check before accepting lock-in
+        const balCheck = await checkBalance(userId, match.stake_amount, match.stake_token);
+        if (!balCheck.ok) {
+            // Kick them from the match if they're the joiner
+            if (isJoiner) {
+                db.updateMatch(match.id, { status: 'open' });
+                db.db.prepare('UPDATE matches SET joiner_id = NULL WHERE id = ?').run(match.id);
+            }
+            return res.status(400).json(fail(balCheck.error));
+        }
 
         // Store the signed tx
         if (!_pendingLockIns.has(match.id)) _pendingLockIns.set(match.id, {});
