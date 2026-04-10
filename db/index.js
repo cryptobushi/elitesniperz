@@ -15,6 +15,7 @@ db.exec(schema);
 
 // Migrations
 try { db.exec('ALTER TABLE users ADD COLUMN profile_picture TEXT'); } catch(e) { /* already exists */ }
+try { db.exec("ALTER TABLE matches ADD COLUMN match_mode TEXT DEFAULT 'open'"); } catch(e) { /* already exists */ }
 
 // --- Prepared statements ---
 
@@ -43,8 +44,8 @@ const _updateUserStats = db.prepare(`
 
 // Matches
 const _createMatch = db.prepare(`
-  INSERT INTO matches (id, creator_id, stake_amount, stake_token, kill_target, password_hash, created_at)
-  VALUES (@id, @creator_id, @stake_amount, @stake_token, @kill_target, @password_hash, @created_at)
+  INSERT INTO matches (id, creator_id, stake_amount, stake_token, kill_target, password_hash, match_mode, created_at)
+  VALUES (@id, @creator_id, @stake_amount, @stake_token, @kill_target, @password_hash, @match_mode, @created_at)
 `);
 const _getMatch = db.prepare('SELECT * FROM matches WHERE id = ?');
 const _joinMatch = db.prepare(`
@@ -100,7 +101,7 @@ function updateUserStats(id, { wins, losses, draws, total_earned, total_wagered 
   return _updateUserStats.run({ id, wins, losses, draws, total_earned, total_wagered });
 }
 
-function createMatch({ id, creator_id, stake_amount, stake_token, kill_target, password_hash }) {
+function createMatch({ id, creator_id, stake_amount, stake_token, kill_target, password_hash, match_mode }) {
   const now = Date.now();
   _createMatch.run({
     id,
@@ -109,6 +110,7 @@ function createMatch({ id, creator_id, stake_amount, stake_token, kill_target, p
     stake_token,
     kill_target: kill_target || 7,
     password_hash: password_hash || null,
+    match_mode: match_mode || 'open',
     created_at: now,
   });
   return _getMatch.get(id);
@@ -203,6 +205,55 @@ function getLeaderboard(limit = 50) {
   return _getLeaderboard.all(limit);
 }
 
+// --- Challenge request queries ---
+
+const _createChallengeRequest = db.prepare(`
+  INSERT INTO challenge_requests (id, match_id, challenger_id, status, created_at)
+  VALUES (@id, @match_id, @challenger_id, 'pending', @created_at)
+`);
+const _getChallengeRequests = db.prepare(`
+  SELECT cr.*, u.twitter_handle, u.wins, u.losses, u.elo, u.profile_picture
+  FROM challenge_requests cr
+  JOIN users u ON cr.challenger_id = u.id
+  WHERE cr.match_id = ? AND cr.status = 'pending'
+  ORDER BY cr.created_at ASC
+`);
+const _getChallengeRequest = db.prepare('SELECT * FROM challenge_requests WHERE id = ?');
+const _updateChallengeRequest = db.prepare('UPDATE challenge_requests SET status = @status WHERE id = @id');
+const _getMyPendingChallenge = db.prepare(
+  "SELECT * FROM challenge_requests WHERE match_id = ? AND challenger_id = ? AND status = 'pending' LIMIT 1"
+);
+const _expireChallengeRequests = db.prepare(
+  "UPDATE challenge_requests SET status = 'expired' WHERE match_id = ? AND status = 'pending'"
+);
+
+function createChallengeRequest({ id, match_id, challenger_id }) {
+  const now = Date.now();
+  _createChallengeRequest.run({ id, match_id, challenger_id, created_at: now });
+  return _getChallengeRequest.get(id);
+}
+
+function getChallengeRequests(matchId) {
+  return _getChallengeRequests.all(matchId);
+}
+
+function getChallengeRequest(id) {
+  return _getChallengeRequest.get(id) || null;
+}
+
+function updateChallengeRequest(id, status) {
+  _updateChallengeRequest.run({ id, status });
+  return _getChallengeRequest.get(id);
+}
+
+function getMyPendingChallenge(matchId, challengerId) {
+  return _getMyPendingChallenge.get(matchId, challengerId) || null;
+}
+
+function expireChallengeRequests(matchId) {
+  return _expireChallengeRequests.run(matchId);
+}
+
 // --- Recovery / cleanup queries ---
 
 function getStuckMatches() {
@@ -240,4 +291,10 @@ module.exports = {
   getStaleFundedMatches,
   expireStaleMatches,
   getRefundTransactions,
+  createChallengeRequest,
+  getChallengeRequests,
+  getChallengeRequest,
+  updateChallengeRequest,
+  getMyPendingChallenge,
+  expireChallengeRequests,
 };

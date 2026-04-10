@@ -919,6 +919,174 @@ const STYLES = `
     .wr-result-back { margin-top: 0.5rem !important; }
     .wr-result-content { padding: 0.5rem; }
 }
+
+/* === SELECTIVE MODE / CHALLENGE SYSTEM === */
+.wl-selective-badge {
+    display: inline-block;
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #aa66ff;
+    border: 1px solid rgba(170,102,255,0.3);
+    background: rgba(170,102,255,0.08);
+    padding: 1px 5px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.wl-challenge-btn {
+    background: #aa66ff;
+    border: 1px solid #aa66ff;
+    color: #0a0a0f;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    font-family: 'Oswald', sans-serif;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+}
+.wl-challenge-btn:hover { background: #9955ee; border-color: #9955ee; }
+.wl-challenge-btn:active { opacity: 0.8; }
+
+/* Match mode toggle in create modal */
+.cm-mode-hint {
+    color: #55555f;
+    font-size: 0.55rem;
+    font-style: italic;
+    margin-top: 0.2rem;
+    text-align: left;
+    min-height: 1.2em;
+}
+
+/* Challengers section in waiting room */
+.wr-challengers {
+    width: 100%;
+    max-width: 480px;
+    margin: 1rem auto;
+    padding: 0 1rem;
+}
+.wr-challengers-title {
+    color: #888894;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+.wr-challengers-empty {
+    color: #55555f;
+    font-size: 0.7rem;
+    text-align: center;
+    font-style: italic;
+    padding: 1rem 0;
+}
+.wr-challenger-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.8rem;
+    background: #12121a;
+    border: 1px solid #1e1e2a;
+    margin-bottom: 0.4rem;
+    transition: border-color 0.15s;
+}
+.wr-challenger-row:hover { border-color: #2a2a3a; }
+.wr-challenger-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Oswald', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0a0a0f;
+    flex-shrink: 0;
+}
+.wr-challenger-info {
+    flex: 1;
+    min-width: 0;
+}
+.wr-challenger-handle {
+    color: #00ff66;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+.wr-challenger-handle a { color: inherit; text-decoration: none; }
+.wr-challenger-handle a:hover { text-decoration: underline; }
+.wr-challenger-stats {
+    color: #888894;
+    font-size: 0.6rem;
+    margin-top: 0.1rem;
+}
+.wr-challenger-actions {
+    display: flex;
+    gap: 0.3rem;
+    flex-shrink: 0;
+}
+.wr-challenger-accept {
+    padding: 4px 12px;
+    background: rgba(0,255,102,0.08);
+    border: 1px solid #00ff66;
+    color: #00ff66;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.6rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: all 0.15s;
+}
+.wr-challenger-accept:hover { background: rgba(0,255,102,0.15); }
+.wr-challenger-decline {
+    padding: 4px 12px;
+    background: none;
+    border: 1px solid rgba(255,51,68,0.3);
+    color: rgba(255,51,68,0.6);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.6rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: all 0.15s;
+}
+.wr-challenger-decline:hover { border-color: #ff3344; color: #ff3344; }
+
+/* Challenge submitted state */
+.wr-challenge-submitted {
+    text-align: center;
+    padding: 1.5rem;
+}
+.wr-challenge-submitted-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+.wr-challenge-submitted-text {
+    color: #aa66ff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+}
+.wr-challenge-submitted-sub {
+    color: #55555f;
+    font-size: 0.7rem;
+    font-style: italic;
+}
+.wr-challenge-declined-text {
+    color: #ff3344;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
 `;
 
 // ── Inject styles ───────────────────────────────────────────────────────────
@@ -1041,6 +1209,12 @@ function buildDOM() {
             </div>
             <div class="cm-label">Password (optional)</div>
             <input type="text" class="cm-input" id="cmPassword" placeholder="Leave empty for public" maxlength="32">
+            <div class="cm-label">Match Mode</div>
+            <div class="cm-toggle-group" id="cmModeGroup">
+                <button class="cm-toggle selected" data-mode="open">OPEN</button>
+                <button class="cm-toggle" data-mode="selective">SELECTIVE</button>
+            </div>
+            <div class="cm-mode-hint" id="cmModeHint">First come, first served</div>
             <button class="cm-submit" id="cmSubmit">POST DUEL</button>
             <button class="cm-cancel" id="cmCancel">Cancel</button>
         </div>
@@ -1070,6 +1244,14 @@ function buildDOM() {
                 <div class="wr-record" id="wrJoinerRecord">No one has taken this yet</div>
                 <div class="wr-status" id="wrJoinerStatus"></div>
             </div>
+        </div>
+        <div class="wr-challengers hidden" id="wrChallengers">
+            <div class="wr-challengers-title">CHALLENGERS</div>
+            <div id="wrChallengersList"></div>
+        </div>
+        <div class="wr-challenge-submitted hidden" id="wrChallengeSubmitted">
+            <div class="wr-challenge-submitted-text">CHALLENGE SENT</div>
+            <div class="wr-challenge-submitted-sub" id="wrChallengeWaitText">Waiting for the creator to review your challenge...</div>
         </div>
         <button class="wr-deposit-btn" id="wrDepositBtn" style="display:none;">LOCK IN 0.01 SOL</button>
         <button class="wr-share-btn" id="wrShareBtn">CHALLENGE ON X</button>
@@ -1155,9 +1337,11 @@ function bindEvents() {
 
     // Waiting room cancel
     document.getElementById('wrCancel')?.addEventListener('click', async () => {
-        if (currentMatchId) {
+        if (currentMatchId && _waitingRoomRole !== 'challenger') {
+            // Creator or joiner cancels the match
             try { await api(`/matches/${currentMatchId}/cancel`, { method: 'POST' }); } catch (_) {}
         }
+        // Challenger just leaves — their pending request stays (creator can still accept/decline)
         hideWaitingRoom();
         showLobby();
     });
@@ -1292,6 +1476,20 @@ function setupCreateMatchEvents() {
         });
     });
 
+    // Match mode toggle
+    document.querySelectorAll('#cmModeGroup .cm-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#cmModeGroup .cm-toggle').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            const hint = document.getElementById('cmModeHint');
+            if (hint) {
+                hint.textContent = btn.dataset.mode === 'selective'
+                    ? 'Review challengers before accepting'
+                    : 'First come, first served';
+            }
+        });
+    });
+
     // Cancel
     document.getElementById('cmCancel')?.addEventListener('click', () => {
         els.createModal.classList.add('hidden');
@@ -1310,6 +1508,7 @@ async function handleCreateMatch() {
     const token = document.querySelector('#cmTokenGroup .cm-toggle.selected')?.dataset.token || 'SOL';
     const killTarget = parseInt(document.querySelector('#cmTargetGroup .cm-toggle.selected')?.dataset.target || '7');
     const password = document.getElementById('cmPassword')?.value?.trim() || undefined;
+    const matchMode = document.querySelector('#cmModeGroup .cm-toggle.selected')?.dataset.mode || 'open';
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'CREATING...';
@@ -1321,7 +1520,8 @@ async function handleCreateMatch() {
                 stakeAmount: token === 'SOL' ? Math.round(stakeVal * 1e9) : Math.round(stakeVal * 1e6),
                 stakeToken: token,
                 killTarget,
-                password: password || undefined
+                password: password || undefined,
+                matchMode,
             }),
         });
 
@@ -1498,6 +1698,8 @@ function renderMatches(matches) {
         const amt = token === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
         const stake = `${amt} ${token}`;
         const lock = m.passwordProtected ? ' <span class="wl-lock">&#x1f512;</span>' : '';
+        const selectiveBadge = m.match_mode === 'selective' ? '<span class="wl-selective-badge">SELECTIVE</span>' : '';
+        const isSelective = m.match_mode === 'selective';
         const pfp = m.creator_pfp;
         const avatarHtml = pfp
             ? `<img src="${esc(pfp)}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
@@ -1511,19 +1713,26 @@ function renderMatches(matches) {
         if (m.status === 'in_progress') { badgeClass = 'live'; badgeText = 'LIVE'; }
         else if (amt >= 1) { badgeClass = 'hot'; badgeText = 'HOT'; }
         else if (i === 0) { badgeClass = 'new'; badgeText = 'NEW'; }
+        const actionBtn = isSelective
+            ? `<button class="wl-challenge-btn" data-match-id="${esc(m.id || m.matchId)}">CHALLENGE</button>`
+            : `<button class="wl-join-btn" data-match-id="${esc(m.id || m.matchId)}">JOIN</button>`;
         return `<tr>
-            <td class="wl-creator"><div style="display:flex;align-items:center;gap:8px;">${avatarHtml}<span>${handleHtml}</span>${lock}</div></td>
+            <td class="wl-creator"><div style="display:flex;align-items:center;gap:8px;">${avatarHtml}<span>${handleHtml}</span>${lock}${selectiveBadge}</div></td>
             <td class="wl-record">${esc(record)}</td>
             <td class="wl-stake">${esc(stake)}</td>
             <td><span class="wl-status-badge ${badgeClass}">${badgeText}</span></td>
             <td></td>
-            <td><button class="wl-join-btn" data-match-id="${esc(m.id || m.matchId)}">JOIN</button></td>
+            <td>${actionBtn}</td>
         </tr>`;
     }).join('');
 
     // Bind join buttons
     tbody.querySelectorAll('.wl-join-btn').forEach(btn => {
         btn.addEventListener('click', () => handleJoin(btn.dataset.matchId));
+    });
+    // Bind challenge buttons (selective matches)
+    tbody.querySelectorAll('.wl-challenge-btn').forEach(btn => {
+        btn.addEventListener('click', () => handleChallenge(btn.dataset.matchId));
     });
 }
 
@@ -1621,6 +1830,34 @@ async function handleJoin(matchId) {
     }
 }
 
+// ── Challenge handler (selective matches) ──────────────────────────────────
+async function handleChallenge(matchId) {
+    if (!matchId) return;
+
+    try {
+        const res = await api(`/matches/${matchId}/challenge`, {
+            method: 'POST',
+            body: JSON.stringify({}),
+        });
+
+        if (!res.success) throw new Error(res.error || 'Failed to submit challenge');
+
+        currentMatchId = matchId;
+        showWaitingRoom(matchId, 'challenger');
+        showToast('Challenge sent! Waiting for the creator to accept.');
+    } catch (err) {
+        showErrorModal(err.message);
+    }
+}
+
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#12121a;border:1px solid #aa66ff;color:#aa66ff;padding:0.6rem 1.4rem;font-family:"Inter",system-ui,sans-serif;font-size:0.75rem;z-index:10003;letter-spacing:0.02em;animation:floatUp 0.3s ease-out;';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 4000);
+}
+
 // ── Create match modal ──────────────────────────────────────────────────────
 export function showCreateMatch() {
     // Reset fields
@@ -1629,16 +1866,33 @@ export function showCreateMatch() {
     const pwInput = document.getElementById('cmPassword');
     if (pwInput) pwInput.value = '';
 
+    // Reset mode toggle to OPEN
+    document.querySelectorAll('#cmModeGroup .cm-toggle').forEach(b => {
+        b.classList.toggle('selected', b.dataset.mode === 'open');
+    });
+    const hint = document.getElementById('cmModeHint');
+    if (hint) hint.textContent = 'First come, first served';
+
     els.createModal.classList.remove('hidden');
 }
 
 // ── Waiting room ────────────────────────────────────────────────────────────
-export function showWaitingRoom(matchId) {
+let _waitingRoomRole = null; // 'creator', 'challenger', or null (joiner in open mode)
+let challengePollingInterval = null;
+
+export function showWaitingRoom(matchId, role) {
     currentMatchId = matchId;
+    _waitingRoomRole = role || null;
     // Hide lobby but don't restore start screen
     els.lobby.classList.add('hidden');
     if (lobbyInterval) { clearInterval(lobbyInterval); lobbyInterval = null; }
     els.waiting.classList.remove('hidden');
+
+    // Reset challenge UI
+    const challengersEl = document.getElementById('wrChallengers');
+    const challengeSubmittedEl = document.getElementById('wrChallengeSubmitted');
+    if (challengersEl) challengersEl.classList.add('hidden');
+    if (challengeSubmittedEl) challengeSubmittedEl.classList.add('hidden');
 
     // Populate with current info from create form (best effort)
     pollWaitingRoom(matchId);
@@ -1648,6 +1902,8 @@ export function showWaitingRoom(matchId) {
 function hideWaitingRoom() {
     els.waiting.classList.add('hidden');
     if (waitingInterval) { clearInterval(waitingInterval); waitingInterval = null; }
+    if (challengePollingInterval) { clearInterval(challengePollingInterval); challengePollingInterval = null; }
+    _waitingRoomRole = null;
     currentMatchId = null;
 }
 
@@ -1667,6 +1923,7 @@ async function pollWaitingRoom(matchId) {
             stakeAmount: wrAmt,
             stakeToken: wrToken,
             killTarget: m.kill_target || 7,
+            matchMode: m.match_mode || 'open',
             creatorTwitter: m.creator_twitter,
             creatorPfp: m.creator_pfp,
             joinerTwitter: m.joiner_twitter,
@@ -1682,7 +1939,8 @@ async function pollWaitingRoom(matchId) {
 
         // Status message
         let statusMsg = m.status;
-        if (m.status === 'open') statusMsg = 'OPEN CHALLENGE \u2014 WAITING FOR OPPONENT';
+        if (m.status === 'open' && m.match_mode === 'selective' && amCreator) statusMsg = 'SELECTIVE DUEL \u2014 REVIEWING CHALLENGERS';
+        else if (m.status === 'open') statusMsg = 'OPEN CHALLENGE \u2014 WAITING FOR OPPONENT';
         else if (m.status === 'matched') statusMsg = 'OPPONENT JOINED \u2014 LOCK IN TO START';
         else if (m.status === 'funded_creator') statusMsg = amCreator ? 'YOU\'RE LOCKED IN \u2014 WAITING ON OPPONENT' : 'OPPONENT LOCKED IN \u2014 YOUR MOVE';
         else if (m.status === 'funded_joiner') statusMsg = amCreator ? 'OPPONENT LOCKED IN \u2014 YOUR MOVE' : 'YOU\'RE LOCKED IN \u2014 WAITING ON OPPONENT';
@@ -1781,6 +2039,55 @@ async function pollWaitingRoom(matchId) {
             depositBtn.style.background = '#00ff66';
         }
 
+        // === Selective mode UI ===
+        const challengersEl = document.getElementById('wrChallengers');
+        const challengeSubmittedEl = document.getElementById('wrChallengeSubmitted');
+        const isSelective = m.match_mode === 'selective';
+
+        if (isSelective && !m.joiner_id) {
+            if (amCreator) {
+                // Creator: show challengers list, poll for challenges
+                if (challengeSubmittedEl) challengeSubmittedEl.classList.add('hidden');
+                if (challengersEl) challengersEl.classList.remove('hidden');
+                pollChallengersList(matchId);
+                if (!challengePollingInterval) {
+                    challengePollingInterval = setInterval(() => pollChallengersList(matchId), 3000);
+                }
+            } else if (_waitingRoomRole === 'challenger') {
+                // Challenger: show "challenge submitted" state
+                if (challengersEl) challengersEl.classList.add('hidden');
+                if (challengeSubmittedEl) {
+                    challengeSubmittedEl.classList.remove('hidden');
+                    const waitText = document.getElementById('wrChallengeWaitText');
+                    if (waitText) waitText.textContent = `Waiting for @${m.creator_twitter || 'creator'} to review your challenge...`;
+                }
+            }
+        } else {
+            // Not selective or already matched — hide challenge UI
+            if (challengersEl) challengersEl.classList.add('hidden');
+            if (challengeSubmittedEl) challengeSubmittedEl.classList.add('hidden');
+            if (challengePollingInterval) { clearInterval(challengePollingInterval); challengePollingInterval = null; }
+        }
+
+        // Challenger got declined — check by polling match details
+        if (isSelective && _waitingRoomRole === 'challenger' && !m.joiner_id) {
+            // Check if our challenge was declined
+            try {
+                const challengeData = await api(`/matches/${matchId}`);
+                const matchData = challengeData.data || challengeData;
+                // If we're the joiner, we got accepted — handled by matched state below
+                // If match still open and we're not joiner, check if we were declined
+                // We can't easily check from this endpoint, so we rely on status changes
+            } catch(_) {}
+        }
+
+        // Challenger got accepted — they become joiner
+        if (isSelective && _waitingRoomRole === 'challenger' && m.joiner_id && me && m.joiner_id === me.id) {
+            // We got accepted! Hide challenge submitted, show normal matched state
+            if (challengeSubmittedEl) challengeSubmittedEl.classList.add('hidden');
+            _waitingRoomRole = null; // Now we're a normal joiner
+        }
+
         // Both funded — start the match
         if (m.status === 'funded_both') {
             hideWaitingRoom();
@@ -1794,6 +2101,86 @@ async function pollWaitingRoom(matchId) {
         }
     } catch (err) {
         console.warn('Waiting room poll error:', err);
+    }
+}
+
+// ── Challenge list polling (for selective match creators) ───────────────────
+async function pollChallengersList(matchId) {
+    try {
+        const data = await api(`/matches/${matchId}/challenges`);
+        if (!data.success) return;
+
+        const challenges = data.data || [];
+        const listEl = document.getElementById('wrChallengersList');
+        if (!listEl) return;
+
+        if (challenges.length === 0) {
+            listEl.innerHTML = '<div class="wr-challengers-empty">No challengers yet. Share your duel to attract opponents.</div>';
+            return;
+        }
+
+        const avatarColor = (name) => {
+            const colors = ['#00ff66','#ff8800','#00bbff','#ff3366','#aa66ff','#ffcc00','#00ffcc'];
+            let hash = 0;
+            for (let i = 0; i < (name||'').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            return colors[Math.abs(hash) % colors.length];
+        };
+
+        listEl.innerHTML = challenges.map(c => {
+            const handle = c.twitter_handle || 'unknown';
+            const avatarHtml = c.profile_picture
+                ? `<div class="wr-challenger-avatar" style="background:url(${esc(c.profile_picture)}) center/cover;"></div>`
+                : `<div class="wr-challenger-avatar" style="background:${avatarColor(handle)};">${esc(handle[0]?.toUpperCase() || '?')}</div>`;
+            const handleLink = handle !== 'unknown'
+                ? `<a href="https://x.com/${esc(handle)}" target="_blank" rel="noopener">@${esc(handle)}</a>`
+                : '@unknown';
+            return `<div class="wr-challenger-row">
+                ${avatarHtml}
+                <div class="wr-challenger-info">
+                    <div class="wr-challenger-handle">${handleLink}</div>
+                    <div class="wr-challenger-stats">${c.wins || 0}W - ${c.losses || 0}L &bull; ELO ${c.elo || 1000}</div>
+                </div>
+                <div class="wr-challenger-actions">
+                    <button class="wr-challenger-accept" data-request-id="${esc(c.id)}">ACCEPT</button>
+                    <button class="wr-challenger-decline" data-request-id="${esc(c.id)}">DECLINE</button>
+                </div>
+            </div>`;
+        }).join('');
+
+        // Bind accept/decline buttons
+        listEl.querySelectorAll('.wr-challenger-accept').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                btn.textContent = '...';
+                btn.disabled = true;
+                try {
+                    const res = await api(`/matches/${matchId}/challenges/${btn.dataset.requestId}/accept`, { method: 'POST' });
+                    if (!res.success) throw new Error(res.error);
+                    // Match is now matched, normal flow takes over via pollWaitingRoom
+                } catch (e) {
+                    showErrorModal('Failed to accept: ' + e.message);
+                    btn.textContent = 'ACCEPT';
+                    btn.disabled = false;
+                }
+            });
+        });
+        listEl.querySelectorAll('.wr-challenger-decline').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                btn.textContent = '...';
+                btn.disabled = true;
+                try {
+                    const res = await api(`/matches/${matchId}/challenges/${btn.dataset.requestId}/decline`, { method: 'POST' });
+                    if (!res.success) throw new Error(res.error);
+                    // Refresh list
+                    pollChallengersList(matchId);
+                } catch (e) {
+                    showErrorModal('Failed to decline: ' + e.message);
+                    btn.textContent = 'DECLINE';
+                    btn.disabled = false;
+                }
+            });
+        });
+    } catch (err) {
+        console.warn('Failed to poll challengers:', err);
     }
 }
 

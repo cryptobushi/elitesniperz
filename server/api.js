@@ -114,7 +114,7 @@ router.get('/profile/:userId', (req, res) => {
 // ---------------------------------------------------------------------------
 router.post('/matches', authMiddleware, async (req, res) => {
     try {
-        const { stakeAmount, stakeToken, killTarget, password } = req.body || {};
+        const { stakeAmount, stakeToken, killTarget, password, matchMode } = req.body || {};
 
         if (!stakeAmount || stakeAmount <= 0) {
             return res.status(400).json(fail('stakeAmount must be greater than 0'));
@@ -124,6 +124,10 @@ router.post('/matches', authMiddleware, async (req, res) => {
         }
         if (!VALID_KILL_TARGETS.includes(killTarget)) {
             return res.status(400).json(fail(`killTarget must be one of: ${VALID_KILL_TARGETS.join(', ')}`));
+        }
+        const mode = matchMode || 'open';
+        if (!['open', 'selective'].includes(mode)) {
+            return res.status(400).json(fail('matchMode must be "open" or "selective"'));
         }
 
         let passwordHash = null;
@@ -138,6 +142,7 @@ router.post('/matches', authMiddleware, async (req, res) => {
             stake_token: stakeToken,
             kill_target: killTarget,
             password_hash: passwordHash,
+            match_mode: mode,
             status: 'open',
             created_at: Date.now(),
         });
@@ -227,6 +232,10 @@ router.post('/matches/:id/join', authMiddleware, async (req, res) => {
             return res.status(400).json(fail('Match is not available to join'));
         }
 
+        if (match.match_mode === 'selective') {
+            return res.status(400).json(fail('This is a selective duel. Submit a challenge request instead.'));
+        }
+
         if (match.creator_id === req.privyUserId) {
             return res.status(400).json(fail('Cannot join your own match'));
         }
@@ -302,11 +311,139 @@ router.post('/matches/:id/cancel', authMiddleware, async (req, res) => {
         }
 
         db.updateMatch(req.params.id, { status: 'cancelled' });
+        db.expireChallengeRequests(req.params.id);
         cleanupPendingLockIn(req.params.id);
         return res.json(success({ cancelled: true }));
     } catch (e) {
         console.error('POST /matches/:id/cancel error:', e);
         return res.status(500).json(fail('Failed to cancel match'));
+    }
+});
+
+// ---------------------------------------------------------------------------
+// POST /matches/:id/challenge — submit a challenge request (selective mode)
+// ---------------------------------------------------------------------------
+router.post('/matches/:id/challenge', authMiddleware, (req, res) => {
+    try {
+        const match = db.getMatch(req.params.id);
+        if (!match) return res.status(404).json(fail('Match not found'));
+
+        if (match.match_mode !== 'selective') {
+            return res.status(400).json(fail('This match is open. Use join instead.'));
+        }
+        if (match.status !== 'open' && match.status !== 'funded_creator') {
+            return res.status(400).json(fail('Match is not available for challenges'));
+        }
+        if (match.creator_id === req.privyUserId) {
+            return res.status(400).json(fail('Cannot challenge your own match'));
+        }
+        if (match.joiner_id) {
+            return res.status(400).json(fail('Match already has an opponent'));
+        }
+
+        const existing = db.getMyPendingChallenge(req.params.id, req.privyUserId);
+        if (existing) {
+            return res.status(400).json(fail('You already have a pending challenge for this match'));
+        }
+
+        const challenge = db.createChallengeRequest({
+            id: uuidv4(),
+            match_id: req.params.id,
+            challenger_id: req.privyUserId,
+        });
+
+        return res.status(201).json(success(challenge));
+    } catch (e) {
+        console.error('POST /matches/:id/challenge error:', e);
+        return res.status(500).json(fail('Failed to submit challenge'));
+    }
+});
+
+// ---------------------------------------------------------------------------
+// GET /matches/:id/challenges — list pending challenge requests (creator only)
+// ---------------------------------------------------------------------------
+router.get('/matches/:id/challenges', authMiddleware, (req, res) => {
+    try {
+        const match = db.getMatch(req.params.id);
+        if (!match) return res.status(404).json(fail('Match not found'));
+
+        if (match.creator_id !== req.privyUserId) {
+            return res.status(403).json(fail('Only the match creator can view challenges'));
+        }
+
+        const challenges = db.getChallengeRequests(req.params.id);
+        return res.json(success(challenges));
+    } catch (e) {
+        console.error('GET /matches/:id/challenges error:', e);
+        return res.status(500).json(fail('Failed to fetch challenges'));
+    }
+});
+
+// ---------------------------------------------------------------------------
+// POST /matches/:id/challenges/:requestId/accept — accept a challenger
+// ---------------------------------------------------------------------------
+router.post('/matches/:id/challenges/:requestId/accept', authMiddleware, (req, res) => {
+    try {
+        const match = db.getMatch(req.params.id);
+        if (!match) return res.status(404).json(fail('Match not found'));
+
+        if (match.creator_id !== req.privyUserId) {
+            return res.status(403).json(fail('Only the match creator can accept challenges'));
+        }
+        if (match.status !== 'open' && match.status !== 'funded_creator') {
+            return res.status(400).json(fail('Match is no longer available'));
+        }
+        if (match.joiner_id) {
+            return res.status(400).json(fail('Match already has an opponent'));
+        }
+
+        const challenge = db.getChallengeRequest(req.params.requestId);
+        if (!challenge) return res.status(404).json(fail('Challenge request not found'));
+        if (challenge.match_id !== req.params.id) return res.status(400).json(fail('Challenge does not belong to this match'));
+        if (challenge.status !== 'pending') return res.status(400).json(fail('Challenge is no longer pending'));
+
+        // Set the challenger as joiner
+        const joined = db.joinMatch(req.params.id, challenge.challenger_id);
+        if (!joined) return res.status(400).json(fail('Failed to set challenger as opponent'));
+
+        // Move to matched
+        db.updateMatch(req.params.id, { status: 'matched' });
+
+        // Mark this request accepted, expire all others
+        db.updateChallengeRequest(req.params.requestId, 'accepted');
+        db.expireChallengeRequests(req.params.id);
+
+        const refreshed = db.getMatch(req.params.id);
+        const { password_hash: pw, ...rest } = refreshed;
+        return res.json(success({ ...rest, passwordProtected: !!pw }));
+    } catch (e) {
+        console.error('POST /matches/:id/challenges/:requestId/accept error:', e);
+        return res.status(500).json(fail('Failed to accept challenge'));
+    }
+});
+
+// ---------------------------------------------------------------------------
+// POST /matches/:id/challenges/:requestId/decline — decline a challenger
+// ---------------------------------------------------------------------------
+router.post('/matches/:id/challenges/:requestId/decline', authMiddleware, (req, res) => {
+    try {
+        const match = db.getMatch(req.params.id);
+        if (!match) return res.status(404).json(fail('Match not found'));
+
+        if (match.creator_id !== req.privyUserId) {
+            return res.status(403).json(fail('Only the match creator can decline challenges'));
+        }
+
+        const challenge = db.getChallengeRequest(req.params.requestId);
+        if (!challenge) return res.status(404).json(fail('Challenge request not found'));
+        if (challenge.match_id !== req.params.id) return res.status(400).json(fail('Challenge does not belong to this match'));
+        if (challenge.status !== 'pending') return res.status(400).json(fail('Challenge is no longer pending'));
+
+        db.updateChallengeRequest(req.params.requestId, 'declined');
+        return res.json(success({ declined: true }));
+    } catch (e) {
+        console.error('POST /matches/:id/challenges/:requestId/decline error:', e);
+        return res.status(500).json(fail('Failed to decline challenge'));
     }
 });
 
@@ -735,6 +872,7 @@ setInterval(() => {
         const stale = db.getStaleFundedMatches(Date.now() - 10 * 60 * 1000);
         for (const match of stale) {
             db.updateMatch(match.id, { status: 'cancelled' });
+            db.expireChallengeRequests(match.id);
             _pendingLockIns.delete(match.id);
             console.log('[CLEANUP] Lock-in expired for match ' + match.id);
         }

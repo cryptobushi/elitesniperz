@@ -1363,6 +1363,11 @@ setInterval(function() {
             .run(Date.now() - 15 * 60 * 1000);
         const total = (openResult?.changes || 0) + (matchedResult?.changes || 0);
         if (total > 0) {
+            // Expire challenge requests for any expired matches
+            const expiredMatches = db.db.prepare("SELECT id FROM matches WHERE status = 'expired'").all();
+            for (const em of expiredMatches) {
+                db.expireChallengeRequests(em.id);
+            }
             console.log('[CLEANUP] Expired ' + total + ' stale matches');
         }
     } catch (e) {

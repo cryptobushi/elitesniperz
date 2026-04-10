@@ -38,8 +38,20 @@ CREATE TABLE IF NOT EXISTS matches (
     creator_kills   INTEGER DEFAULT 0,
     joiner_kills    INTEGER DEFAULT 0,
     creator_deaths  INTEGER DEFAULT 0,
-    joiner_deaths   INTEGER DEFAULT 0
+    joiner_deaths   INTEGER DEFAULT 0,
+    match_mode      TEXT DEFAULT 'open'          -- 'open' or 'selective'
 );
+
+-- Challenge requests (for selective duels)
+CREATE TABLE IF NOT EXISTS challenge_requests (
+    id              TEXT PRIMARY KEY,
+    match_id        TEXT NOT NULL REFERENCES matches(id),
+    challenger_id   TEXT NOT NULL REFERENCES users(id),
+    status          TEXT NOT NULL DEFAULT 'pending',  -- pending, accepted, declined, expired
+    created_at      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_challenges_match ON challenge_requests(match_id);
+CREATE INDEX IF NOT EXISTS idx_challenges_challenger ON challenge_requests(challenger_id);
 
 -- On-chain transaction log
 CREATE TABLE IF NOT EXISTS transactions (
