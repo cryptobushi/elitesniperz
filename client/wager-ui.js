@@ -1380,6 +1380,45 @@ function renderMatches(matches) {
     });
 }
 
+function showPasswordModal() {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,5,10,0.9);z-index:10002;display:flex;align-items:center;justify-content:center;font-family:"Inter",system-ui,sans-serif;';
+        overlay.innerHTML = `
+            <div style="background:#12121a;border:1px solid #2a2a3a;padding:2rem;width:min(90%,360px);text-align:center;">
+                <div style="font-family:'Oswald',sans-serif;font-size:1.2rem;font-weight:700;color:#e8e8ec;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.3rem;">PRIVATE DUEL</div>
+                <div style="color:#888894;font-size:0.7rem;margin-bottom:1.2rem;">This match requires a password to join</div>
+                <input id="pwModalInput" type="password" placeholder="Enter password"
+                    style="width:100%;padding:12px;background:#0a0a0f;border:1px solid #2a2a3a;color:#e8e8ec;font-family:'Inter',system-ui,sans-serif;font-size:0.85rem;text-align:center;box-sizing:border-box;margin-bottom:0.8rem;transition:border-color 0.15s;" />
+                <div id="pwModalError" style="color:#ff3344;font-size:0.65rem;min-height:1em;margin-bottom:0.6rem;"></div>
+                <button id="pwModalSubmit" style="width:100%;padding:12px;background:#00ff66;border:none;color:#0a0a0f;font-family:'Inter',system-ui,sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;transition:opacity 0.15s;">JOIN DUEL</button>
+                <div id="pwModalCancel" style="color:#55555f;font-size:0.65rem;cursor:pointer;transition:color 0.15s;">Cancel</div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        const cleanup = () => { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); };
+        const input = document.getElementById('pwModalInput');
+        setTimeout(() => input?.focus(), 100);
+
+        document.getElementById('pwModalSubmit').addEventListener('click', () => {
+            const val = input?.value?.trim();
+            if (!val) { document.getElementById('pwModalError').textContent = 'Enter a password'; return; }
+            cleanup();
+            resolve(val);
+        });
+        input?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const val = input.value.trim();
+                if (!val) return;
+                cleanup();
+                resolve(val);
+            }
+        });
+        document.getElementById('pwModalCancel').addEventListener('click', () => { cleanup(); resolve(null); });
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) { cleanup(); resolve(null); } });
+    });
+}
+
 async function handleJoin(matchId) {
     if (!matchId) return;
 
@@ -1390,9 +1429,9 @@ async function handleJoin(matchId) {
             body: JSON.stringify({}),
         });
 
-        // If password required, prompt and retry
+        // If password required, show styled modal and retry
         if (!res.success && res.error && res.error.toLowerCase().includes('password')) {
-            const password = prompt('This match is password protected. Enter password:');
+            const password = await showPasswordModal();
             if (!password) return;
             res = await api(`/matches/${matchId}/join`, {
                 method: 'POST',
