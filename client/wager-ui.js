@@ -90,6 +90,92 @@ const STYLES = `
 .wl-topbar .wl-btn:hover { background: #2a2a3a; color: #e8e8ec; border-color: #00ff66; }
 .wl-topbar .wl-btn:active { opacity: 0.8; }
 
+/* My Duels management section */
+.wl-my-duels {
+    width: 100%;
+    max-width: 640px;
+    padding: 0.8rem 1rem;
+    flex-shrink: 0;
+}
+.wl-my-duels.hidden { display: none; }
+.wl-my-duels-header {
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.75rem;
+    color: #888894;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+.wl-my-duel-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 0.8rem;
+    background: #12121a;
+    border: 1px solid #1e1e2a;
+    margin-bottom: 0.4rem;
+    gap: 0.5rem;
+}
+.wl-my-duel-info {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.75rem;
+    color: #e8e8ec;
+    flex: 1;
+    min-width: 0;
+}
+.wl-my-duel-stake {
+    color: #00ff66;
+    font-weight: 700;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+.wl-my-duel-target {
+    color: #888894;
+    font-size: 0.65rem;
+    white-space: nowrap;
+}
+.wl-my-duel-status {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+}
+.wl-my-duel-status.waiting { background: rgba(255,136,0,0.12); color: #ff8800; }
+.wl-my-duel-status.open { background: rgba(0,255,102,0.1); color: #00ff66; }
+.wl-my-duel-cancel {
+    padding: 4px 12px;
+    background: none;
+    border: 1px solid #2a2a3a;
+    color: #ff3344;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.6rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.wl-my-duel-cancel:hover { border-color: #ff3344; background: rgba(255,51,68,0.08); }
+.wl-my-duel-resume {
+    padding: 4px 12px;
+    background: none;
+    border: 1px solid #00ff66;
+    color: #00ff66;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.6rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.wl-my-duel-resume:hover { background: rgba(0,255,102,0.08); }
+
 .wl-header {
     width: 100%;
     max-width: 640px;
@@ -899,6 +985,10 @@ function buildDOM() {
                 <button id="wdCancel" style="width:100%;padding:6px;background:none;border:none;color:#55555f;font-family:inherit;font-size:0.7rem;cursor:pointer;">Cancel</button>
             </div>
         </div>
+        <div id="wlMyDuels" class="wl-my-duels hidden">
+            <div class="wl-my-duels-header">YOUR OPEN DUELS</div>
+            <div id="wlMyDuelsList"></div>
+        </div>
         <div class="wl-header">
             <div class="wl-title"><span class="wl-pulse"></span> OPEN DUELS</div>
             <div class="wl-subtitle">Accept a challenge or post your own</div>
@@ -1334,6 +1424,60 @@ async function fetchMatches() {
 function renderMatches(matches) {
     const tbody = els.wlMatches;
     const empty = els.wlEmpty;
+
+    // Render "My Duels" management section
+    const me = getUser();
+    const myId = me?.id;
+    const myDuels = myId ? matches.filter(m =>
+        m.creator_id === myId && ['open', 'funded_creator', 'matched'].includes(m.status)
+    ) : [];
+    const myDuelsEl = document.getElementById('wlMyDuels');
+    const myDuelsListEl = document.getElementById('wlMyDuelsList');
+    if (myDuelsEl && myDuelsListEl) {
+        if (myDuels.length > 0) {
+            myDuelsEl.classList.remove('hidden');
+            myDuelsListEl.innerHTML = myDuels.map(m => {
+                const token = m.stake_token || 'SOL';
+                const amt = token === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
+                const target = m.kill_target || 7;
+                const hasJoiner = !!m.joiner_id;
+                const statusClass = hasJoiner ? 'waiting' : 'open';
+                const statusText = hasJoiner ? 'MATCHED' : 'WAITING';
+                return `<div class="wl-my-duel-row">
+                    <div class="wl-my-duel-info">
+                        <span class="wl-my-duel-stake">${amt} ${token}</span>
+                        <span class="wl-my-duel-target">FT${target}</span>
+                        <span class="wl-my-duel-status ${statusClass}">${statusText}</span>
+                    </div>
+                    <div style="display:flex;gap:0.4rem;">
+                        ${hasJoiner ? `<button class="wl-my-duel-resume" data-match-id="${m.id}">RESUME</button>` : ''}
+                        <button class="wl-my-duel-cancel" data-match-id="${m.id}">CANCEL</button>
+                    </div>
+                </div>`;
+            }).join('');
+            // Bind cancel buttons
+            myDuelsListEl.querySelectorAll('.wl-my-duel-cancel').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const matchId = btn.dataset.matchId;
+                    btn.textContent = '...';
+                    btn.disabled = true;
+                    try {
+                        await api(`/matches/${matchId}/cancel`, { method: 'POST' });
+                    } catch(_) {}
+                    fetchMatches();
+                });
+            });
+            // Bind resume buttons
+            myDuelsListEl.querySelectorAll('.wl-my-duel-resume').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    showWaitingRoom(btn.dataset.matchId);
+                });
+            });
+        } else {
+            myDuelsEl.classList.add('hidden');
+            myDuelsListEl.innerHTML = '';
+        }
+    }
 
     const openMatches = matches.filter(m => m.status === 'open' || m.status === 'funded_creator');
 
