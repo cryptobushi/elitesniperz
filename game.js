@@ -2119,18 +2119,13 @@ class Player {
                 }).filter(Boolean).join('  ');
                 killerItems = `\n${items}`;
             }
-            const preBefore = _playerPrice.toFixed(2);
             document.getElementById('deathKiller').innerHTML =
-                `Rugged by ${killerName}` +
-                `<div style="margin-top:0.4rem;font-size:0.9rem;color:#ff4444;">$${preBefore} → $${(_playerPrice * 0.5).toFixed(2)}</div>` +
+                `Killed by ${killerName}` +
                 (killerItems ? `<div style="margin-top:0.3rem;font-size:0.7rem;color:#ffd700;">${killerItems}</div>` : '');
 
             popup.classList.add('hidden');
             void popup.offsetHeight;
             popup.classList.remove('hidden');
-
-            // Draw the death chart — your price history ending in a crash
-            drawDeathChart();
 
             setTimeout(() => popup.classList.add('hidden'), 5000);
         }
@@ -2565,8 +2560,8 @@ function addKillFeed(killer, victim) {
     const isPlayerKill = gameState.player && killer === gameState.player.username;
     const isPlayerDeath = gameState.player && victim === gameState.player.username;
     message.className = 'kill-message ' + (isPlayerKill ? 'buy' : isPlayerDeath ? 'sell' : '');
-    message.textContent = isPlayerKill ? `BUY $${killer} +${_playerPrice.toFixed(2)} (killed ${victim})`
-        : isPlayerDeath ? `LIQUIDATED $${victim} (by ${killer})`
+    message.textContent = isPlayerKill ? `${killer} killed ${victim}`
+        : isPlayerDeath ? `${killer} killed ${victim}`
         : `${killer} > ${victim}`;
     killFeed.appendChild(message);
 
@@ -2602,25 +2597,21 @@ function updateScoreboard() {
     });
 
     let html = `<div class="sb-table-wrap">
-        <div class="sb-title">WATCHLIST</div>
+        <div class="sb-title">SCOREBOARD</div>
         <table class="sb-table">
-            <tr><th>#</th><th>TICKER</th><th>K/D</th><th>CHART</th><th>PRICE</th></tr>
+            <tr><th>#</th><th>PLAYER</th><th>KILLS</th><th>DEATHS</th><th>GOLD</th></tr>
     `;
 
     all.forEach((p, i) => {
         const isMe = p === gameState.player;
         const teamClass = p.team === 'red' ? 'sb-team-red' : 'sb-team-blue';
-        const ticker = '$' + p.username.toUpperCase().slice(0, 5);
-        const pctChange = ((p.price - 1.0) / 1.0 * 100);
-        const pctColor = pctChange >= 0 ? '#00ff44' : '#ff4444';
-        const pctText = (pctChange >= 0 ? '+' : '') + pctChange.toFixed(0) + '%';
 
         html += `<tr class="sb-row ${teamClass} ${isMe ? 'me' : ''}">
             <td style="color:#555;">${i + 1}</td>
-            <td class="sb-ticker">${ticker}</td>
-            <td class="sb-kd">${p.kills}/${p.deaths}</td>
-            <td><canvas class="sb-chart" data-player-idx="${i}" width="80" height="24"></canvas></td>
-            <td class="sb-price" style="color:${pctColor};">$${p.price.toFixed(2)} <span style="font-size:0.6rem;">${pctText}</span></td>
+            <td class="sb-ticker">${p.username}</td>
+            <td style="color:#00ff66;font-weight:600;">${p.kills}</td>
+            <td style="color:#ff3344;font-weight:600;">${p.deaths}</td>
+            <td style="color:#ffd700;">${p.gold || 0}</td>
         </tr>`;
     });
 
@@ -4133,13 +4124,10 @@ function handleJsonMessage(msg) {
                 gameState.targetLock = null;
 
                 const popup = document.getElementById('deathPopup');
-                document.getElementById('deathKiller').innerHTML =
-                    'Rugged by ' + msg.kn +
-                    '<div style="margin-top:0.4rem;font-size:0.9rem;color:#ff4444;">$' + _playerPrice.toFixed(2) + ' -> $' + (_playerPrice * 0.5).toFixed(2) + '</div>';
+                document.getElementById('deathKiller').innerHTML = 'Killed by ' + msg.kn;
                 popup.classList.add('hidden');
                 void popup.offsetHeight;
                 popup.classList.remove('hidden');
-                drawDeathChart();
                 setTimeout(() => popup.classList.add('hidden'), 5000);
                 resetStreakChart();
             }

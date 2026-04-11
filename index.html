@@ -1965,23 +1965,21 @@
                 border:1px solid #1F2933;
                 border-radius:2px;
                 padding:6px 10px;
-                min-width:150px;
                 font-family:'Courier New',monospace;
                 pointer-events:all;
                 backdrop-filter:blur(4px);
             ">
-                <div style="display:flex;align-items:baseline;gap:6px;">
-                    <span id="ticker" class="term-ticker" style="color:#00ff66;font-size:0.85rem;font-weight:700;letter-spacing:0.04em;">$YOU</span>
-                    <span id="price" class="term-price" style="color:#e8e8ec;font-size:0.8rem;font-weight:600;">1.00</span>
-                    <span id="pctChange" class="term-pct" style="color:#00ff66;font-size:0.6rem;font-weight:500;">+0.0%</span>
+                <div style="display:flex;gap:12px;font-size:0.7rem;letter-spacing:0.03em;">
+                    <span style="color:#55555f;">KILLS <span id="killCount" style="color:#00ff66;font-weight:700;font-size:0.85rem;">0</span></span>
+                    <span style="color:#55555f;">DEATHS <span id="deathCount" style="color:#ff3344;font-weight:700;font-size:0.85rem;">0</span></span>
+                    <span style="color:#55555f;">GOLD <span id="goldCount" style="color:#ffd700;font-weight:700;font-size:0.85rem;">0</span></span>
                 </div>
-                <div style="display:flex;gap:10px;margin-top:4px;font-size:0.58rem;color:#55555f;letter-spacing:0.03em;">
-                    <span style="color:#55555f;">K <span id="killCount" style="color:#00ff66;font-weight:600;">0</span></span>
-                    <span style="color:#55555f;">D <span id="deathCount" style="color:#ff3344;font-weight:600;">0</span></span>
-                    <span style="color:#55555f;">G <span id="goldCount" style="color:#ffd700;font-weight:600;">0c</span></span>
-                </div>
-                <canvas id="hudChart" width="140" height="40" style="margin-top:4px;border-radius:1px;background:#080C10;border:1px solid #1A1F26;"></canvas>
             </div>
+            <!-- Hidden elements game.js writes to (kept so JS doesn't error) -->
+            <span id="ticker" style="display:none;"></span>
+            <span id="price" style="display:none;"></span>
+            <span id="pctChange" style="display:none;"></span>
+            <canvas id="hudChart" style="display:none;" width="1" height="1"></canvas>
             <!-- Top-right panel: FPS + MENU grouped -->
             <div id="topRightPanel">
                 <span class="trp-fps" id="trpFps">FPS: --</span>
@@ -2040,20 +2038,7 @@
 
         <div id="deathPopup" class="hidden">
             <div id="deathOverlay"></div>
-            <div id="deathCandle" style="
-                position:relative; z-index:1; display:flex; flex-direction:column;
-                align-items:center; animation:deathSubIn 0.5s ease-out 0.1s forwards; opacity:0;
-            ">
-                <div style="width:5px;height:40px;background:linear-gradient(to bottom,#cc0000,#ff2222);box-shadow:0 0 10px #ff2222;margin-bottom:2px;animation:candleGrow 0.3s ease-out 0.3s both;transform-origin:top;"></div>
-                <div style="width:24px;height:80px;background:linear-gradient(to bottom,#cc0000,#ff2222);box-shadow:0 0 20px #ff2222,0 0 40px #cc000066;border-radius:2px;animation:candleGrow 0.25s ease-out 0.2s both;transform-origin:top;"></div>
-                <div style="width:5px;height:16px;background:#990000;margin-top:2px;"></div>
-            </div>
-            <div id="deathText">LIQUIDATED</div>
-            <canvas id="deathChart" width="250" height="80" style="
-                position:relative; z-index:1; border-radius:4px; background:#0a0a0a;
-                border:1px solid #ff222233; margin-top:0.5rem;
-                opacity:0; animation:deathSubIn 0.5s ease-out 1s forwards;
-            "></canvas>
+            <div id="deathText">ELIMINATED</div>
             <div id="deathKiller"></div>
             <button id="respawnBtn">RETURN TO SPAWN</button>
         </div>
