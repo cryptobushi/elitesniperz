@@ -2254,11 +2254,32 @@ function updateGoldUI() {
 }
 
 // === TRADING TERMINAL — price tracking + HUD chart ===
+// Price system removed — stubs kept so callers don't error
 let _playerPrice = 1.00;
 let _priceHistory = [1.00];
 let _startPrice = 1.00;
+function updateTerminal() {}
+function drawHudChart() {}
+function pumpPrice() {}
+function dumpPrice() {}
+function spawnFlyingCandle() {}
+function resetStreakChart() {}
+function drawDeathChart() {}
+function showGoldPopup(text) {
+    // Simple floating gold text
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);color:#ffd700;font-family:Oswald,sans-serif;font-size:1.5rem;font-weight:700;pointer-events:none;z-index:9999;text-shadow:0 0 10px rgba(255,215,0,0.5);animation:goldFloat 1s ease-out forwards;';
+    el.textContent = text;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
+}
 
-function updateTerminal() {
+/* --- REMOVED: updateTerminal, drawHudChart, pumpPrice, dumpPrice,
+   spawnFlyingCandle, resetStreakChart, drawDeathChart, flying candle system,
+   price tracking chart code --- */
+
+/* Old price/candle/chart code removed — block starts here
+if (false) {
     const pct = ((_playerPrice - _startPrice) / _startPrice * 100);
     const el = document.getElementById('price');
     if (el) el.textContent = _playerPrice.toFixed(2);
@@ -2551,8 +2572,7 @@ function showStreakPopup(text, color) {
     // Big flying candle for streaks — mark active so green candle doesn't override
     _streakCandleActive = true;
     spawnFlyingCandle(text, color, boost * 5);
-    setTimeout(() => { _streakCandleActive = false; }, 1200);
-}
+End of removed price code block */
 
 function addKillFeed(killer, victim) {
     const killFeed = document.getElementById('killFeed');
@@ -2585,7 +2605,7 @@ function updateScoreboard() {
     }
 
     // Sort by price descending
-    all.sort((a, b) => b.price - a.price);
+    all.sort((a, b) => b.kills - a.kills);
 
     // Track price history per player for sparklines
     all.forEach(p => {
@@ -4232,7 +4252,7 @@ function showMatchEnd(msg) {
             '<div class="stat-box"><div class="stat-val">' + me.k + '</div><div class="stat-label">Kills</div></div>' +
             '<div class="stat-box"><div class="stat-val">' + me.d + '</div><div class="stat-label">Deaths</div></div>' +
             '<div class="stat-box"><div class="stat-val">' + kd + '</div><div class="stat-label">K/D</div></div>' +
-            '<div class="stat-box"><div class="stat-val">$' + me.p.toFixed(1) + '</div><div class="stat-label">Price</div></div>';
+            '<div class="stat-box"><div class="stat-val">' + (me.g || 0) + '</div><div class="stat-label">Gold</div></div>';
     } else {
         yourStats.innerHTML = '';
     }
