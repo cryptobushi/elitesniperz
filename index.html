@@ -1490,15 +1490,42 @@
         @media (max-width: 768px), (max-height: 500px) {
             #controls { display: none !important; }
 
-            #terminal { padding: 4px 8px; min-width: 120px; }
-            #terminal .term-ticker { font-size: 0.75rem; }
-            #terminal .term-price { font-size: 0.65rem; }
-            #terminal .term-pct { font-size: 0.5rem; }
-            #hudChart { width: 100px; height: 30px; }
+            #terminal { padding: 4px 8px; min-width: 100px; }
+            #terminal { font-size: 0.6rem; }
 
-            .ability { padding: 4px 8px; gap: 3px; }
-            .ability-key { font-size: 0.6rem; }
-            .ability-name { font-size: 0.4rem; }
+            /* Mobile abilities — large touch targets */
+            #abilities {
+                bottom: 0;
+                left: 0;
+                right: 0;
+                transform: none;
+                width: 100%;
+                justify-content: stretch;
+                border-left: none;
+                border-right: none;
+                border-bottom: none;
+                border-radius: 0;
+                padding-bottom: max(env(safe-area-inset-bottom, 4px), 4px);
+            }
+            .ability {
+                flex: 1;
+                padding: 12px 6px;
+                justify-content: center;
+                flex-direction: column;
+                gap: 2px;
+                min-height: 48px;
+            }
+            .ability-key {
+                font-size: 0.85rem;
+                font-weight: 800;
+            }
+            .ability-name {
+                font-size: 0.5rem;
+                letter-spacing: 0.05em;
+            }
+            .ability:active {
+                background: rgba(0, 255, 102, 0.15);
+            }
 
             .minimap { width: 80px; height: 94px; }
             .minimap-canvas { background-size: 16px 16px; }
