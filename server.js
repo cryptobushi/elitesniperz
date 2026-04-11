@@ -246,7 +246,10 @@ const AFK_TIMEOUT = 120; // seconds before AFK player becomes bot-controlled
 const REJOIN_WINDOW = 300; // seconds to rejoin and recover state
 
 function createPlayer(id, name, team, isBot) {
-    const pos = spawnPos(team);
+    let pos = spawnPos(team);
+    for (let tries = 0; tries < 10 && collidesWithWall(pos.x, pos.z, 0.8); tries++) {
+        pos = spawnPos(team);
+    }
     return {
         id, username: name, team, isBot,
         x: pos.x, z: pos.z, y: terrainY(pos.x, pos.z) + 0.6,
@@ -456,15 +459,22 @@ function updateBot(bot, dt) {
         }
     }
 
-    // If bot is inside a wall, push it out
+    // If bot is inside a wall, aggressively push it out
     if (collidesWithWall(bot.x, bot.z, BOT_RADIUS)) {
-        var pushSpd = bot.speed * dt * 4;
-        for (var a = 0; a < Math.PI * 2; a += Math.PI / 16) {
-            var px = bot.x + Math.cos(a) * pushSpd;
-            var pz = bot.z + Math.sin(a) * pushSpd;
-            if (!collidesWithWall(px, pz, BOT_RADIUS)) {
-                bot.x = px; bot.z = pz; break;
+        var escaped = false;
+        for (var radius = 1; radius <= 8 && !escaped; radius++) {
+            for (var a = 0; a < Math.PI * 2; a += Math.PI / 16) {
+                var px = bot.x + Math.cos(a) * radius;
+                var pz = bot.z + Math.sin(a) * radius;
+                if (!collidesWithWall(px, pz, BOT_RADIUS) && Math.abs(px) < MAP_SIZE/2 - 2 && Math.abs(pz) < MAP_SIZE/2 - 2) {
+                    bot.x = px; bot.z = pz; escaped = true; break;
+                }
             }
+        }
+        // If still stuck after trying 8 units out, teleport to spawn
+        if (!escaped) {
+            var pos = spawnPos(bot.team);
+            bot.x = pos.x; bot.z = pos.z;
         }
     }
 
@@ -709,7 +719,11 @@ function tryShoot(attacker) {
     setTimeout(function() {
         const p = players.get(deadId);
         if (!p) return;
-        const pos = spawnPos(p.team);
+        let pos = spawnPos(p.team);
+        // Ensure spawn isn't inside a wall
+        for (let tries = 0; tries < 10 && collidesWithWall(pos.x, pos.z, 0.8); tries++) {
+            pos = spawnPos(p.team);
+        }
         p.health = 100;
         p.x = pos.x;
         p.z = pos.z;
