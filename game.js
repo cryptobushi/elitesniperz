@@ -3029,7 +3029,9 @@ document.getElementById('startBtn').addEventListener('click', () => {
 });
 
 document.querySelectorAll('.ability').forEach(el => {
-    el.addEventListener('click', () => {
+    el.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+    el.addEventListener('click', (e) => {
+        e.stopPropagation();
         const ability = el.dataset.ability;
         if (ability === 'windwalk') useWindwalk();
         if (ability === 'farsight') useFarsight();
@@ -3053,6 +3055,7 @@ document.getElementById('scoreboard')?.addEventListener('click', () => {
     if (gameState.gameStarted) document.getElementById('scoreboard').classList.add('hidden');
 });
 // Menu button
+document.getElementById('menuBtn')?.addEventListener('mousedown', (e) => { e.stopPropagation(); });
 document.getElementById('menuBtn')?.addEventListener('click', () => {
     document.getElementById('gameMenu')?.classList.remove('hidden');
 });
