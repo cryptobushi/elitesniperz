@@ -2191,7 +2191,7 @@ class Player {
             gameState.gold = this.gold;
             updateGoldUI();
             // Float gold text
-            showGoldPopup(`+${earned}c`);
+            showGoldPopup(`+${earned}g`);
         }
     }
 
@@ -2250,7 +2250,7 @@ class Player {
 // Gold + Shop UI
 function updateGoldUI() {
     const el = document.getElementById('goldCount');
-    if (el) el.textContent = `${gameState.gold}c`;
+    if (el) el.textContent = gameState.gold;
 }
 
 // === TRADING TERMINAL — price tracking + HUD chart ===
@@ -2485,7 +2485,7 @@ function updateShopUI() {
     const inv = gameState.player.inventory;
     const gold = gameState.player.gold;
     const shopGold = document.getElementById('shopGold');
-    if (shopGold) shopGold.textContent = `${gold}c`;
+    if (shopGold) shopGold.textContent = `Gold: ${gold}`;
 
     let html = '';
     for (const [id, item] of Object.entries(SHOP_ITEMS)) {
@@ -2502,7 +2502,7 @@ function updateShopUI() {
         html += `<div class="shop-item${disabled ? ' disabled' : ''}" data-item="${id}">
             <span class="shop-icon">${item.icon}</span>
             <span class="shop-name">${item.name}</span>
-            <span class="shop-cost">${item.cost}c</span>
+            <span class="shop-cost">${item.cost}g</span>
             <span class="shop-desc">${item.desc}${status}</span>
         </div>`;
     }
