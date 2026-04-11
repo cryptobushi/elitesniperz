@@ -1252,8 +1252,8 @@ function buildDOM() {
     createModal.innerHTML = `
         <div class="cm-panel">
             <h2>POST A DUEL</h2>
-            <div class="cm-label">Stake Amount</div>
-            <input type="number" class="cm-input" id="cmStake" placeholder="e.g. 0.05" min="0.1" step="any">
+            <div class="cm-label" style="display:flex;justify-content:space-between;align-items:baseline;">Stake Amount <span id="cmAvailBal" style="font-size:0.55rem;color:#00ff66;font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer;" title="Click to use max"></span></div>
+            <input type="number" class="cm-input" id="cmStake" placeholder="e.g. 0.05" min="0.001" step="any">
             <div class="cm-label">Token</div>
             <div class="cm-toggle-group" id="cmTokenGroup">
                 <button class="cm-toggle selected" data-token="SOL">SOL</button>
@@ -1526,7 +1526,18 @@ function setupCreateMatchEvents() {
         btn.addEventListener('click', () => {
             document.querySelectorAll('#cmTokenGroup .cm-toggle').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
+            _updateCreateModalBalance();
         });
+    });
+
+    // Click available balance to fill max
+    document.getElementById('cmAvailBal')?.addEventListener('click', () => {
+        const token = document.querySelector('#cmTokenGroup .cm-toggle.selected')?.dataset.token || 'SOL';
+        const avail = token === 'SOL' ? _cachedBalance.sol : _cachedBalance.usdc;
+        if (avail > 0) {
+            const input = document.getElementById('cmStake');
+            if (input) input.value = avail >= 1 ? avail.toFixed(2) : avail.toFixed(4);
+        }
     });
 
     // Kill target toggle
@@ -1985,6 +1996,23 @@ export function showCreateMatch() {
     if (hint) hint.textContent = 'First come, first served';
 
     els.createModal.classList.remove('hidden');
+
+    // Show available balance
+    _updateCreateModalBalance();
+}
+
+let _cachedBalance = { sol: 0, usdc: 0 };
+async function _updateCreateModalBalance() {
+    const balEl = document.getElementById('cmAvailBal');
+    if (!balEl) return;
+    try {
+        const bal = await checkBalance();
+        if (bal) _cachedBalance = bal;
+    } catch(_) {}
+    const token = document.querySelector('#cmTokenGroup .cm-toggle.selected')?.dataset.token || 'SOL';
+    const avail = token === 'SOL' ? _cachedBalance.sol : _cachedBalance.usdc;
+    const formatted = typeof avail === 'number' ? (avail >= 1 ? avail.toFixed(2) : avail.toFixed(4)) : '--';
+    balEl.textContent = `${formatted} ${token} available`;
 }
 
 // ── Waiting room ────────────────────────────────────────────────────────────
