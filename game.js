@@ -3163,13 +3163,20 @@ document.getElementById('menuQuit')?.addEventListener('click', () => {
     _myServerId = null;
 });
 
-document.addEventListener('click', (e) => {
+document.addEventListener('mousedown', (e) => {
     if (!gameState.gameStarted) return;
     const shop = document.getElementById('shopPanel');
     if (shop && !shop.classList.contains('hidden') && !e.target.closest('#shopPanel, .ability')) {
         shop.classList.add('hidden');
     }
-});
+}, true); // capture phase — runs before stopPropagation on abilities
+document.addEventListener('touchstart', (e) => {
+    if (!gameState.gameStarted) return;
+    const shop = document.getElementById('shopPanel');
+    if (shop && !shop.classList.contains('hidden') && !e.target.closest('#shopPanel, .ability')) {
+        shop.classList.add('hidden');
+    }
+}, true);
 
 function startGame() {
     console.log('startGame() called');
