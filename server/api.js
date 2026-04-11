@@ -12,6 +12,7 @@ const VALID_TOKENS = ['SOL', 'USDC'];
 const VALID_KILL_TARGETS = [1, 5, 7, 10];
 const BCRYPT_ROUNDS = 10;
 const MIN_STAKE = { SOL: 10000000, USDC: 1000000 }; // 0.01 SOL, 1 USDC in base units
+const MAX_STAKE = { SOL: 100000000000, USDC: 10000000000 }; // 100 SOL, 10000 USDC in base units
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -141,6 +142,10 @@ router.post('/matches', authMiddleware, async (req, res) => {
         if (stakeAmount < MIN_STAKE[stakeToken]) {
             const human = stakeToken === 'SOL' ? (MIN_STAKE[stakeToken] / 1e9) : (MIN_STAKE[stakeToken] / 1e6);
             return res.status(400).json(fail(`Minimum stake is ${human} ${stakeToken}`));
+        }
+        if (stakeAmount > MAX_STAKE[stakeToken]) {
+            const human = stakeToken === 'SOL' ? (MAX_STAKE[stakeToken] / 1e9) : (MAX_STAKE[stakeToken] / 1e6);
+            return res.status(400).json(fail(`Maximum stake is ${human} ${stakeToken}`));
         }
         if (!VALID_KILL_TARGETS.includes(killTarget)) {
             return res.status(400).json(fail(`killTarget must be one of: ${VALID_KILL_TARGETS.join(', ')}`));
@@ -790,7 +795,7 @@ router.post('/matches/:id/confirm-deposit', authMiddleware, async (req, res) => 
         const user = db.getUser(userId);
         const token = req.headers.authorization?.replace('Bearer ', '') || '';
         const isDevToken = ALLOW_DEV_TOKENS && token.startsWith('dev:');
-        const skipVerification = isDevToken || process.env.SKIP_DEPOSIT_VERIFY === '1';
+        const skipVerification = isDevToken;
 
         if (!skipVerification) {
             if (!user || !user.privy_wallet) return res.status(400).json(fail('No wallet'));

@@ -16,7 +16,14 @@ const { collidesWithWall, hasLineOfSight } = require('./shared/collision');
 const app = express();
 app.use(express.json());
 app.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
-app.use(express.static(path.join(__dirname)));
+// Block access to server-side code and sensitive files
+app.use((req, res, next) => {
+    const blocked = ['/server/', '/db/', '/node_modules/', '/.env', '/.git', '/test-'];
+    const lower = req.path.toLowerCase();
+    if (blocked.some(b => lower.startsWith(b))) return res.status(403).send('Forbidden');
+    next();
+});
+app.use(express.static(path.join(__dirname), { dotfiles: 'deny' }));
 
 // OAuth callback — serve index.html so the client JS handles it
 app.get('/auth/callback', (req, res) => {
@@ -69,6 +76,31 @@ async function recoverStuckMatches() {
                 }
                 db.updateMatch(match.id, { status: targetStatus, ended_at: Date.now() });
                 console.log('[RECOVERY] Match ' + match.id + ' set to ' + targetStatus);
+            } else if (match.status === 'completed') {
+                // Completed = game ended but payout failed — retry payout
+                const winner = match.winner_id ? db.getUser(match.winner_id) : null;
+                if (winner && winner.privy_wallet && escrow.isReady()) {
+                    const totalPot = match.stake_amount * 2;
+                    const rake = Math.floor(totalPot * 0.05);
+                    const payout = totalPot - rake;
+                    try {
+                        const payoutResult = await escrow.sendPayout(winner.privy_wallet, payout, match.stake_token);
+                        if (payoutResult && payoutResult.signature) {
+                            db.createTransaction({
+                                id: require('uuid').v4(), match_id: match.id, user_id: match.winner_id,
+                                tx_type: 'payout', amount: payout, token: match.stake_token,
+                                tx_signature: payoutResult.signature, from_wallet: 'escrow', to_wallet: winner.privy_wallet
+                            });
+                            db.updateMatch(match.id, { status: 'settled', rake_amount: rake });
+                            console.log('[RECOVERY] Payout retry succeeded for match ' + match.id + ' winner=' + match.winner_id + ' sig=' + payoutResult.signature);
+                        }
+                    } catch (e) {
+                        console.error('[RECOVERY] Payout retry failed for match ' + match.id + ':', e.message);
+                        // Leave as completed for next restart attempt
+                    }
+                } else if (!winner || !winner.privy_wallet) {
+                    console.log('[RECOVERY] Match ' + match.id + ' completed but no winner wallet — skipping');
+                }
             } else if (match.status === 'submitting') {
                 // Submitting state is transient — treat as cancelled
                 db.updateMatch(match.id, { status: 'cancelled', ended_at: Date.now() });
@@ -102,7 +134,7 @@ const wss = new WebSocketServer({ server });
 
 // /debug needs wss defined
 app.get('/debug', (req, res) => {
-    if (process.env.ADMIN_SECRET && req.query.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'forbidden' });
+    if (!process.env.ADMIN_SECRET || req.query.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'forbidden' });
     const list = [];
     players.forEach((p, id) => list.push({ id, name: p.username, team: p.team, isBot: p.isBot, x: Math.round(p.x), z: Math.round(p.z), health: p.health, kills: p.kills, deaths: p.deaths }));
     res.json({ players: list, total: players.size, clients: wss.clients.size });
@@ -141,7 +173,7 @@ console.log('Collision walls loaded from shared/collision.js');
 // GET /test-mode?on=1  → enter test mode (1 passive bot at center, verbose logs)
 // GET /test-mode?on=0  → exit test mode (restore normal 5v5)
 app.get('/test-mode', (req, res) => {
-    if (process.env.ADMIN_SECRET && req.query.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'forbidden' });
+    if (!process.env.ADMIN_SECRET || req.query.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'forbidden' });
     if (req.query.on === '1') {
         enterTestMode();
         res.json({ mode: 'test', players: players.size });
@@ -803,9 +835,15 @@ setInterval(function() {
 
 // === CONNECTIONS ===
 // === WAGER MATCH SETTLEMENT ===
+const _settlementInProgress = new Set();
+
 async function settleWagerMatch(matchId, winnerId, reason, stats) {
+    if (_settlementInProgress.has(matchId)) return;
+    _settlementInProgress.add(matchId);
+
+    try {
     const match = db.getMatch(matchId);
-    if (!match || match.status === 'settled') return;
+    if (!match || match.status === 'settled') { _settlementInProgress.delete(matchId); return; }
 
     // === DRAW PATH ===
     if (winnerId === null) {
@@ -816,9 +854,11 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
         const creator = db.getUser(match.creator_id);
         const joiner = db.getUser(match.joiner_id);
 
+        let drawRefundsOk = true;
         if (escrow.isReady()) {
             if (creator && creator.privy_wallet) {
-                escrow.sendPayout(creator.privy_wallet, match.stake_amount, match.stake_token).then(result => {
+                try {
+                    const result = await escrow.sendPayout(creator.privy_wallet, match.stake_amount, match.stake_token);
                     if (result && result.signature) {
                         db.createTransaction({
                             id: require('uuid').v4(), match_id: matchId, user_id: match.creator_id,
@@ -826,10 +866,14 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
                             tx_signature: result.signature, from_wallet: 'escrow', to_wallet: creator.privy_wallet
                         });
                     }
-                }).catch(e => console.error('[WAGER] Draw refund error (creator):', e));
+                } catch (e) {
+                    console.error('[WAGER] Draw refund error (creator):', e);
+                    drawRefundsOk = false;
+                }
             }
             if (joiner && joiner.privy_wallet) {
-                escrow.sendPayout(joiner.privy_wallet, match.stake_amount, match.stake_token).then(result => {
+                try {
+                    const result = await escrow.sendPayout(joiner.privy_wallet, match.stake_amount, match.stake_token);
                     if (result && result.signature) {
                         db.createTransaction({
                             id: require('uuid').v4(), match_id: matchId, user_id: match.joiner_id,
@@ -837,8 +881,23 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
                             tx_signature: result.signature, from_wallet: 'escrow', to_wallet: joiner.privy_wallet
                         });
                     }
-                }).catch(e => console.error('[WAGER] Draw refund error (joiner):', e));
+                } catch (e) {
+                    console.error('[WAGER] Draw refund error (joiner):', e);
+                    drawRefundsOk = false;
+                }
             }
+        }
+
+        if (!drawRefundsOk) {
+            console.log('[WAGER] Draw refund(s) failed for match ' + matchId + ' — leaving as completed for retry');
+            db.updateMatch(matchId, {
+                status: 'completed', winner_id: null, win_reason: 'draw',
+                creator_kills: creatorStats.kills || 0, joiner_kills: joinerStats.kills || 0,
+                creator_deaths: creatorStats.deaths || 0, joiner_deaths: joinerStats.deaths || 0,
+                ended_at: Date.now(), rake_amount: 0
+            });
+            activeWagerMatches.delete(matchId);
+            return;
         }
 
         db.updateMatch(matchId, {
@@ -848,17 +907,9 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
             ended_at: Date.now(), rake_amount: 0
         });
 
-        // Update draw counts
-        db.updateUserStats(match.creator_id, {
-            wins: creator?.wins || 0, losses: creator?.losses || 0,
-            draws: (creator?.draws || 0) + 1, total_earned: creator?.total_earned || 0,
-            total_wagered: creator?.total_wagered || 0
-        });
-        db.updateUserStats(match.joiner_id, {
-            wins: joiner?.wins || 0, losses: joiner?.losses || 0,
-            draws: (joiner?.draws || 0) + 1, total_earned: joiner?.total_earned || 0,
-            total_wagered: joiner?.total_wagered || 0
-        });
+        // Update draw counts (incremental)
+        db.updateUserStats(match.creator_id, { draws: 1 });
+        db.updateUserStats(match.joiner_id, { draws: 1 });
 
         // Write match history for both
         const now = Date.now();
@@ -903,8 +954,8 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
     const loser = db.getUser(loserId);
 
     // Update user stats
-    db.updateUserStats(winnerId, { wins: (winner?.wins || 0) + 1, total_earned: (winner?.total_earned || 0) + payout });
-    db.updateUserStats(loserId, { losses: (loser?.losses || 0) + 1 });
+    db.updateUserStats(winnerId, { wins: 1, total_earned: payout });
+    db.updateUserStats(loserId, { losses: 1 });
 
     // Write match history for both
     const now = Date.now();
@@ -959,6 +1010,9 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
     }
 
     activeWagerMatches.delete(matchId);
+    } finally {
+        _settlementInProgress.delete(matchId);
+    }
 }
 
 // === WAGER WEBSOCKET HANDLER ===
@@ -1224,8 +1278,8 @@ wss.on('connection', function(ws) {
                     if (p._fsCooldown > 0) return;
                     p._fsCooldown = 15;
                     p.farsight = true;
-                    p.farsightX = msg.x;
-                    p.farsightZ = msg.z;
+                    p.farsightX = Math.max(-MAP_SIZE/2, Math.min(MAP_SIZE/2, msg.x || 0));
+                    p.farsightZ = Math.max(-MAP_SIZE/2, Math.min(MAP_SIZE/2, msg.z || 0));
                     p.farsightTimer = 5.0;
                 }
             }

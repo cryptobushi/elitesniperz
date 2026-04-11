@@ -32,15 +32,7 @@ const _upsertUser = db.prepare(`
     profile_picture = COALESCE(excluded.profile_picture, users.profile_picture),
     last_seen = excluded.last_seen
 `);
-const _updateUserStats = db.prepare(`
-  UPDATE users SET
-    wins = @wins,
-    losses = @losses,
-    draws = @draws,
-    total_earned = @total_earned,
-    total_wagered = @total_wagered
-  WHERE id = @id
-`);
+// _updateUserStats is now dynamic — see updateUserStats() below
 
 // Matches
 const _createMatch = db.prepare(`
@@ -97,8 +89,12 @@ function upsertUser({ id, twitter_handle, twitter_id, privy_wallet, display_name
   return _getUser.get(id);
 }
 
-function updateUserStats(id, { wins, losses, draws, total_earned, total_wagered }) {
-  return _updateUserStats.run({ id, wins, losses, draws, total_earned, total_wagered });
+function updateUserStats(id, updates) {
+  const allowed = ['wins', 'losses', 'draws', 'total_earned', 'total_wagered'];
+  const keys = Object.keys(updates).filter(k => allowed.includes(k));
+  if (keys.length === 0) return;
+  const sets = keys.map(k => `${k} = ${k} + @${k}`).join(', ');
+  db.prepare(`UPDATE users SET ${sets} WHERE id = @id`).run({ id, ...Object.fromEntries(keys.map(k => [k, updates[k]])) });
 }
 
 function createMatch({ id, creator_id, stake_amount, stake_token, kill_target, password_hash, match_mode }) {
@@ -143,12 +139,16 @@ function listOpenMatches({ token, minStake, maxStake, limit = 50, offset = 0 } =
   return db.prepare(sql).all(...params);
 }
 
+const MATCH_FIELDS = ['status', 'joiner_id', 'winner_id', 'win_reason', 'creator_kills', 'joiner_kills', 'creator_deaths', 'joiner_deaths', 'funded_at', 'started_at', 'ended_at', 'rake_amount', 'match_mode'];
+
 function updateMatch(id, fields) {
-  const keys = Object.keys(fields);
+  const keys = Object.keys(fields).filter(k => MATCH_FIELDS.includes(k));
   if (keys.length === 0) return null;
+  const filteredFields = {};
+  for (const k of keys) filteredFields[k] = fields[k];
   const sets = keys.map(k => `${k} = @${k}`).join(', ');
   const stmt = db.prepare(`UPDATE matches SET ${sets} WHERE id = @id`);
-  stmt.run({ id, ...fields });
+  stmt.run({ id, ...filteredFields });
   return _getMatch.get(id);
 }
 
@@ -285,7 +285,7 @@ function clearTestChallengeDeclines(creatorId, challengerId) {
 // --- Recovery / cleanup queries ---
 
 function getStuckMatches() {
-  return db.prepare("SELECT * FROM matches WHERE status IN ('in_progress', 'funded_both', 'submitting')").all();
+  return db.prepare("SELECT * FROM matches WHERE status IN ('in_progress', 'funded_both', 'submitting', 'completed')").all();
 }
 
 function getStaleFundedMatches(cutoffMs) {

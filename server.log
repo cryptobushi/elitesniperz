@@ -1,6 +1,23 @@
+◇ injected env (5) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+[escrow] Escrow wallet: F1ouG7yQh4iL8qcjAUwKkfJbzexjGHsRQ3coqzuTdMsT
+[escrow] Treasury wallet: FscyMwnYo72ZeWgoN85Ma6UdqMB8vakSRa53uGTQQqV9
 Collision walls loaded from shared/collision.js
 Initialized 10 bots
-Elite Snipers server on port 3000 (10 bots, 64hz tick, 30hz send)
-Sniper joined red. Total: 10
-Sniper left, bot added
-ushi joined red. Total: 10
+HTTPS + WSS on :443 (10 bots, 64hz tick, 30hz send)
+HTTP :80 → HTTPS redirect
+[escrow] getBalance error: Non-base58 character
+[escrow] getBalance error: Invalid public key input
+[escrow] getBalance error: Non-base58 character
+[escrow] getBalance error: Invalid public key input
+[escrow] getBalance error: Invalid public key input
+[escrow] getBalance error: Invalid public key input
+[escrow] getBalance error: Non-base58 character
+[escrow] getBalance error: Invalid public key input
+[escrow] getBalance error: Invalid public key input
+[escrow] getBalance error: Non-base58 character
+[escrow] getBalance error: Non-base58 character
+[escrow] getBalance error: Non-base58 character
+[escrow] getBalance error: Invalid public key input
+[escrow] getBalance error: Invalid public key input
+[escrow] getBalance error: Invalid public key input
+[escrow] getBalance error: Invalid public key input

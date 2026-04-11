@@ -3,7 +3,7 @@
 const PRIVY_APP_ID = process.env.PRIVY_APP_ID || '';
 const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET || '';
 const DEV_MODE = !PRIVY_APP_ID || PRIVY_APP_ID === 'your-privy-app-id';
-const ALLOW_DEV_TOKENS = process.env.ALLOW_DEV_TOKENS === '1' || (!PRIVY_APP_ID || DEV_MODE);
+const ALLOW_DEV_TOKENS = process.env.ALLOW_DEV_TOKENS === '1';
 
 let privy = null;
 if (!DEV_MODE) {

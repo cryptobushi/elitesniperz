@@ -3,13 +3,14 @@
 
 const {
     MAP_SIZE, SHOOT_RANGE, SHOOT_COOLDOWN, SPAWN_PROTECTION,
-    TICK_RATE, SEND_RATE, terrainY, spawnPos, isNearSpawn
+    TICK_RATE, SEND_RATE, terrainY, spawnPos, isNearSpawn,
+    WAGER_AFK_TIMEOUT, WAGER_DISCONNECT_TIMEOUT
 } = require('../shared/constants');
 const { collidesWithWall, hasLineOfSight } = require('../shared/collision');
 
 // === CONSTANTS ===
-const AFK_TIMEOUT = 120;           // 2 minutes no input = forfeit
-const DISCONNECT_TIMEOUT = 60;     // 60 seconds to reconnect
+const AFK_TIMEOUT = WAGER_AFK_TIMEOUT || 30;
+const DISCONNECT_TIMEOUT = WAGER_DISCONNECT_TIMEOUT || 30;
 const TIME_LIMIT = 10 * 60;       // 10 minutes
 const RESPAWN_DELAY = 3000;       // 3s respawn in 1v1
 const BYTES_PER_PLAYER = 28;      // Same binary format as main server
@@ -215,8 +216,8 @@ class WagerMatch {
                 if (p.fsCooldown > 0) return;
                 p.fsCooldown = 15;
                 p.farsight = true;
-                p.farsightX = msg.x;
-                p.farsightZ = msg.z;
+                p.farsightX = Math.max(-MAP_SIZE/2, Math.min(MAP_SIZE/2, msg.x || 0));
+                p.farsightZ = Math.max(-MAP_SIZE/2, Math.min(MAP_SIZE/2, msg.z || 0));
                 p.farsightTimer = 5.0;
             }
         }
