@@ -102,6 +102,7 @@ const wss = new WebSocketServer({ server });
 
 // /debug needs wss defined
 app.get('/debug', (req, res) => {
+    if (process.env.ADMIN_SECRET && req.query.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'forbidden' });
     const list = [];
     players.forEach((p, id) => list.push({ id, name: p.username, team: p.team, isBot: p.isBot, x: Math.round(p.x), z: Math.round(p.z), health: p.health, kills: p.kills, deaths: p.deaths }));
     res.json({ players: list, total: players.size, clients: wss.clients.size });
@@ -140,6 +141,7 @@ console.log('Collision walls loaded from shared/collision.js');
 // GET /test-mode?on=1  → enter test mode (1 passive bot at center, verbose logs)
 // GET /test-mode?on=0  → exit test mode (restore normal 5v5)
 app.get('/test-mode', (req, res) => {
+    if (process.env.ADMIN_SECRET && req.query.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'forbidden' });
     if (req.query.on === '1') {
         enterTestMode();
         res.json({ mode: 'test', players: players.size });
@@ -289,10 +291,9 @@ function encodeState(viewerTeam) {
         const inFog = isEnemy && p.health > 0 && !enemyVisible.has(p.id);
 
         view.setUint16(off, p.id, true); off += 2;
-        // Send last-known position for fog enemies (won't be rendered anyway)
-        view.setFloat32(off, p.x, true); off += 4;
-        view.setFloat32(off, p.z, true); off += 4;
-        view.setFloat32(off, p.rot, true); off += 4;
+        view.setFloat32(off, inFog ? 0 : p.x, true); off += 4;
+        view.setFloat32(off, inFog ? 0 : p.z, true); off += 4;
+        view.setFloat32(off, inFog ? 0 : p.rot, true); off += 4;
         view.setUint8(off, p.health > 0 ? 1 : 0); off += 1;
         view.setInt16(off, p.kills, true); off += 2;
         view.setInt16(off, p.deaths, true); off += 2;
@@ -723,6 +724,10 @@ setInterval(function() {
         // Shoot cooldown
         if (p.shootCd > 0) p.shootCd -= dt;
 
+        // Ability cooldowns
+        if (p._wwCooldown > 0) p._wwCooldown -= dt;
+        if (p._fsCooldown > 0) p._fsCooldown -= dt;
+
         // Windwalk timer
         if (p.windwalk) {
             p.windwalkTimer -= dt;
@@ -798,7 +803,7 @@ setInterval(function() {
 
 // === CONNECTIONS ===
 // === WAGER MATCH SETTLEMENT ===
-function settleWagerMatch(matchId, winnerId, reason, stats) {
+async function settleWagerMatch(matchId, winnerId, reason, stats) {
     const match = db.getMatch(matchId);
     if (!match || match.status === 'settled') return;
 
@@ -897,31 +902,6 @@ function settleWagerMatch(matchId, winnerId, reason, stats) {
     const winner = db.getUser(winnerId);
     const loser = db.getUser(loserId);
 
-    if (winner && winner.privy_wallet && escrow.isReady()) {
-        // Send payout to winner
-        escrow.sendPayout(winner.privy_wallet, payout, match.stake_token).then(result => {
-            if (result && result.signature) {
-                db.createTransaction({
-                    id: require('uuid').v4(), match_id: matchId, user_id: winnerId,
-                    tx_type: 'payout', amount: payout, token: match.stake_token,
-                    tx_signature: result.signature, from_wallet: 'escrow', to_wallet: winner.privy_wallet
-                });
-                db.confirmTransaction(result.signature, Date.now());
-            }
-        }).catch(e => console.error('[WAGER] Payout error:', e));
-
-        // Send rake to treasury
-        escrow.sendRake(rake, match.stake_token).then(result => {
-            if (result && result.signature) {
-                db.createTransaction({
-                    id: require('uuid').v4(), match_id: matchId, user_id: null,
-                    tx_type: 'rake', amount: rake, token: match.stake_token,
-                    tx_signature: result.signature, from_wallet: 'escrow', to_wallet: 'treasury'
-                });
-            }
-        }).catch(e => console.error('[WAGER] Rake error:', e));
-    }
-
     // Update user stats
     db.updateUserStats(winnerId, { wins: (winner?.wins || 0) + 1, total_earned: (winner?.total_earned || 0) + payout });
     db.updateUserStats(loserId, { losses: (loser?.losses || 0) + 1 });
@@ -941,9 +921,44 @@ function settleWagerMatch(matchId, winnerId, reason, stats) {
         stake_amount: match.stake_amount, stake_token: match.stake_token, payout: 0, played_at: now
     });
 
-    db.updateMatch(matchId, { status: 'settled', rake_amount: rake });
+    if (winner && winner.privy_wallet && escrow.isReady()) {
+        try {
+            // Send payout to winner
+            const payoutResult = await escrow.sendPayout(winner.privy_wallet, payout, match.stake_token);
+            if (payoutResult && payoutResult.signature) {
+                db.createTransaction({
+                    id: require('uuid').v4(), match_id: matchId, user_id: winnerId,
+                    tx_type: 'payout', amount: payout, token: match.stake_token,
+                    tx_signature: payoutResult.signature, from_wallet: 'escrow', to_wallet: winner.privy_wallet
+                });
+                db.confirmTransaction(payoutResult.signature, Date.now());
+            }
+
+            // Send rake to treasury
+            const rakeResult = await escrow.sendRake(rake, match.stake_token);
+            if (rakeResult && rakeResult.signature) {
+                db.createTransaction({
+                    id: require('uuid').v4(), match_id: matchId, user_id: null,
+                    tx_type: 'rake', amount: rake, token: match.stake_token,
+                    tx_signature: rakeResult.signature, from_wallet: 'escrow', to_wallet: 'treasury'
+                });
+            }
+
+            // Payout succeeded — mark as settled
+            db.updateMatch(matchId, { status: 'settled', rake_amount: rake });
+            console.log('[WAGER] Settled match ' + matchId + ' winner=' + winnerId + ' payout=' + payout + ' rake=' + rake);
+        } catch (e) {
+            // Payout failed — keep status as 'completed' so it can be retried
+            console.error('[WAGER] Payout error for match ' + matchId + ':', e);
+            console.log('[WAGER] Match ' + matchId + ' staying in completed status for retry');
+        }
+    } else {
+        // No escrow configured (dev mode) — mark as settled immediately
+        db.updateMatch(matchId, { status: 'settled', rake_amount: rake });
+        console.log('[WAGER] Settled match ' + matchId + ' (no escrow) winner=' + winnerId);
+    }
+
     activeWagerMatches.delete(matchId);
-    console.log('[WAGER] Settled match ' + matchId + ' winner=' + winnerId + ' payout=' + payout + ' rake=' + rake);
 }
 
 // === WAGER WEBSOCKET HANDLER ===
@@ -1018,8 +1033,15 @@ function handleWagerWs(ws, userId, matchId) {
 wss.on('connection', function(ws) {
     ws.playerId = null;
     ws._isWager = false;
+    ws._msgCount = 0;
+    ws._msgResetTime = Date.now();
 
     ws.on('message', function(data) {
+        ws._msgCount++;
+        const now = Date.now();
+        if (now - ws._msgResetTime > 1000) { ws._msgCount = 1; ws._msgResetTime = now; }
+        if (ws._msgCount > 64) return; // Drop excess messages
+
         try {
             const msg = JSON.parse(data);
 
@@ -1181,18 +1203,26 @@ wss.on('connection', function(ws) {
                 }
             }
             else if (msg.t === 'god' && ws.playerId) {
-                const p = players.get(ws.playerId);
-                if (p) { p.godMode = !p.godMode; console.log(p.username + ' god mode: ' + p.godMode); }
+                if (TEST_MODE) {
+                    const p = players.get(ws.playerId);
+                    if (p) { p.godMode = !p.godMode; console.log(p.username + ' god mode: ' + p.godMode); }
+                }
             }
             else if (msg.t === 'ab' && ws.playerId) {
                 const p = players.get(ws.playerId);
                 if (!p || p.health <= 0) return;
 
                 if (msg.a === 'ww') {
+                    if (!p._wwCooldown) p._wwCooldown = 0;
+                    if (p._wwCooldown > 0) return;
+                    p._wwCooldown = 10;
                     p.windwalk = true;
                     p.windwalkTimer = 3.0;
                 }
                 else if (msg.a === 'fs' && typeof msg.x === 'number' && typeof msg.z === 'number') {
+                    if (!p._fsCooldown) p._fsCooldown = 0;
+                    if (p._fsCooldown > 0) return;
+                    p._fsCooldown = 15;
                     p.farsight = true;
                     p.farsightX = msg.x;
                     p.farsightZ = msg.z;
@@ -1209,6 +1239,8 @@ wss.on('connection', function(ws) {
                 }
             }
             else if (msg.t === 'ch' && ws.playerId) {
+                if (ws._lastChat && Date.now() - ws._lastChat < 1000) return;
+                ws._lastChat = Date.now();
                 const p = players.get(ws.playerId);
                 if (p && msg.x) {
                     broadcast(JSON.stringify({

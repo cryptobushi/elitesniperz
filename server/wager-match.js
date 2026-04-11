@@ -36,6 +36,8 @@ function createPlayer(id, team) {
         hasShield: false, goldMultiplier: 1.0,
         inventory: {},
         moveTarget: null,
+        // Ability cooldowns
+        wwCooldown: 0, fsCooldown: 0,
         // Wager-specific
         lastInput: Date.now(),
         afk: false
@@ -205,9 +207,13 @@ class WagerMatch {
             if (p.health <= 0) return;
             // Only windwalk and farsight allowed in wager matches (no shop)
             if (msg.a === 'ww') {
+                if (p.wwCooldown > 0) return;
+                p.wwCooldown = 10;
                 p.windwalk = true;
                 p.windwalkTimer = 3.0;
             } else if (msg.a === 'fs' && typeof msg.x === 'number' && typeof msg.z === 'number') {
+                if (p.fsCooldown > 0) return;
+                p.fsCooldown = 15;
                 p.farsight = true;
                 p.farsightX = msg.x;
                 p.farsightZ = msg.z;
@@ -257,6 +263,10 @@ class WagerMatch {
 
             // Shoot cooldown
             if (p.shootCd > 0) p.shootCd -= dt;
+
+            // Ability cooldowns
+            if (p.wwCooldown > 0) p.wwCooldown -= dt;
+            if (p.fsCooldown > 0) p.fsCooldown -= dt;
 
             // Windwalk timer
             if (p.windwalk) {
@@ -496,9 +506,9 @@ class WagerMatch {
             const inFog = isEnemy && p.health > 0 && !enemyVisible.has(p.id);
 
             view.setUint16(off, p.id, true); off += 2;
-            view.setFloat32(off, p.x, true); off += 4;
-            view.setFloat32(off, p.z, true); off += 4;
-            view.setFloat32(off, p.rot, true); off += 4;
+            view.setFloat32(off, inFog ? 0 : p.x, true); off += 4;
+            view.setFloat32(off, inFog ? 0 : p.z, true); off += 4;
+            view.setFloat32(off, inFog ? 0 : p.rot, true); off += 4;
             view.setUint8(off, p.health > 0 ? 1 : 0); off += 1;
             view.setInt16(off, p.kills, true); off += 2;
             view.setInt16(off, p.deaths, true); off += 2;

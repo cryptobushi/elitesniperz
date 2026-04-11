@@ -73,7 +73,7 @@ async function run() {
     console.log('\n--- Open Mode (existing behavior) ---');
 
     const openMatch = await api('POST', '/matches', CREATOR_TOKEN, {
-        stakeAmount: 0.01, stakeToken: 'SOL', killTarget: 5, matchMode: 'open',
+        stakeAmount: 10000000, stakeToken: 'SOL', killTarget: 5, matchMode: 'open',
     });
     test('2. Create OPEN match', openMatch.success === true || 'err=' + (openMatch.error || openMatch.raw));
     const openId = openMatch.data?.id;
@@ -90,7 +90,7 @@ async function run() {
     console.log('\n--- Selective Mode: Basic Flow ---');
 
     const selMatch = await api('POST', '/matches', CREATOR_TOKEN, {
-        stakeAmount: 0.01, stakeToken: 'SOL', killTarget: 5, matchMode: 'selective',
+        stakeAmount: 10000000, stakeToken: 'SOL', killTarget: 5, matchMode: 'selective',
     });
     test('5. Create SELECTIVE match', selMatch.success === true || 'err=' + (selMatch.error || selMatch.raw));
     const selId = selMatch.data?.id;
@@ -141,7 +141,7 @@ async function run() {
     console.log('\n--- Selective Mode: Decline ---');
 
     const selMatch2 = await api('POST', '/matches', CREATOR_TOKEN, {
-        stakeAmount: 0.01, stakeToken: 'SOL', killTarget: 5, matchMode: 'selective',
+        stakeAmount: 10000000, stakeToken: 'SOL', killTarget: 5, matchMode: 'selective',
     });
     test('16. Create new SELECTIVE match', selMatch2.success === true || 'err=' + (selMatch2.error || selMatch2.raw));
     const sel2Id = selMatch2.data?.id;
@@ -172,7 +172,7 @@ async function run() {
 
     // Challenge own match
     const selMatch3 = await api('POST', '/matches', CREATOR_TOKEN, {
-        stakeAmount: 0.01, stakeToken: 'SOL', killTarget: 5, matchMode: 'selective',
+        stakeAmount: 10000000, stakeToken: 'SOL', killTarget: 5, matchMode: 'selective',
     });
     const sel3Id = selMatch3.data?.id;
     if (sel3Id) matchesToClean.push(sel3Id);
@@ -207,7 +207,8 @@ async function run() {
     } catch(e) {}
 
     // Create a selective match for cooldown testing
-    const cdMatch = await api('POST', '/matches', CREATOR_TOKEN, { stakeAmount: 1000000, stakeToken: 'SOL', killTarget: 5, matchMode: 'selective' });
+    const cdMatch = await api('POST', '/matches', CREATOR_TOKEN, { stakeAmount: 10000000, stakeToken: 'SOL', killTarget: 5, matchMode: 'selective' });
+    if (!cdMatch.success) { console.log('  Cooldown match creation failed:', cdMatch.error || cdMatch.status); process.exit(1); }
     const cdMatchId = cdMatch.data.id;
     matchesToClean.push(cdMatchId);
 

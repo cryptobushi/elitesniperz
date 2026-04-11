@@ -11,6 +11,7 @@ const router = express.Router();
 const VALID_TOKENS = ['SOL', 'USDC'];
 const VALID_KILL_TARGETS = [1, 5, 7, 10];
 const BCRYPT_ROUNDS = 10;
+const MIN_STAKE = { SOL: 10000000, USDC: 1000000 }; // 0.01 SOL, 1 USDC in base units
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -131,14 +132,24 @@ router.post('/matches', authMiddleware, async (req, res) => {
     try {
         const { stakeAmount, stakeToken, killTarget, password, matchMode } = req.body || {};
 
-        if (!stakeAmount || stakeAmount <= 0) {
-            return res.status(400).json(fail('stakeAmount must be greater than 0'));
+        if (!Number.isInteger(stakeAmount) || stakeAmount <= 0) {
+            return res.status(400).json(fail('stakeAmount must be a positive integer in base units'));
         }
         if (!VALID_TOKENS.includes(stakeToken)) {
             return res.status(400).json(fail(`stakeToken must be one of: ${VALID_TOKENS.join(', ')}`));
         }
+        if (stakeAmount < MIN_STAKE[stakeToken]) {
+            const human = stakeToken === 'SOL' ? (MIN_STAKE[stakeToken] / 1e9) : (MIN_STAKE[stakeToken] / 1e6);
+            return res.status(400).json(fail(`Minimum stake is ${human} ${stakeToken}`));
+        }
         if (!VALID_KILL_TARGETS.includes(killTarget)) {
             return res.status(400).json(fail(`killTarget must be one of: ${VALID_KILL_TARGETS.join(', ')}`));
+        }
+
+        // Limit open matches per user
+        const openCount = db.db.prepare("SELECT COUNT(*) as cnt FROM matches WHERE creator_id = ? AND status IN ('open', 'matched', 'funded_creator', 'funded_joiner')").get(req.privyUserId)?.cnt || 0;
+        if (openCount >= 5) {
+            return res.status(429).json(fail('Maximum 5 open matches. Cancel existing matches first.'));
         }
         const mode = matchMode || 'open';
         if (!['open', 'selective'].includes(mode)) {
@@ -553,6 +564,7 @@ router.get('/matches/:id/deposit-tx', authMiddleware, async (req, res) => {
 // ---------------------------------------------------------------------------
 // In-memory storage for signed transactions pending both lock-ins
 const _pendingLockIns = new Map(); // matchId -> { creator: {tx,sig}, joiner: {tx,sig} }
+const _lockInProgress = new Set(); // matchId set to prevent concurrent lock-in races
 
 // POST /matches/:id/lock-in — store signed tx, submit BOTH when both locked
 router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
@@ -565,12 +577,16 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
         const isJoiner = userId === match.joiner_id;
         if (!isCreator && !isJoiner) return res.status(403).json(fail('Not in this match'));
 
+        if (_lockInProgress.has(match.id)) return res.status(409).json(fail('Lock-in in progress'));
+        _lockInProgress.add(match.id);
+
         const { transaction, signature } = req.body;
-        if (!transaction || !signature) return res.status(400).json(fail('Missing transaction or signature'));
+        if (!transaction || !signature) { _lockInProgress.delete(match.id); return res.status(400).json(fail('Missing transaction or signature')); }
 
         // Balance check before accepting lock-in
         const balCheck = await checkBalance(userId, match.stake_amount, match.stake_token);
         if (!balCheck.ok) {
+            _lockInProgress.delete(match.id);
             // Kick them from the match if they're the joiner
             if (isJoiner) {
                 db.updateMatch(match.id, { status: 'open' });
@@ -605,6 +621,7 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
             }
             const newStatus = db.getMatch(match.id).status;
             console.log('[LOCK-IN]', role, 'locked for match', match.id, 'status:', newStatus);
+            _lockInProgress.delete(match.id);
             return res.json(success({ status: newStatus, locked: role }));
         }
 
@@ -629,6 +646,7 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
 
             if (!creatorBhValid || !joinerBhValid) {
                 _pendingLockIns.delete(match.id);
+                _lockInProgress.delete(match.id);
                 db.updateMatch(match.id, { status: 'matched' });
                 console.log('[LOCK-IN] Blockhash expired for match', match.id, 'creator:', creatorBhValid, 'joiner:', joinerBhValid);
                 return res.status(400).json(fail('Transaction expired. Please re-lock.'));
@@ -666,8 +684,10 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
         _pendingLockIns.delete(match.id);
         console.log('[LOCK-IN] Match', match.id, 'fully funded');
 
+        _lockInProgress.delete(match.id);
         return res.json(success({ status: 'funded_both', locked: 'both' }));
     } catch (e) {
+        _lockInProgress.delete(req.params.id);
         console.error('POST /matches/:id/lock-in error:', e);
         return res.status(500).json(fail('Lock-in failed: ' + e.message));
     }
