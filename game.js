@@ -3212,7 +3212,6 @@ function startGame() {
     }
 
     updateScoreboard();
-    console.log('Game started! Player can now move with WASD');
 
     // Make sure the window has focus for keyboard input
     window.focus();
