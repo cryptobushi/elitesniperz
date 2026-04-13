@@ -2421,9 +2421,10 @@
             modal.classList.remove('hidden');
         });
 
-        // "Back" closes modal
+        // "Back" closes modal and returns to landing page
         document.getElementById('modalCloseBtn').addEventListener('click', () => {
             modal.classList.add('hidden');
+            returnToLanding();
         });
 
         // "ENTER WAGER LOBBY" buttons
