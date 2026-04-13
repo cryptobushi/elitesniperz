@@ -1614,15 +1614,30 @@ async function handleCreateMatch() {
 }
 
 // ── Show / Hide lobby ───────────────────────────────────────────────────────
+function _returnToLandingPage() {
+    const landing = document.getElementById('landingPage');
+    const canvas = document.getElementById('gameCanvas');
+    const ui = document.getElementById('ui');
+    if (landing) landing.classList.remove('hidden');
+    if (canvas) canvas.style.display = 'none';
+    if (ui) ui.style.display = 'none';
+    document.body.classList.remove('game-active');
+    window.scrollTo(0, 0);
+}
+
 export async function showLobby() {
     if (!isAuthenticated()) {
         try {
             await login();
         } catch (err) {
             console.warn('Login cancelled or failed:', err);
+            _returnToLandingPage();
             return;
         }
-        if (!isAuthenticated()) return;
+        if (!isAuthenticated()) {
+            _returnToLandingPage();
+            return;
+        }
     }
 
     // Populate user info
