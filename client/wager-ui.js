@@ -1219,7 +1219,7 @@ function buildDOM() {
     createModal.innerHTML = `
         <div class="cm-panel">
             <h2>POST A DUEL</h2>
-            <div class="cm-label" style="display:flex;justify-content:space-between;align-items:baseline;">Stake Amount <span id="cmAvailBal" style="font-size:0.55rem;color:#00ff66;font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer;" title="Click to use max"></span></div>
+            <div class="cm-label" style="display:flex;justify-content:space-between;align-items:baseline;">Stake Amount <span id="cmAvailBal" style="font-size:0.55rem;color:#ffcc00;font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer;font-family:'Courier New',monospace;" title="Click to use max"></span></div>
             <input type="number" class="cm-input" id="cmStake" placeholder="e.g. 0.05" min="0.001" step="any">
             <div class="cm-label">Token</div>
             <div class="cm-toggle-group" id="cmTokenGroup">
@@ -1258,14 +1258,14 @@ function buildDOM() {
         <div id="wrStatus" class="wr-challenge-text">OPEN CHALLENGE &mdash; WAITING FOR OPPONENT</div>
         <div class="wr-players">
             <div class="wr-card not-deposited" id="wrCreator">
-                <div class="wr-avatar" id="wrCreatorAvatar" style="background:#00ff66;">?</div>
+                <div class="wr-avatar" id="wrCreatorAvatar" style="background:#ffcc00;">?</div>
                 <div class="wr-name" id="wrCreatorName">---</div>
                 <div class="wr-record" id="wrCreatorRecord">0W - 0L &bull; ELO 1000</div>
                 <div class="wr-status not-locked" id="wrCreatorStatus">STAKE NOT LOCKED</div>
             </div>
             <div class="wr-vs">VS</div>
             <div class="wr-card empty" id="wrJoiner">
-                <div class="wr-avatar" id="wrJoinerAvatar" style="background:#2a2a3a;color:#55555f;">?</div>
+                <div class="wr-avatar" id="wrJoinerAvatar" style="background:#333333;color:#888888;">?</div>
                 <div class="wr-name" id="wrJoinerName">OPEN CHALLENGE</div>
                 <div class="wr-record" id="wrJoinerRecord">No one has taken this yet</div>
                 <div class="wr-status" id="wrJoinerStatus"></div>
@@ -1382,7 +1382,7 @@ function bindEvents() {
             const result = await requestDeposit(currentMatchId);
             if (result.success) {
                 btn.textContent = '\u2713 LOCKED IN';
-                btn.style.background = '#00cc52';
+                btn.style.background = '#00ff44';
                 btn.style.display = 'none';
             } else {
                 showErrorModal(result.error || 'Lock-in failed. Please try again.');
@@ -1433,8 +1433,8 @@ function bindEvents() {
         const statusEl = document.getElementById('wdStatus');
         const btn = document.getElementById('wdSubmit');
 
-        if (!dest) { statusEl.textContent = 'Enter destination address'; statusEl.style.color = '#ff3344'; return; }
-        if (!amount || amount <= 0) { statusEl.textContent = 'Enter valid amount'; statusEl.style.color = '#ff3344'; return; }
+        if (!dest) { statusEl.textContent = 'Enter destination address'; statusEl.style.color = '#ff3333'; return; }
+        if (!amount || amount <= 0) { statusEl.textContent = 'Enter valid amount'; statusEl.style.color = '#ff3333'; return; }
 
         btn.disabled = true;
         btn.textContent = 'PROCESSING...';
@@ -1821,33 +1821,33 @@ function showErrorModal(message) {
     let title = 'ERROR';
     let icon = '';
     let hint = '';
-    let borderColor = '#ff3344';
+    let borderColor = '#ff3333';
 
     if (isBalance) {
         title = 'INSUFFICIENT FUNDS';
         icon = '<div style="font-size:2rem;margin-bottom:0.5rem;">⚠️</div>';
-        hint = '<div style="color:#55555f;font-size:0.6rem;margin-top:0.8rem;line-height:1.4;">Deposit SOL or USDC to your wallet from the duel lobby to fund wagers.</div>';
-        borderColor = '#ff8800';
+        hint = '<div style="color:#888888;font-size:0.6rem;margin-top:0.8rem;line-height:1.4;">Deposit SOL or USDC to your wallet from the duel lobby to fund wagers.</div>';
+        borderColor = '#ffcc00';
     } else if (isExpired) {
         title = 'TRANSACTION EXPIRED';
         icon = '<div style="font-size:2rem;margin-bottom:0.5rem;">⏱</div>';
-        hint = '<div style="color:#55555f;font-size:0.6rem;margin-top:0.8rem;">Please try locking in again.</div>';
-        borderColor = '#ff8800';
+        hint = '<div style="color:#888888;font-size:0.6rem;margin-top:0.8rem;">Please try locking in again.</div>';
+        borderColor = '#ffcc00';
     } else if (isTimeout) {
         title = 'MATCH TIMED OUT';
         icon = '<div style="font-size:2rem;margin-bottom:0.5rem;">⏱</div>';
-        borderColor = '#ff8800';
+        borderColor = '#ffcc00';
     }
 
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,5,10,0.9);z-index:10002;display:flex;align-items:center;justify-content:center;font-family:"Inter",system-ui,sans-serif;';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:10002;display:flex;align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif;';
     overlay.innerHTML = `
-        <div style="background:#12121a;border:1px solid ${borderColor};padding:2rem;width:min(90%,380px);text-align:center;">
+        <div style="background:#1a1a1a;border:1px solid ${borderColor};padding:2rem;width:min(90%,380px);text-align:center;">
             ${icon}
-            <div style="font-family:'Oswald',sans-serif;font-size:1.1rem;font-weight:700;color:${borderColor};letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.5rem;">${title}</div>
-            <div style="color:#e8e8ec;font-size:0.8rem;margin-bottom:0.8rem;line-height:1.5;">${message}</div>
+            <div style="font-family:'Courier New',monospace;font-size:1.1rem;font-weight:700;color:${borderColor};letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.5rem;">${title}</div>
+            <div style="color:#ffffff;font-size:0.8rem;margin-bottom:0.8rem;line-height:1.5;">${message}</div>
             ${hint}
-            <button style="margin-top:1rem;padding:10px 24px;background:#1a1a25;border:1px solid #2a2a3a;color:#e8e8ec;font-family:'Inter',system-ui,sans-serif;font-size:0.75rem;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;transition:all 0.15s;">DISMISS</button>
+            <button style="margin-top:1rem;padding:10px 24px;background:#1a1a1a;border:1px solid #333333;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:0.75rem;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;transition:color 0.15s,border-color 0.15s;">DISMISS</button>
         </div>
     `;
     document.body.appendChild(overlay);
@@ -1859,16 +1859,16 @@ function showErrorModal(message) {
 function showPasswordModal(errorMsg) {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,5,10,0.9);z-index:10002;display:flex;align-items:center;justify-content:center;font-family:"Inter",system-ui,sans-serif;';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:10002;display:flex;align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif;';
         overlay.innerHTML = `
-            <div style="background:#12121a;border:1px solid ${errorMsg ? '#ff3344' : '#2a2a3a'};padding:2rem;width:min(90%,360px);text-align:center;transition:border-color 0.3s;">
-                <div style="font-family:'Oswald',sans-serif;font-size:1.2rem;font-weight:700;color:#e8e8ec;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.3rem;">PRIVATE DUEL</div>
-                <div style="color:#888894;font-size:0.7rem;margin-bottom:1.2rem;">This match requires a password to join</div>
+            <div style="background:#1a1a1a;border:1px solid ${errorMsg ? '#ff3333' : '#333333'};padding:2rem;width:min(90%,360px);text-align:center;transition:border-color 0.15s;">
+                <div style="font-family:'Courier New',monospace;font-size:1.2rem;font-weight:700;color:#ffcc00;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.3rem;">PRIVATE DUEL</div>
+                <div style="color:#888888;font-size:0.7rem;margin-bottom:1.2rem;">This match requires a password to join</div>
                 <input id="pwModalInput" type="password" placeholder="Enter password"
-                    style="width:100%;padding:12px;background:#0a0a0f;border:1px solid ${errorMsg ? '#ff3344' : '#2a2a3a'};color:#e8e8ec;font-family:'Inter',system-ui,sans-serif;font-size:0.85rem;text-align:center;box-sizing:border-box;margin-bottom:0.8rem;transition:border-color 0.15s;" />
-                <div id="pwModalError" style="color:#ff3344;font-size:0.65rem;min-height:1em;margin-bottom:0.6rem;">${errorMsg || ''}</div>
-                <button id="pwModalSubmit" style="width:100%;padding:12px;background:#00ff66;border:none;color:#0a0a0f;font-family:'Inter',system-ui,sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;transition:opacity 0.15s;">JOIN DUEL</button>
-                <div id="pwModalCancel" style="color:#55555f;font-size:0.65rem;cursor:pointer;transition:color 0.15s;">Cancel</div>
+                    style="width:100%;padding:12px;background:#000000;border:1px solid ${errorMsg ? '#ff3333' : '#333333'};color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:0.85rem;text-align:center;box-sizing:border-box;margin-bottom:0.8rem;transition:border-color 0.15s;border-radius:0;" />
+                <div id="pwModalError" style="color:#ff3333;font-size:0.65rem;min-height:1em;margin-bottom:0.6rem;">${errorMsg || ''}</div>
+                <button id="pwModalSubmit" style="width:100%;padding:12px;background:#ffcc00;border:1px solid #ffcc00;color:#000000;font-family:'Courier New',monospace;font-size:0.8rem;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;transition:opacity 0.15s;border-radius:0;">JOIN DUEL</button>
+                <div id="pwModalCancel" style="color:#888888;font-size:0.65rem;cursor:pointer;transition:color 0.15s;">Cancel</div>
             </div>
         `;
         document.body.appendChild(overlay);
@@ -1956,7 +1956,7 @@ async function handleChallenge(matchId) {
 
 function showToast(message) {
     const toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#12121a;border:1px solid #aa66ff;color:#aa66ff;padding:0.6rem 1.4rem;font-family:"Inter",system-ui,sans-serif;font-size:0.75rem;z-index:10003;letter-spacing:0.02em;animation:floatUp 0.3s ease-out;';
+    toast.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#1a1a1a;border:1px solid #ffcc00;color:#ffcc00;padding:0.6rem 1.4rem;font-family:"Courier New",monospace;font-size:0.75rem;z-index:10003;letter-spacing:0.02em;';
     toast.textContent = message;
     document.body.appendChild(toast);
     setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 4000);
