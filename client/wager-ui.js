@@ -39,12 +39,12 @@ const STYLES = `
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    background: #0a0a0f;
+    background: #000000;
     z-index: 500;
     display: flex;
     flex-direction: column;
     align-items: center;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
     overflow-y: auto;
 }
 #wagerLobby.hidden { display: none !important; }
@@ -56,8 +56,8 @@ const STYLES = `
     align-items: center;
     justify-content: space-between;
     padding: 0.6rem 1rem;
-    border-bottom: 1px solid #1e1e2a;
-    background: #12121a;
+    border-bottom: 1px solid #333333;
+    background: #1a1a1a;
     flex-shrink: 0;
 }
 .wl-topbar .wl-user-group {
@@ -66,31 +66,33 @@ const STYLES = `
     gap: 0.6rem;
 }
 .wl-topbar .wl-user {
-    color: #00ff66;
+    color: #ffcc00;
     font-size: 0.75rem;
     font-weight: 600;
+    font-family: 'Courier New', monospace;
 }
 .wl-topbar .wl-balance {
-    color: #888894;
+    color: #888888;
     font-size: 0.65rem;
     font-weight: 500;
-    background: #1a1a25;
+    background: #1a1a1a;
     padding: 0.15rem 0.5rem;
-    border: 1px solid #1e1e2a;
+    border: 1px solid #333333;
+    font-family: 'Courier New', monospace;
 }
 .wl-topbar .wl-btn {
-    background: #1a1a25;
-    border: 1px solid #2a2a3a;
-    color: #888894;
+    background: #1a1a1a;
+    border: 1px solid #333333;
+    color: #888888;
     padding: 0.3rem 0.7rem;
     font-size: 0.65rem;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    transition: all 0.15s;
+    transition: color 0.15s, border-color 0.15s;
 }
-.wl-topbar .wl-btn:hover { background: #2a2a3a; color: #e8e8ec; border-color: #00ff66; }
+.wl-topbar .wl-btn:hover { background: #222222; color: #ffffff; border-color: #ffcc00; }
 .wl-topbar .wl-btn:active { opacity: 0.8; }
 
 /* My Duels management section */
@@ -102,9 +104,9 @@ const STYLES = `
 }
 .wl-my-duels.hidden { display: none; }
 .wl-my-duels-header {
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     font-size: 0.75rem;
-    color: #888894;
+    color: #888888;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     margin-bottom: 0.5rem;
@@ -114,8 +116,8 @@ const STYLES = `
     align-items: center;
     justify-content: space-between;
     padding: 0.6rem 0.8rem;
-    background: #12121a;
-    border: 1px solid #1e1e2a;
+    background: #1a1a1a;
+    border: 1px solid #333333;
     margin-bottom: 0.4rem;
     gap: 0.5rem;
 }
@@ -124,19 +126,19 @@ const STYLES = `
     align-items: center;
     gap: 0.8rem;
     font-size: 0.75rem;
-    color: #e8e8ec;
+    color: #ffffff;
     flex: 1;
     min-width: 0;
 }
 .wl-my-duel-stake {
-    color: #00ff66;
+    color: #ffcc00;
     font-weight: 700;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     font-size: 0.85rem;
     white-space: nowrap;
 }
 .wl-my-duel-target {
-    color: #888894;
+    color: #888888;
     font-size: 0.65rem;
     white-space: nowrap;
 }
@@ -145,41 +147,40 @@ const STYLES = `
     text-transform: uppercase;
     letter-spacing: 0.06em;
     padding: 2px 8px;
-    border-radius: 2px;
     white-space: nowrap;
+    border: 1px solid #333333;
 }
-.wl-my-duel-status.waiting { background: rgba(255,136,0,0.12); color: #ff8800; }
-.wl-my-duel-status.open { background: rgba(0,255,102,0.1); color: #00ff66; }
-.wl-my-duel-status.hot { background: rgba(255,136,0,0.15); color: #ff8800; animation: badgePulse 1.5s ease-in-out infinite; }
-@keyframes badgePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+.wl-my-duel-status.waiting { background: #1a1a1a; color: #ffcc00; border-color: #ffcc00; }
+.wl-my-duel-status.open { background: #1a1a1a; color: #00ff44; border-color: #00ff44; }
+.wl-my-duel-status.hot { background: #1a1a1a; color: #ffcc00; border-color: #ffcc00; }
 .wl-my-duel-cancel {
     padding: 4px 12px;
     background: none;
-    border: 1px solid #2a2a3a;
-    color: #ff3344;
-    font-family: 'Inter', system-ui, sans-serif;
+    border: 1px solid #333333;
+    color: #ff3333;
+    font-family: Arial, Helvetica, sans-serif;
     font-size: 0.6rem;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    transition: all 0.15s;
+    transition: border-color 0.15s;
     white-space: nowrap;
 }
-.wl-my-duel-cancel:hover { border-color: #ff3344; background: rgba(255,51,68,0.08); }
+.wl-my-duel-cancel:hover { border-color: #ff3333; }
 .wl-my-duel-resume {
     padding: 4px 12px;
     background: none;
-    border: 1px solid #00ff66;
-    color: #00ff66;
-    font-family: 'Inter', system-ui, sans-serif;
+    border: 1px solid #00ff44;
+    color: #00ff44;
+    font-family: Arial, Helvetica, sans-serif;
     font-size: 0.6rem;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    transition: all 0.15s;
+    transition: background 0.15s;
     white-space: nowrap;
 }
-.wl-my-duel-resume:hover { background: rgba(0,255,102,0.08); }
+.wl-my-duel-resume:hover { background: #111111; }
 
 .wl-header {
     width: 100%;
@@ -188,8 +189,8 @@ const STYLES = `
     flex-shrink: 0;
 }
 .wl-title {
-    color: #e8e8ec;
-    font-family: 'Oswald', sans-serif;
+    color: #ffcc00;
+    font-family: 'Courier New', monospace;
     font-size: clamp(1.4rem, 5vw, 2rem);
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -201,19 +202,12 @@ const STYLES = `
 .wl-title .wl-pulse {
     width: 8px;
     height: 8px;
-    background: #00ff66;
-    border-radius: 50%;
+    background: #00ff44;
     display: inline-block;
-    animation: wlPulse 2s ease-in-out infinite;
-    box-shadow: 0 0 6px rgba(0,255,102,0.5);
-}
-@keyframes wlPulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.4; transform: scale(0.8); }
 }
 
 .wl-subtitle {
-    color: #55555f;
+    color: #888888;
     font-size: 0.7rem;
     margin-top: 0.3rem;
     flex-shrink: 0;
@@ -229,35 +223,35 @@ const STYLES = `
 }
 .wl-table {
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 0 2px;
+    border-collapse: collapse;
 }
 .wl-table th {
-    color: #55555f;
+    color: #888888;
     font-size: 0.55rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     padding: 8px 10px;
-    border-bottom: 1px solid #1e1e2a;
+    border-bottom: 1px solid #333333;
     text-align: left;
     position: sticky;
     top: 0;
-    background: #0a0a0f;
+    background: #000000;
     font-weight: 500;
+    font-family: 'Courier New', monospace;
 }
 .wl-table td {
     padding: 10px;
     font-size: 0.72rem;
-    color: #e8e8ec;
-    background: #12121a;
-    border-bottom: 1px solid #1e1e2a;
+    color: #ffffff;
+    background: #1a1a1a;
+    border-bottom: 1px solid #333333;
     transition: background 0.15s;
 }
-.wl-table tr:hover td { background: #1a1a25; }
-.wl-table .wl-creator { color: #00ff66; font-weight: 600; }
-.wl-table .wl-record { color: #888894; }
-.wl-table .wl-stake { color: #00ff66; font-weight: 600; }
-.wl-table .wl-target { color: #e8e8ec; }
+.wl-table tr:hover td { background: #222222; }
+.wl-table .wl-creator { color: #ffcc00; font-weight: 600; }
+.wl-table .wl-record { color: #888888; }
+.wl-table .wl-stake { color: #ffcc00; font-weight: 600; font-family: 'Courier New', monospace; }
+.wl-table .wl-target { color: #ffffff; }
 .wl-table .wl-lock { font-size: 0.8rem; }
 
 .wl-status-badge {
@@ -267,31 +261,31 @@ const STYLES = `
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    border-radius: 2px;
+    border: 1px solid #333333;
 }
-.wl-status-badge.open { background: rgba(0,255,102,0.1); color: #00ff66; border: 1px solid rgba(0,255,102,0.25); }
-.wl-status-badge.live { background: rgba(255,51,68,0.1); color: #ff3344; border: 1px solid rgba(255,51,68,0.25); animation: wlPulse 1.5s ease-in-out infinite; }
-.wl-status-badge.hot { background: rgba(255,136,0,0.1); color: #ff8800; border: 1px solid rgba(255,136,0,0.25); }
-.wl-status-badge.new { background: rgba(68,136,255,0.1); color: #4488ff; border: 1px solid rgba(68,136,255,0.25); }
+.wl-status-badge.open { background: #000000; color: #00ff44; border-color: #00ff44; }
+.wl-status-badge.live { background: #000000; color: #ff3333; border-color: #ff3333; }
+.wl-status-badge.hot { background: #000000; color: #ffcc00; border-color: #ffcc00; }
+.wl-status-badge.new { background: #000000; color: #00ccff; border-color: #00ccff; }
 
 .wl-join-btn {
-    background: #00ff66;
-    border: 1px solid #00ff66;
-    color: #0a0a0f;
+    background: #ffcc00;
+    border: 1px solid #ffcc00;
+    color: #000000;
     padding: 0.3rem 0.8rem;
     font-size: 0.65rem;
     font-weight: 700;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    transition: all 0.15s;
+    transition: opacity 0.15s;
 }
-.wl-join-btn:hover { background: #00cc52; border-color: #00cc52; }
-.wl-join-btn:active { opacity: 0.8; }
+.wl-join-btn:hover { opacity: 0.85; }
+.wl-join-btn:active { opacity: 0.7; }
 
 .wl-empty {
-    color: #55555f;
+    color: #888888;
     text-align: center;
     padding: 3rem 1rem;
     font-size: 0.8rem;
@@ -301,26 +295,26 @@ const STYLES = `
     width: 100%;
     max-width: 640px;
     padding: 0.8rem 1rem;
-    border-top: 1px solid #1e1e2a;
+    border-top: 1px solid #333333;
     display: flex;
     justify-content: center;
     flex-shrink: 0;
 }
 .wl-create-btn {
-    background: #00ff66;
-    border: 1px solid #00ff66;
-    color: #0a0a0f;
+    background: #ffcc00;
+    border: 1px solid #ffcc00;
+    color: #000000;
     padding: 0.7rem 2.5rem;
     font-size: 0.95rem;
     font-weight: 700;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    transition: all 0.15s;
+    transition: opacity 0.15s;
 }
-.wl-create-btn:hover { background: #00cc52; border-color: #00cc52; }
-.wl-create-btn:active { opacity: 0.8; }
+.wl-create-btn:hover { opacity: 0.85; }
+.wl-create-btn:active { opacity: 0.7; }
 
 /* === CREATE MATCH MODAL === */
 #createMatchModal {
@@ -331,28 +325,28 @@ const STYLES = `
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0,0,0,0.85);
+    background: rgba(0,0,0,0.9);
 }
 #createMatchModal.hidden { display: none !important; }
 
 .cm-panel {
-    background: #12121a;
-    border: 1px solid #2a2a3a;
+    background: #1a1a1a;
+    border: 1px solid #333333;
     padding: 1.5rem;
     width: min(92%, 400px);
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
     text-align: center;
 }
 .cm-panel h2 {
-    color: #e8e8ec;
-    font-family: 'Oswald', sans-serif;
+    color: #ffcc00;
+    font-family: 'Courier New', monospace;
     font-size: 1.3rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     margin-bottom: 1rem;
 }
 .cm-label {
-    color: #888894;
+    color: #888888;
     font-size: 0.6rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -360,22 +354,23 @@ const STYLES = `
     margin-bottom: 0.3rem;
     margin-top: 0.6rem;
     font-weight: 500;
+    font-family: 'Courier New', monospace;
 }
 .cm-input {
-    background: #0a0a0f;
-    border: 1px solid #2a2a3a;
-    color: #e8e8ec;
+    background: #000000;
+    border: 1px solid #333333;
+    color: #ffffff;
     padding: 0.5rem 0.6rem;
     font-size: 0.85rem;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
     width: 100%;
     -webkit-appearance: none;
     border-radius: 0;
     transition: border-color 0.15s;
     box-sizing: border-box;
 }
-.cm-input:focus { outline: none; border-color: #00ff66; }
-.cm-input::placeholder { color: #55555f; font-style: italic; }
+.cm-input:focus { outline: none; border-color: #ffcc00; }
+.cm-input::placeholder { color: #555555; font-style: italic; }
 
 .cm-toggle-group {
     display: flex;
@@ -384,42 +379,42 @@ const STYLES = `
 }
 .cm-toggle {
     flex: 1;
-    background: #1a1a25;
-    border: 1px solid #2a2a3a;
-    color: #888894;
+    background: #1a1a1a;
+    border: 1px solid #333333;
+    color: #888888;
     padding: 0.45rem;
     font-size: 0.75rem;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
     font-weight: 600;
     cursor: pointer;
     text-transform: uppercase;
-    transition: all 0.15s;
+    transition: color 0.15s, border-color 0.15s;
 }
-.cm-toggle:hover { border-color: #55555f; color: #e8e8ec; }
+.cm-toggle:hover { border-color: #555555; color: #ffffff; }
 .cm-toggle:active { opacity: 0.8; }
 .cm-toggle.selected {
-    background: rgba(0,255,102,0.08);
-    border-color: #00ff66;
-    color: #00ff66;
+    background: #000000;
+    border-color: #ffcc00;
+    color: #ffcc00;
 }
 
 .cm-submit {
     margin-top: 1rem;
-    background: #00ff66;
-    border: 1px solid #00ff66;
-    color: #0a0a0f;
+    background: #ffcc00;
+    border: 1px solid #ffcc00;
+    color: #000000;
     padding: 0.7rem;
     font-size: 0.9rem;
     font-weight: 700;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     cursor: pointer;
     width: 100%;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    transition: all 0.15s;
+    transition: opacity 0.15s;
 }
-.cm-submit:hover { background: #00cc52; border-color: #00cc52; }
-.cm-submit:active { opacity: 0.8; }
+.cm-submit:hover { opacity: 0.85; }
+.cm-submit:active { opacity: 0.7; }
 .cm-submit:disabled {
     opacity: 0.4;
     cursor: default;
@@ -429,68 +424,62 @@ const STYLES = `
     margin-top: 0.5rem;
     background: none;
     border: none;
-    color: #55555f;
+    color: #888888;
     padding: 0.4rem 1rem;
     font-size: 0.65rem;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
     cursor: pointer;
     text-transform: uppercase;
-    transition: all 0.15s;
+    transition: color 0.15s;
 }
-.cm-cancel:hover { color: #888894; }
+.cm-cancel:hover { color: #cccccc; }
 
 /* === WAITING ROOM === */
 @keyframes wrPulse {
-    0%, 100% { border-color: #2a2a3a; }
-    50% { border-color: #3a3a4a; }
+    0%, 100% { border-color: #333333; }
+    50% { border-color: #555555; }
 }
 
 #waitingRoom {
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    background: #0a0a0f;
-    background-image:
-        linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-    background-size: 40px 40px;
+    background: #000000;
     z-index: 520;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
     padding: 2rem 1rem;
 }
 #waitingRoom.hidden { display: none !important; }
 
 .wr-title {
-    color: #00ff66;
-    font-family: 'Oswald', sans-serif;
+    color: #ffcc00;
+    font-family: 'Courier New', monospace;
     font-size: clamp(1.8rem, 6vw, 2.6rem);
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     margin-bottom: 0.4rem;
-    text-shadow: 0 0 30px rgba(0,255,102,0.2);
 }
 .wr-info {
-    color: #e8e8ec;
-    font-family: 'Oswald', sans-serif;
+    color: #ffffff;
+    font-family: 'Courier New', monospace;
     font-size: clamp(1.1rem, 4vw, 1.6rem);
     letter-spacing: 0.08em;
     margin-bottom: 0.3rem;
     text-transform: uppercase;
 }
 .wr-helper {
-    color: #55555f;
+    color: #888888;
     font-size: 0.7rem;
     margin-bottom: 1.8rem;
-    font-style: italic;
 }
 .wr-challenge-text {
-    color: #ff8800;
-    font-family: 'Oswald', sans-serif;
+    color: #ffcc00;
+    font-family: 'Courier New', monospace;
     font-size: clamp(0.7rem, 2.5vw, 0.85rem);
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -504,53 +493,52 @@ const STYLES = `
     margin-bottom: 1.8rem;
 }
 .wr-card {
-    background: #12121a;
-    border: 1px solid #2a2a3a;
+    background: #1a1a1a;
+    border: 1px solid #333333;
     padding: 1.4rem 2rem;
     min-width: 200px;
     text-align: center;
-    transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
+    transition: border-color 0.15s, background 0.15s;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.3rem;
 }
 .wr-card.funded {
-    border-color: #00ff66;
-    background: rgba(0,255,102,0.04);
-    box-shadow: 0 0 20px rgba(0,255,102,0.08), inset 0 0 20px rgba(0,255,102,0.02);
+    border-color: #00ff44;
+    background: #0a0a0a;
 }
-.wr-card.awaiting { border-color: #ff8800; background: rgba(255,136,0,0.03); }
-.wr-card.not-deposited { border-color: rgba(255,51,68,0.3); }
+.wr-card.awaiting { border-color: #ffcc00; background: #0a0a0a; }
+.wr-card.not-deposited { border-color: #ff3333; }
 .wr-card.empty {
-    border: 2px dashed #2a2a3a;
+    border: 2px dashed #333333;
     animation: wrPulse 2.5s ease-in-out infinite;
-    background: rgba(18,18,26,0.6);
+    background: #0a0a0a;
 }
 .wr-avatar {
     width: 48px;
     height: 48px;
-    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     font-size: 1.3rem;
     font-weight: 700;
-    color: #0a0a0f;
+    color: #000000;
     margin-bottom: 0.3rem;
     flex-shrink: 0;
+    border: 1px solid #333333;
 }
 .wr-card .wr-name {
-    color: #00ff66;
-    font-family: 'Oswald', sans-serif;
+    color: #ffcc00;
+    font-family: 'Courier New', monospace;
     font-size: 1.05rem;
     font-weight: 600;
     letter-spacing: 0.04em;
     margin-bottom: 0.15rem;
 }
 .wr-card .wr-record {
-    color: #888894;
+    color: #888888;
     font-size: 0.65rem;
     margin-bottom: 0.2rem;
     letter-spacing: 0.02em;
@@ -562,39 +550,38 @@ const STYLES = `
     text-transform: uppercase;
     letter-spacing: 0.06em;
     padding: 0.2rem 0.6rem;
+    font-family: 'Courier New', monospace;
 }
-.wr-card .wr-status.locked { color: #00ff66; border: 1px solid rgba(0,255,102,0.2); background: rgba(0,255,102,0.06); }
-.wr-card .wr-status.waiting { color: #ff8800; border: 1px solid rgba(255,136,0,0.2); background: rgba(255,136,0,0.06); }
-.wr-card .wr-status.not-locked { color: rgba(255,51,68,0.7); border: 1px solid rgba(255,51,68,0.15); background: rgba(255,51,68,0.04); }
+.wr-card .wr-status.locked { color: #00ff44; border: 1px solid #00ff44; background: #000000; }
+.wr-card .wr-status.waiting { color: #ffcc00; border: 1px solid #ffcc00; background: #000000; }
+.wr-card .wr-status.not-locked { color: #ff3333; border: 1px solid #ff3333; background: #000000; }
 /* legacy class compat */
-.wr-card .wr-status.ok { color: #00ff66; }
-.wr-card .wr-status.pending { color: #ff8800; }
+.wr-card .wr-status.ok { color: #00ff44; }
+.wr-card .wr-status.pending { color: #ffcc00; }
 .wr-card.empty .wr-name {
-    color: #00ff66;
-    font-family: 'Oswald', sans-serif;
+    color: #ffcc00;
+    font-family: 'Courier New', monospace;
     font-size: 1rem;
     opacity: 0.9;
 }
 .wr-card.empty .wr-record {
-    color: #55555f;
+    color: #888888;
     font-size: 0.65rem;
-    font-style: italic;
 }
 
 .wr-vs {
-    color: #00ff66;
-    font-family: 'Oswald', sans-serif;
+    color: #ffcc00;
+    font-family: 'Courier New', monospace;
     font-size: clamp(2rem, 6vw, 3rem);
     font-weight: 900;
     letter-spacing: 0.12em;
-    text-shadow: 0 0 30px rgba(0,255,102,0.35), 0 0 60px rgba(0,255,102,0.15);
     display: flex;
     align-items: center;
     align-self: center;
 }
 
 .wr-dots {
-    color: #00ff66;
+    color: #ffcc00;
     font-size: 1rem;
     margin-bottom: 1rem;
     animation: blink2k 1s step-end infinite;
@@ -603,59 +590,57 @@ const STYLES = `
 .wr-deposit-btn {
     margin: 0.5rem auto;
     padding: 0.8rem 2.5rem;
-    background: #00ff66;
-    border: 1px solid #00ff66;
-    color: #0a0a0f;
+    background: #ffcc00;
+    border: 1px solid #ffcc00;
+    color: #000000;
     font-weight: 700;
     cursor: pointer;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     font-size: 1rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    transition: all 0.15s;
-    box-shadow: 0 0 20px rgba(0,255,102,0.2);
+    transition: opacity 0.15s;
 }
-.wr-deposit-btn:hover { background: #00cc52; border-color: #00cc52; box-shadow: 0 0 30px rgba(0,255,102,0.3); }
-.wr-deposit-btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+.wr-deposit-btn:hover { opacity: 0.85; }
+.wr-deposit-btn:disabled { opacity: 0.4; cursor: default; }
 
 .wr-share-btn {
     margin: 0.6rem auto;
     padding: 0.5rem 1.8rem;
     background: transparent;
-    border: 1px solid #00ff66;
-    color: #00ff66;
+    border: 1px solid #00ccff;
+    color: #00ccff;
     font-weight: 600;
     cursor: pointer;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    transition: all 0.15s;
+    transition: background 0.15s;
     display: block;
 }
-.wr-share-btn:hover { background: rgba(0,255,102,0.08); box-shadow: 0 0 15px rgba(0,255,102,0.15); }
+.wr-share-btn:hover { background: #111111; }
 
 .wr-note {
-    color: #55555f;
+    color: #888888;
     font-size: 0.65rem;
     margin-top: 1.2rem;
-    font-style: italic;
 }
 
 .wr-cancel {
     background: none;
-    border: 1px solid rgba(255,51,68,0.15);
-    color: rgba(255,51,68,0.5);
+    border: 1px solid #333333;
+    color: #ff3333;
     padding: 0.35rem 1rem;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
     font-size: 0.6rem;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    transition: all 0.2s;
+    transition: border-color 0.15s;
     margin-top: 0.5rem;
 }
-.wr-cancel:hover { border-color: #ff3344; color: #ff3344; }
+.wr-cancel:hover { border-color: #ff3333; }
 
 /* === WAGER HUD === */
 #wagerHUD {
@@ -668,29 +653,29 @@ const STYLES = `
     flex-direction: column;
     align-items: center;
     padding-top: max(env(safe-area-inset-top, 6px), 6px);
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Courier New', monospace;
 }
 #wagerHUD.hidden { display: none !important; }
 
 .wh-score {
-    background: rgba(10,10,15,0.9);
-    border: 1px solid #2a2a3a;
+    background: #000000;
+    border: 1px solid #333333;
     padding: 4px 20px;
     display: flex;
     align-items: baseline;
     gap: 12px;
 }
 .wh-score .wh-you {
-    color: #00ff66;
+    color: #00ff44;
     font-size: clamp(1rem, 4vw, 1.6rem);
     font-weight: 900;
 }
 .wh-score .wh-sep {
-    color: #55555f;
+    color: #888888;
     font-size: clamp(0.8rem, 3vw, 1.2rem);
 }
 .wh-score .wh-opp {
-    color: #ff3344;
+    color: #ff3333;
     font-size: clamp(1rem, 4vw, 1.6rem);
     font-weight: 900;
 }
@@ -700,11 +685,11 @@ const STYLES = `
     margin-top: 2px;
 }
 .wh-target {
-    color: #888894;
+    color: #888888;
     font-size: clamp(0.5rem, 1.8vw, 0.65rem);
 }
 .wh-stake {
-    color: #00ff66;
+    color: #ffcc00;
     font-size: clamp(0.5rem, 1.8vw, 0.65rem);
 }
 
@@ -719,7 +704,7 @@ const STYLES = `
     align-items: center;
     justify-content: center;
     pointer-events: all;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
     overflow-y: auto;
     padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
 }
@@ -740,10 +725,6 @@ const STYLES = `
     60% { transform: scale(1.2); }
     100% { transform: scale(1); opacity: 1; }
 }
-@keyframes shimmer {
-    0% { background-position: -200% center; }
-    100% { background-position: 200% center; }
-}
 @keyframes floatUp {
     0% { transform: translateY(20px); opacity: 0; }
     100% { transform: translateY(0); opacity: 1; }
@@ -752,15 +733,16 @@ const STYLES = `
     position: absolute;
     top: 0; left: 0;
     width: 100%; height: 100%;
+    background: #000000;
 }
 .wr-result-bg.victory-bg {
-    background: radial-gradient(ellipse at center, rgba(0,255,102,0.15) 0%, rgba(10,10,15,0.98) 70%);
+    background: #000000;
 }
 .wr-result-bg.defeat-bg {
-    background: radial-gradient(ellipse at center, rgba(255,51,68,0.15) 0%, rgba(10,10,15,0.98) 70%);
+    background: #000000;
 }
 .wr-result-bg.draw-bg {
-    background: radial-gradient(ellipse at center, rgba(255,136,0,0.12) 0%, rgba(10,10,15,0.98) 70%);
+    background: #000000;
 }
 .wr-result-content {
     position: relative;
@@ -772,7 +754,7 @@ const STYLES = `
     gap: 0;
 }
 .wr-result-title {
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     font-size: clamp(4rem, 18vw, 8rem);
     font-weight: 900;
     letter-spacing: 0.15em;
@@ -781,63 +763,52 @@ const STYLES = `
     line-height: 1;
 }
 .wr-result-title.victory {
-    color: #00ff66;
-    text-shadow: 0 0 60px rgba(0,255,102,0.8), 0 0 120px rgba(0,255,102,0.4), 0 4px 0 #004d1f;
+    color: #00ff44;
     animation: resultSlam 0.6s cubic-bezier(0.2, 0.8, 0.3, 1.2) forwards, resultPulse 2s 0.8s ease-in-out infinite;
 }
 .wr-result-title.defeat {
-    color: #ff3344;
-    text-shadow: 0 0 60px rgba(255,51,68,0.8), 0 0 120px rgba(255,51,68,0.4), 0 4px 0 #660014;
+    color: #ff3333;
 }
 .wr-result-title.draw {
-    color: #ff8800;
-    text-shadow: 0 0 60px rgba(255,136,0,0.6), 0 0 120px rgba(255,136,0,0.3), 0 4px 0 #663600;
+    color: #ffcc00;
 }
 .wr-result-opponent {
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     font-size: clamp(1.2rem, 5vw, 2rem);
-    color: #888894;
+    color: #888888;
     margin-top: 0.5rem;
     animation: floatUp 0.5s 0.3s ease-out both;
 }
 .wr-result-score {
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     font-size: clamp(2.5rem, 10vw, 5rem);
-    color: #e8e8ec;
+    color: #ffffff;
     letter-spacing: 0.2em;
     margin-top: 0.3rem;
     animation: floatUp 0.5s 0.4s ease-out both;
 }
 .wr-result-payout {
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     font-size: clamp(1.5rem, 7vw, 3rem);
     font-weight: 900;
     margin-top: 0.8rem;
     animation: payoutCount 0.6s 0.6s ease-out both;
 }
 .wr-result-payout.win {
-    color: #00ff66;
-    text-shadow: 0 0 30px rgba(0,255,102,0.6), 0 0 60px rgba(0,255,102,0.3);
-    background: linear-gradient(90deg, #00ff66, #44ffaa, #00ff66);
-    background-size: 200%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: payoutCount 0.6s 0.6s ease-out both, shimmer 3s 1.2s linear infinite;
+    color: #00ff44;
 }
 .wr-result-payout.loss {
-    color: #ff3344;
-    text-shadow: 0 0 20px rgba(255,51,68,0.4);
+    color: #ff3333;
 }
 .wr-result-payout.draw-payout {
-    color: #ff8800;
-    text-shadow: 0 0 20px rgba(255,136,0,0.4);
+    color: #ffcc00;
 }
 .wr-result-tx {
     margin-top: 0.8rem;
     animation: floatUp 0.5s 0.9s ease-out both;
 }
 .wr-result-tx a {
-    color: #00ff66;
+    color: #00ccff;
     font-size: 0.75rem;
     text-decoration: underline;
     opacity: 0.7;
@@ -845,31 +816,31 @@ const STYLES = `
 .wr-result-tx a:hover { opacity: 1; }
 .wr-result-back {
     margin-top: 1.5rem;
-    background: #00ff66;
-    border: 1px solid #00ff66;
-    color: #0a0a0f;
+    background: #ffcc00;
+    border: 1px solid #ffcc00;
+    color: #000000;
     padding: 0.8rem 2.5rem;
     font-size: clamp(0.9rem, 3vw, 1.1rem);
     font-weight: 700;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     animation: floatUp 0.5s 1s ease-out both;
-    transition: all 0.15s;
+    transition: opacity 0.15s;
 }
-.wr-result-back:hover { background: #00cc52; border-color: #00cc52; }
-.wr-result-back:active { opacity: 0.8; }
+.wr-result-back:hover { opacity: 0.85; }
+.wr-result-back:active { opacity: 0.7; }
 
 /* === WAGER BUTTON on start screen === */
 #wagerBtn {
-    background: #00ff66;
-    border: 1px solid #00ff66;
-    color: #0a0a0f;
+    background: #ffcc00;
+    border: 1px solid #ffcc00;
+    color: #000000;
     padding: 0.5rem;
     font-size: 0.85rem;
     font-weight: 700;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     cursor: pointer;
     width: 100%;
     border-radius: 0;
@@ -877,10 +848,10 @@ const STYLES = `
     letter-spacing: 0.1em;
     margin-top: 0.5rem;
     -webkit-tap-highlight-color: transparent;
-    transition: all 0.15s;
+    transition: opacity 0.15s;
 }
-#wagerBtn:hover { background: #00cc52; border-color: #00cc52; }
-#wagerBtn:active { opacity: 0.8; }
+#wagerBtn:hover { opacity: 0.85; }
+#wagerBtn:active { opacity: 0.7; }
 
 /* === Mobile responsive === */
 @media (max-width: 768px), (max-height: 500px) {
@@ -929,34 +900,33 @@ const STYLES = `
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #aa66ff;
-    border: 1px solid rgba(170,102,255,0.3);
-    background: rgba(170,102,255,0.08);
+    color: #cccccc;
+    border: 1px solid #333333;
+    background: #000000;
     padding: 1px 5px;
     margin-left: 6px;
     vertical-align: middle;
 }
 .wl-challenge-btn {
-    background: #aa66ff;
-    border: 1px solid #aa66ff;
-    color: #0a0a0f;
+    background: #ffffff;
+    border: 1px solid #ffffff;
+    color: #000000;
     padding: 0.3rem 0.8rem;
     font-size: 0.65rem;
     font-weight: 700;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    transition: all 0.15s;
+    transition: opacity 0.15s;
 }
-.wl-challenge-btn:hover { background: #9955ee; border-color: #9955ee; }
-.wl-challenge-btn:active { opacity: 0.8; }
+.wl-challenge-btn:hover { opacity: 0.85; }
+.wl-challenge-btn:active { opacity: 0.7; }
 
 /* Match mode toggle in create modal */
 .cm-mode-hint {
-    color: #55555f;
+    color: #888888;
     font-size: 0.55rem;
-    font-style: italic;
     margin-top: 0.2rem;
     text-align: left;
     min-height: 1.2em;
@@ -971,18 +941,17 @@ const STYLES = `
     justify-content: center;
     width: 15px;
     height: 15px;
-    border-radius: 50%;
-    border: 1px solid #2a2a3a;
-    color: #55555f;
+    border: 1px solid #333333;
+    color: #888888;
     font-size: 0.55rem;
     font-weight: 700;
     font-style: normal;
     cursor: help;
-    transition: all 0.15s;
+    transition: color 0.15s, border-color 0.15s;
 }
 .cm-tooltip-trigger:hover {
-    border-color: #00ff66;
-    color: #00ff66;
+    border-color: #ffcc00;
+    color: #ffcc00;
 }
 .cm-tooltip-box {
     display: none;
@@ -991,13 +960,13 @@ const STYLES = `
     left: 50%;
     transform: translateX(-50%);
     width: 260px;
-    background: #1a1a25;
-    border: 1px solid #2a2a3a;
+    background: #1a1a1a;
+    border: 1px solid #333333;
     padding: 0.7rem;
     font-size: 0.6rem;
     font-style: normal;
     font-weight: 400;
-    color: #888894;
+    color: #888888;
     line-height: 1.5;
     text-transform: none;
     letter-spacing: normal;
@@ -1005,7 +974,7 @@ const STYLES = `
     pointer-events: none;
 }
 .cm-tooltip-box strong {
-    color: #e8e8ec;
+    color: #ffffff;
     font-weight: 600;
 }
 .cm-tooltip-wrap:hover .cm-tooltip-box {
@@ -1027,8 +996,8 @@ const STYLES = `
     padding: 0 1rem;
 }
 .wr-challengers-title {
-    color: #888894;
-    font-family: 'Oswald', sans-serif;
+    color: #888888;
+    font-family: 'Courier New', monospace;
     font-size: 0.75rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -1036,10 +1005,9 @@ const STYLES = `
     text-align: center;
 }
 .wr-challengers-empty {
-    color: #55555f;
+    color: #888888;
     font-size: 0.7rem;
     text-align: center;
-    font-style: italic;
     padding: 1rem 0;
 }
 .wr-challenger-row {
@@ -1047,39 +1015,39 @@ const STYLES = `
     align-items: center;
     gap: 0.6rem;
     padding: 0.6rem 0.8rem;
-    background: #12121a;
-    border: 1px solid #1e1e2a;
+    background: #1a1a1a;
+    border: 1px solid #333333;
     margin-bottom: 0.4rem;
     transition: border-color 0.15s;
 }
-.wr-challenger-row:hover { border-color: #2a2a3a; }
+.wr-challenger-row:hover { border-color: #555555; }
 .wr-challenger-avatar {
     width: 36px;
     height: 36px;
-    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Courier New', monospace;
     font-size: 1rem;
     font-weight: 700;
-    color: #0a0a0f;
+    color: #000000;
     flex-shrink: 0;
+    border: 1px solid #333333;
 }
 .wr-challenger-info {
     flex: 1;
     min-width: 0;
 }
 .wr-challenger-handle {
-    color: #00ff66;
-    font-family: 'Oswald', sans-serif;
+    color: #ffcc00;
+    font-family: 'Courier New', monospace;
     font-size: 0.8rem;
     font-weight: 600;
 }
 .wr-challenger-handle a { color: inherit; text-decoration: none; }
 .wr-challenger-handle a:hover { text-decoration: underline; }
 .wr-challenger-stats {
-    color: #888894;
+    color: #888888;
     font-size: 0.6rem;
     margin-top: 0.1rem;
 }
@@ -1090,31 +1058,31 @@ const STYLES = `
 }
 .wr-challenger-accept {
     padding: 4px 12px;
-    background: rgba(0,255,102,0.08);
-    border: 1px solid #00ff66;
-    color: #00ff66;
-    font-family: 'Inter', system-ui, sans-serif;
+    background: #000000;
+    border: 1px solid #00ff44;
+    color: #00ff44;
+    font-family: Arial, Helvetica, sans-serif;
     font-size: 0.6rem;
     font-weight: 600;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    transition: all 0.15s;
+    transition: background 0.15s;
 }
-.wr-challenger-accept:hover { background: rgba(0,255,102,0.15); }
+.wr-challenger-accept:hover { background: #111111; }
 .wr-challenger-decline {
     padding: 4px 12px;
     background: none;
-    border: 1px solid rgba(255,51,68,0.3);
-    color: rgba(255,51,68,0.6);
-    font-family: 'Inter', system-ui, sans-serif;
+    border: 1px solid #333333;
+    color: #ff3333;
+    font-family: Arial, Helvetica, sans-serif;
     font-size: 0.6rem;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    transition: all 0.15s;
+    transition: border-color 0.15s;
 }
-.wr-challenger-decline:hover { border-color: #ff3344; color: #ff3344; }
+.wr-challenger-decline:hover { border-color: #ff3333; }
 
 /* Challenge submitted state */
 .wr-challenge-submitted {
@@ -1126,21 +1094,20 @@ const STYLES = `
     margin-bottom: 0.5rem;
 }
 .wr-challenge-submitted-text {
-    color: #aa66ff;
-    font-family: 'Oswald', sans-serif;
+    color: #ffcc00;
+    font-family: 'Courier New', monospace;
     font-size: 0.9rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     margin-bottom: 0.3rem;
 }
 .wr-challenge-submitted-sub {
-    color: #55555f;
+    color: #888888;
     font-size: 0.7rem;
-    font-style: italic;
 }
 .wr-challenge-declined-text {
-    color: #ff3344;
-    font-family: 'Oswald', sans-serif;
+    color: #ff3333;
+    font-family: 'Courier New', monospace;
     font-size: 0.9rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -1187,32 +1154,32 @@ function buildDOM() {
                 <button class="wl-btn" id="wlLogout">LOGOUT</button>
             </div>
         </div>
-        <div id="wlWalletBox" style="display:none;margin:0.5rem auto;max-width:560px;background:#12121a;border:1px solid #1e1e2a;padding:0.6rem 0.8rem;text-align:center;">
-            <div style="color:#55555f;font-size:0.6rem;margin-bottom:0.3rem;font-family:'Inter',system-ui,sans-serif;text-transform:uppercase;letter-spacing:0.06em;">Your Solana Wallet</div>
-            <div id="wlWalletAddr" style="background:#0a0a0f;border:1px solid #2a2a3a;padding:0.5rem;font-family:'Inter',system-ui,sans-serif;font-size:clamp(0.55rem,2vw,0.75rem);color:#00ff66;word-break:break-all;cursor:pointer;user-select:all;-webkit-user-select:all;" title="Click to copy"></div>
-            <div id="wlWalletCopied" style="color:#00ff66;font-size:0.55rem;margin-top:0.2rem;min-height:1em;"></div>
+        <div id="wlWalletBox" style="display:none;margin:0.5rem auto;max-width:560px;background:#1a1a1a;border:1px solid #333333;padding:0.6rem 0.8rem;text-align:center;">
+            <div style="color:#888888;font-size:0.6rem;margin-bottom:0.3rem;font-family:'Courier New',monospace;text-transform:uppercase;letter-spacing:0.06em;">Your Solana Wallet</div>
+            <div id="wlWalletAddr" style="background:#000000;border:1px solid #333333;padding:0.5rem;font-family:'Courier New',monospace;font-size:clamp(0.55rem,2vw,0.75rem);color:#ffcc00;word-break:break-all;cursor:pointer;user-select:all;-webkit-user-select:all;" title="Click to copy"></div>
+            <div id="wlWalletCopied" style="color:#00ff44;font-size:0.55rem;margin-top:0.2rem;min-height:1em;"></div>
         </div>
-        <div id="wlWithdrawModal" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10001;display:flex;align-items:center;justify-content:center;">
-            <div style="background:#12121a;border:1px solid #2a2a3a;padding:1.5rem;width:min(90%,360px);font-family:'Inter',system-ui,sans-serif;">
-                <div style="color:#e8e8ec;font-weight:700;font-size:1rem;text-align:center;margin-bottom:1rem;font-family:'Oswald',sans-serif;letter-spacing:0.06em;text-transform:uppercase;">WITHDRAW FUNDS</div>
-                <div style="color:#888894;font-size:0.65rem;margin-bottom:0.5rem;">Destination Solana address</div>
-                <input id="wdDest" type="text" placeholder="Paste Solana wallet address" style="width:100%;padding:8px;background:#0a0a0f;border:1px solid #2a2a3a;color:#e8e8ec;font-family:inherit;font-size:0.75rem;box-sizing:border-box;margin-bottom:0.5rem;" />
+        <div id="wlWithdrawModal" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:10001;display:flex;align-items:center;justify-content:center;">
+            <div style="background:#1a1a1a;border:1px solid #333333;padding:1.5rem;width:min(90%,360px);font-family:Arial,Helvetica,sans-serif;">
+                <div style="color:#ffcc00;font-weight:700;font-size:1rem;text-align:center;margin-bottom:1rem;font-family:'Courier New',monospace;letter-spacing:0.06em;text-transform:uppercase;">WITHDRAW FUNDS</div>
+                <div style="color:#888888;font-size:0.65rem;margin-bottom:0.5rem;font-family:'Courier New',monospace;">Destination Solana address</div>
+                <input id="wdDest" type="text" placeholder="Paste Solana wallet address" style="width:100%;padding:8px;background:#000000;border:1px solid #333333;color:#ffffff;font-family:inherit;font-size:0.75rem;box-sizing:border-box;margin-bottom:0.5rem;border-radius:0;" />
                 <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
                     <div style="flex:1;">
-                        <div style="color:#888894;font-size:0.65rem;margin-bottom:0.3rem;">Amount</div>
-                        <input id="wdAmount" type="number" step="0.001" placeholder="0.00" style="width:100%;padding:8px;background:#0a0a0f;border:1px solid #2a2a3a;color:#e8e8ec;font-family:inherit;font-size:0.85rem;box-sizing:border-box;" />
+                        <div style="color:#888888;font-size:0.65rem;margin-bottom:0.3rem;font-family:'Courier New',monospace;">Amount</div>
+                        <input id="wdAmount" type="number" step="0.001" placeholder="0.00" style="width:100%;padding:8px;background:#000000;border:1px solid #333333;color:#ffffff;font-family:inherit;font-size:0.85rem;box-sizing:border-box;border-radius:0;" />
                     </div>
                     <div style="width:80px;">
-                        <div style="color:#888894;font-size:0.65rem;margin-bottom:0.3rem;">Token</div>
-                        <select id="wdToken" style="width:100%;padding:8px;background:#0a0a0f;border:1px solid #2a2a3a;color:#e8e8ec;font-family:inherit;font-size:0.85rem;">
+                        <div style="color:#888888;font-size:0.65rem;margin-bottom:0.3rem;font-family:'Courier New',monospace;">Token</div>
+                        <select id="wdToken" style="width:100%;padding:8px;background:#000000;border:1px solid #333333;color:#ffffff;font-family:inherit;font-size:0.85rem;border-radius:0;">
                             <option value="SOL">SOL</option>
                             <option value="USDC">USDC</option>
                         </select>
                     </div>
                 </div>
-                <div id="wdStatus" style="color:#888894;font-size:0.65rem;min-height:1.2em;margin-bottom:0.5rem;text-align:center;"></div>
-                <button id="wdSubmit" style="width:100%;padding:10px;background:#00ff66;border:1px solid #00ff66;color:#0a0a0f;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;font-size:0.85rem;margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.06em;">WITHDRAW</button>
-                <button id="wdCancel" style="width:100%;padding:6px;background:none;border:none;color:#55555f;font-family:inherit;font-size:0.7rem;cursor:pointer;">Cancel</button>
+                <div id="wdStatus" style="color:#888888;font-size:0.65rem;min-height:1.2em;margin-bottom:0.5rem;text-align:center;"></div>
+                <button id="wdSubmit" style="width:100%;padding:10px;background:#ffcc00;border:1px solid #ffcc00;color:#000000;font-weight:700;cursor:pointer;font-family:'Courier New',monospace;font-size:0.85rem;margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.06em;border-radius:0;">WITHDRAW</button>
+                <button id="wdCancel" style="width:100%;padding:6px;background:none;border:none;color:#888888;font-family:inherit;font-size:0.7rem;cursor:pointer;">Cancel</button>
             </div>
         </div>
         <div id="wlMyDuels" class="wl-my-duels hidden">

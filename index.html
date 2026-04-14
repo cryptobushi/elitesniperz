@@ -105,24 +105,29 @@
 
         /* Hide Three.js hero canvas */
         #heroCanvas {
-            display: none !important;
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.3;
         }
 
         .hero-logo { display: none; }
         .hero-formation {
             position: relative;
-            width: 300px;
-            height: 200px;
+            width: 180px;
+            height: 180px;
             margin: 0 auto 1rem;
         }
         .hero-char {
             position: absolute;
             border-radius: 50%;
-            border: 2px solid #ffcc00;
+            border: 3px solid #ff3333;
             background: #000;
             overflow: hidden;
         }
-        /* Scope crosshair lines */
+        /* Scope crosshair lines — red, thick */
         .hero-char::before {
             content: '';
             position: absolute;
@@ -130,46 +135,31 @@
             z-index: 2;
             pointer-events: none;
             background:
-                linear-gradient(transparent 49%, #ffcc0044 49%, #ffcc0044 51%, transparent 51%),
-                linear-gradient(90deg, transparent 49%, #ffcc0044 49%, #ffcc0044 51%, transparent 51%);
+                linear-gradient(transparent 48%, #ff3333 48%, #ff3333 52%, transparent 52%),
+                linear-gradient(90deg, transparent 48%, #ff3333 48%, #ff3333 52%, transparent 52%);
         }
         /* Center dot */
         .hero-char::after {
             content: '';
             position: absolute;
             top: 50%; left: 50%;
-            width: 6px; height: 6px;
+            width: 8px; height: 8px;
             transform: translate(-50%, -50%);
-            border: 1px solid #ffcc00;
+            border: 2px solid #ff3333;
             border-radius: 50%;
             z-index: 3;
             pointer-events: none;
         }
         .hero-char-front {
-            width: 140px;
+            width: 160px;
             bottom: 0;
             left: 50%;
             transform: translateX(-50%);
             z-index: 3;
         }
-        .hero-char-back-left {
-            width: 100px;
-            bottom: 60px;
-            left: 15px;
-            z-index: 1;
-            opacity: 0.6;
-        }
-        .hero-char-back-right {
-            width: 100px;
-            bottom: 60px;
-            right: 15px;
-            z-index: 1;
-            opacity: 0.6;
-        }
         @media (max-width: 500px) {
-            .hero-formation { width: 220px; height: 150px; }
-            .hero-char-front { width: 110px; }
-            .hero-char-back-left, .hero-char-back-right { width: 75px; bottom: 45px; }
+            .hero-formation { width: 140px; height: 140px; }
+            .hero-char-front { width: 120px; }
         }
 
         .hero-tag {
@@ -1625,8 +1615,6 @@
             <canvas id="heroCanvas"></canvas>
             <div class="hero-content">
                 <div class="hero-formation">
-                    <img src="/images/snipers_transparent.png" alt="" class="hero-char hero-char-back-left">
-                    <img src="/images/snipers_transparent.png" alt="" class="hero-char hero-char-back-right">
                     <img src="/images/snipers_transparent.png" alt="sNiPeRz" class="hero-char hero-char-front">
                 </div>
                 <h1>RISK-TO-EARN<br>SNIPER DUELS</h1>
@@ -1935,11 +1923,11 @@
 
         const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1)); // Lower res for perf
-        renderer.setClearColor(0x0a0a0f, 1);
+        renderer.setClearColor(0x000000, 1);
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x1a0a2e);
-        scene.fog = new THREE.Fog(0x1a0a2e, 60, 140);
+        scene.background = new THREE.Color(0x000000);
+        scene.fog = new THREE.Fog(0x000000, 50, 120);
         const camera = new THREE.PerspectiveCamera(50, 2, 0.1, 500);
 
         // Lights
