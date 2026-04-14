@@ -108,13 +108,61 @@
             display: none !important;
         }
 
-        .hero-logo {
-            display: block;
-            max-width: 180px;
-            margin: 0 auto 1.2rem;
-            filter: none;
-            border: none;
-            background: none;
+        .hero-logo { display: none; }
+        .hero-formation {
+            position: relative;
+            width: 300px;
+            height: 200px;
+            margin: 0 auto 1rem;
+        }
+        .hero-char {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid #ffcc00;
+            background: #000;
+            /* Scope crosshair overlay */
+            background-image:
+                linear-gradient(#ffcc0033 1px, transparent 1px),
+                linear-gradient(90deg, #ffcc0033 1px, transparent 1px);
+            background-size: 100% 50%, 50% 100%;
+            background-position: center center;
+            background-repeat: no-repeat;
+            box-shadow: inset 0 0 0 1px #ffcc0022;
+        }
+        .hero-char::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 8px; height: 8px;
+            transform: translate(-50%, -50%);
+            border: 1px solid #ffcc0066;
+            border-radius: 50%;
+        }
+        .hero-char-front {
+            width: 140px;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3;
+        }
+        .hero-char-back-left {
+            width: 100px;
+            bottom: 60px;
+            left: 15px;
+            z-index: 1;
+            opacity: 0.6;
+        }
+        .hero-char-back-right {
+            width: 100px;
+            bottom: 60px;
+            right: 15px;
+            z-index: 1;
+            opacity: 0.6;
+        }
+        @media (max-width: 500px) {
+            .hero-formation { width: 220px; height: 150px; }
+            .hero-char-front { width: 110px; }
+            .hero-char-back-left, .hero-char-back-right { width: 75px; bottom: 45px; }
         }
 
         .hero-tag {
@@ -1569,7 +1617,11 @@
             <!-- 3D Sniper characters -->
             <canvas id="heroCanvas"></canvas>
             <div class="hero-content">
-                <img src="/images/snipers_transparent.png" alt="sNiPeRz" class="hero-logo">
+                <div class="hero-formation">
+                    <img src="/images/snipers_transparent.png" alt="" class="hero-char hero-char-back-left">
+                    <img src="/images/snipers_transparent.png" alt="" class="hero-char hero-char-back-right">
+                    <img src="/images/snipers_transparent.png" alt="sNiPeRz" class="hero-char hero-char-front">
+                </div>
                 <h1>RISK-TO-EARN<br>SNIPER DUELS</h1>
                 <p class="hero-sub">Play free or wager on Solana.</p>
                 <p class="hero-desc">WC3-inspired arena combat. 1v1 wagers. 5v5 multiplayer.</p>
@@ -1626,7 +1678,7 @@
                             <th>W</th>
                             <th>L</th>
                             <th>MATCHES</th>
-                            <th>EARNED</th>
+                            <th>PnL</th>
                         </tr>
                     </thead>
                     <tbody id="leaderboardBody">
@@ -1672,7 +1724,11 @@
                         const losses = p.losses || 0;
                         const matches = wins + losses + (p.draws || 0);
                         const earned = p.total_earned || 0;
-                        const earnedDisplay = earned > 0 ? (earned / 1e9).toFixed(4) + ' SOL' : '-';
+                        const wagered = p.total_wagered || 0;
+                        const pnl = earned - wagered;
+                        const pnlSol = pnl / 1e9;
+                        const pnlColor = pnl > 0 ? '#00ff44' : pnl < 0 ? '#ff3333' : '#888';
+                        const pnlDisplay = pnl === 0 ? '-' : (pnl > 0 ? '+' : '') + pnlSol.toFixed(4) + ' SOL';
                         const pfp = p.profile_picture;
                         const avatarHtml = pfp
                             ? '<img src="' + pfp + '" style="width:20px;height:20px;display:inline-block;vertical-align:middle;margin-right:6px;">'
@@ -1686,7 +1742,7 @@
                             '<td style="color:#00ff44;">' + wins + '</td>' +
                             '<td style="color:#ff3333;">' + losses + '</td>' +
                             '<td>' + matches + '</td>' +
-                            '<td style="color:#ffcc00;">' + earnedDisplay + '</td>' +
+                            '<td style="color:' + pnlColor + ';">' + pnlDisplay + '</td>' +
                             '</tr>';
                     }).join('');
                 })

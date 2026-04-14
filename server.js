@@ -968,8 +968,8 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
     const loser = db.getUser(loserId);
 
     // Update user stats
-    db.updateUserStats(winnerId, { wins: 1, total_earned: payout });
-    db.updateUserStats(loserId, { losses: 1 });
+    db.updateUserStats(winnerId, { wins: 1, total_earned: payout, total_wagered: match.stake_amount });
+    db.updateUserStats(loserId, { losses: 1, total_wagered: match.stake_amount });
 
     // Write match history for both
     const now = Date.now();
