@@ -69,7 +69,7 @@ const STYLES = `
     color: #ffcc00;
     font-size: 0.75rem;
     font-weight: 600;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
 }
 .wl-topbar .wl-balance {
     color: #888888;
@@ -78,7 +78,7 @@ const STYLES = `
     background: #1a1a1a;
     padding: 0.15rem 0.5rem;
     border: 1px solid #333333;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
 }
 .wl-topbar .wl-btn {
     background: #1a1a1a;
@@ -104,7 +104,7 @@ const STYLES = `
 }
 .wl-my-duels.hidden { display: none; }
 .wl-my-duels-header {
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: 0.75rem;
     color: #888888;
     letter-spacing: 0.1em;
@@ -133,7 +133,7 @@ const STYLES = `
 .wl-my-duel-stake {
     color: #ffcc00;
     font-weight: 700;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: 0.85rem;
     white-space: nowrap;
 }
@@ -190,7 +190,7 @@ const STYLES = `
 }
 .wl-title {
     color: #ffcc00;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: clamp(1.4rem, 5vw, 2rem);
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -237,7 +237,7 @@ const STYLES = `
     top: 0;
     background: #000000;
     font-weight: 500;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
 }
 .wl-table td {
     padding: 10px;
@@ -250,7 +250,7 @@ const STYLES = `
 .wl-table tr:hover td { background: #222222; }
 .wl-table .wl-creator { color: #ffcc00; font-weight: 600; }
 .wl-table .wl-record { color: #888888; }
-.wl-table .wl-stake { color: #ffcc00; font-weight: 600; font-family: 'Courier New', monospace; }
+.wl-table .wl-stake { color: #ffcc00; font-weight: 600; font-family: 'MedievalSharp', 'Courier New', cursive; }
 .wl-table .wl-target { color: #ffffff; }
 .wl-table .wl-lock { font-size: 0.8rem; }
 
@@ -275,7 +275,7 @@ const STYLES = `
     padding: 0.3rem 0.8rem;
     font-size: 0.65rem;
     font-weight: 700;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -307,7 +307,7 @@ const STYLES = `
     padding: 0.7rem 2.5rem;
     font-size: 0.95rem;
     font-weight: 700;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -339,7 +339,7 @@ const STYLES = `
 }
 .cm-panel h2 {
     color: #ffcc00;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: 1.3rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -354,7 +354,7 @@ const STYLES = `
     margin-bottom: 0.3rem;
     margin-top: 0.6rem;
     font-weight: 500;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
 }
 .cm-input {
     background: #000000;
@@ -406,7 +406,7 @@ const STYLES = `
     padding: 0.7rem;
     font-size: 0.9rem;
     font-weight: 700;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     cursor: pointer;
     width: 100%;
     text-transform: uppercase;
@@ -457,7 +457,7 @@ const STYLES = `
 
 .wr-title {
     color: #ffcc00;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: clamp(1.8rem, 6vw, 2.6rem);
     font-weight: 700;
     letter-spacing: 0.14em;
@@ -466,7 +466,7 @@ const STYLES = `
 }
 .wr-info {
     color: #ffffff;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: clamp(1.1rem, 4vw, 1.6rem);
     letter-spacing: 0.08em;
     margin-bottom: 0.3rem;
@@ -479,7 +479,7 @@ const STYLES = `
 }
 .wr-challenge-text {
     color: #ffcc00;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: clamp(0.7rem, 2.5vw, 0.85rem);
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -521,7 +521,7 @@ const STYLES = `
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: 1.3rem;
     font-weight: 700;
     color: #000000;
@@ -531,7 +531,7 @@ const STYLES = `
 }
 .wr-card .wr-name {
     color: #ffcc00;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: 1.05rem;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -550,7 +550,7 @@ const STYLES = `
     text-transform: uppercase;
     letter-spacing: 0.06em;
     padding: 0.2rem 0.6rem;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
 }
 .wr-card .wr-status.locked { color: #00ff44; border: 1px solid #00ff44; background: #000000; }
 .wr-card .wr-status.waiting { color: #ffcc00; border: 1px solid #ffcc00; background: #000000; }
@@ -560,7 +560,7 @@ const STYLES = `
 .wr-card .wr-status.pending { color: #ffcc00; }
 .wr-card.empty .wr-name {
     color: #ffcc00;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: 1rem;
     opacity: 0.9;
 }
@@ -571,7 +571,7 @@ const STYLES = `
 
 .wr-vs {
     color: #ffcc00;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: clamp(2rem, 6vw, 3rem);
     font-weight: 900;
     letter-spacing: 0.12em;
@@ -595,7 +595,7 @@ const STYLES = `
     color: #000000;
     font-weight: 700;
     cursor: pointer;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: 1rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -612,7 +612,7 @@ const STYLES = `
     color: #00ccff;
     font-weight: 600;
     cursor: pointer;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -653,7 +653,7 @@ const STYLES = `
     flex-direction: column;
     align-items: center;
     padding-top: max(env(safe-area-inset-top, 6px), 6px);
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
 }
 #wagerHUD.hidden { display: none !important; }
 
@@ -754,7 +754,7 @@ const STYLES = `
     gap: 0;
 }
 .wr-result-title {
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: clamp(4rem, 18vw, 8rem);
     font-weight: 900;
     letter-spacing: 0.15em;
@@ -773,14 +773,14 @@ const STYLES = `
     color: #ffcc00;
 }
 .wr-result-opponent {
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: clamp(1.2rem, 5vw, 2rem);
     color: #888888;
     margin-top: 0.5rem;
     animation: floatUp 0.5s 0.3s ease-out both;
 }
 .wr-result-score {
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: clamp(2.5rem, 10vw, 5rem);
     color: #ffffff;
     letter-spacing: 0.2em;
@@ -788,7 +788,7 @@ const STYLES = `
     animation: floatUp 0.5s 0.4s ease-out both;
 }
 .wr-result-payout {
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: clamp(1.5rem, 7vw, 3rem);
     font-weight: 900;
     margin-top: 0.8rem;
@@ -822,7 +822,7 @@ const STYLES = `
     padding: 0.8rem 2.5rem;
     font-size: clamp(0.9rem, 3vw, 1.1rem);
     font-weight: 700;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -840,7 +840,7 @@ const STYLES = `
     padding: 0.5rem;
     font-size: 0.85rem;
     font-weight: 700;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     cursor: pointer;
     width: 100%;
     border-radius: 0;
@@ -914,7 +914,7 @@ const STYLES = `
     padding: 0.3rem 0.8rem;
     font-size: 0.65rem;
     font-weight: 700;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -997,7 +997,7 @@ const STYLES = `
 }
 .wr-challengers-title {
     color: #888888;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: 0.75rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -1027,7 +1027,7 @@ const STYLES = `
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: 1rem;
     font-weight: 700;
     color: #000000;
@@ -1040,7 +1040,7 @@ const STYLES = `
 }
 .wr-challenger-handle {
     color: #ffcc00;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: 0.8rem;
     font-weight: 600;
 }
@@ -1095,7 +1095,7 @@ const STYLES = `
 }
 .wr-challenge-submitted-text {
     color: #ffcc00;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: 0.9rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -1107,7 +1107,7 @@ const STYLES = `
 }
 .wr-challenge-declined-text {
     color: #ff3333;
-    font-family: 'Courier New', monospace;
+    font-family: 'MedievalSharp', 'Courier New', cursive;
     font-size: 0.9rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;

@@ -1744,8 +1744,8 @@
                             ? '<img src="' + pfp + '" style="width:20px;height:20px;display:inline-block;vertical-align:middle;margin-right:6px;">'
                             : '';
                         const twitterLink = handle !== 'Anon'
-                            ? '<a href="https://x.com/' + handle + '" target="_blank" rel="noopener" style="color:#ffcc00;text-decoration:none;">@' + handle + '</a>'
-                            : 'Anon';
+                            ? '<a href="https://x.com/' + handle + '" target="_blank" rel="noopener" style="color:#ffcc00;text-decoration:none;font-family:MedievalSharp,cursive;">@' + handle + '</a>'
+                            : '<span style="font-family:MedievalSharp,cursive;">Anon</span>';
                         return '<tr>' +
                             '<td style="color:#888;">' + (i + 1) + '</td>' +
                             '<td>' + avatarHtml + twitterLink + '</td>' +
