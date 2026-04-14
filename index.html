@@ -1868,7 +1868,7 @@
                     if (!data.success || !data.data) return;
                     const tbody = document.getElementById('leaderboardBody');
                     if (!tbody) return;
-                    const players = data.data;
+                    const players = data.data.filter(p => (p.wins || 0) + (p.losses || 0) + (p.draws || 0) > 0);
                     if (players.length === 0) {
                         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#554433;">No warriors yet. Be the first.</td></tr>';
                         return;
