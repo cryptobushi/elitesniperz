@@ -3125,6 +3125,11 @@ document.getElementById('menuBtn')?.addEventListener('click', () => {
 document.getElementById('menuResume')?.addEventListener('click', () => {
     document.getElementById('gameMenu')?.classList.add('hidden');
 });
+document.getElementById('menuMute')?.addEventListener('click', () => {
+    audioManager.enabled = !audioManager.enabled;
+    const btn = document.getElementById('menuMute');
+    if (btn) btn.textContent = audioManager.enabled ? '🔊 SOUND: ON' : '🔇 SOUND: OFF';
+});
 document.getElementById('menuQuit')?.addEventListener('click', () => {
     document.getElementById('gameMenu')?.classList.add('hidden');
 
