@@ -163,32 +163,32 @@ export async function login() {
         // Show login modal with both options
         const overlay = document.createElement('div');
         overlay.id = 'authOverlay';
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,5,10,0.92);z-index:20000;display:flex;align-items:center;justify-content:center;font-family:"Inter",system-ui,sans-serif;background-image:linear-gradient(rgba(30,30,42,0.15) 1px,transparent 1px),linear-gradient(90deg,rgba(30,30,42,0.15) 1px,transparent 1px);background-size:40px 40px;';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:20000;display:flex;align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif;';
 
         overlay.innerHTML = `
-            <div style="background:#12121a;border:1px solid #2a2a3a;padding:2.5rem 2rem;width:min(90%,400px);text-align:center;">
-                <div style="font-family:'Oswald',sans-serif;font-size:1.8rem;font-weight:700;color:#e8e8ec;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:0.4rem;">ENTER THE ARENA</div>
-                <div style="color:#888894;font-size:0.75rem;margin-bottom:0.3rem;">Connect to compete in wager duels</div>
-                <div style="color:#55555f;font-size:0.6rem;margin-bottom:2rem;font-style:italic;">Every match is public. Every win and loss is recorded.</div>
+            <div style="background:#1a1a1a;border:1px solid #333;padding:2rem;width:min(90%,360px);text-align:center;">
+                <div style="font-family:'Courier New',monospace;font-size:1.2rem;font-weight:700;color:#ffcc00;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.4rem;">ENTER THE ARENA</div>
+                <div style="color:#ccc;font-size:0.75rem;margin-bottom:0.3rem;">Connect to compete in wager duels</div>
+                <div style="color:#888;font-size:0.6rem;margin-bottom:1.5rem;">Every match is public. Every win and loss is recorded.</div>
 
-                <button id="authTwitterBtn" style="width:100%;padding:14px 16px;background:#1a1a25;border:1px solid #2a2a3a;color:#e8e8ec;font-family:'Inter',system-ui,sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;margin-bottom:0.75rem;display:flex;align-items:center;justify-content:center;gap:10px;transition:all 0.15s;letter-spacing:0.02em;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#e8e8ec"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                <button id="authTwitterBtn" style="width:100%;padding:12px;background:#000;border:1px solid #ffcc00;color:#ffcc00;font-family:Arial,Helvetica,sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;margin-bottom:0.75rem;display:flex;align-items:center;justify-content:center;gap:10px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffcc00"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                     Sign in with X
                 </button>
 
-                <div id="authStatus" style="color:#888894;font-size:0.65rem;margin:0.5rem 0;min-height:1.2em;"></div>
+                <div id="authStatus" style="color:#888;font-size:0.65rem;margin:0.5rem 0;min-height:1.2em;"></div>
 
-                <div style="border-top:1px solid #1e1e2a;margin:1.5rem 0 1rem;"></div>
-                <div style="color:#55555f;font-size:0.55rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.6rem;">Dev Mode</div>
+                <div style="border-top:1px solid #333;margin:1rem 0 0.8rem;"></div>
+                <div style="color:#888;font-size:0.55rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.5rem;">Dev Mode</div>
 
                 <input id="authHandleInput" type="text" placeholder="@handle"
-                    style="width:100%;padding:10px;background:#0a0a0f;border:1px solid #2a2a3a;color:#e8e8ec;font-family:'Inter',system-ui,sans-serif;font-size:0.8rem;text-align:center;box-sizing:border-box;margin-bottom:0.6rem;transition:border-color 0.15s;" />
+                    style="width:100%;padding:10px;background:#000;border:1px solid #333;color:#fff;font-family:Arial,Helvetica,sans-serif;font-size:0.8rem;text-align:center;box-sizing:border-box;margin-bottom:0.5rem;" />
 
-                <button id="authDevBtn" style="width:100%;padding:10px;background:#1a1a25;border:1px solid #2a2a3a;color:#888894;font-family:'Inter',system-ui,sans-serif;font-size:0.7rem;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;transition:all 0.15s;">
+                <button id="authDevBtn" style="width:100%;padding:10px;background:#000;border:1px solid #333;color:#888;font-family:Arial,Helvetica,sans-serif;font-size:0.7rem;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;">
                     Dev Login
                 </button>
 
-                <div id="authCancelBtn" style="color:#55555f;font-size:0.65rem;cursor:pointer;margin-top:1rem;transition:color 0.15s;">
+                <div id="authCancelBtn" style="color:#888;font-size:0.65rem;cursor:pointer;margin-top:0.8rem;">
                     Cancel
                 </div>
             </div>

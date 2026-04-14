@@ -1439,7 +1439,7 @@ function bindEvents() {
         btn.disabled = true;
         btn.textContent = 'PROCESSING...';
         statusEl.textContent = 'Creating transaction...';
-        statusEl.style.color = '#ff8800';
+        statusEl.style.color = '#ffcc00';
 
         try {
             // Step 1: Get unsigned withdrawal tx
@@ -1479,7 +1479,7 @@ function bindEvents() {
             }, 3000);
         } catch (e) {
             statusEl.textContent = 'Failed: ' + e.message;
-            statusEl.style.color = '#ff3344';
+            statusEl.style.color = '#ff3333';
         } finally {
             btn.disabled = false;
             btn.textContent = 'WITHDRAW';
@@ -1779,8 +1779,8 @@ async function renderMatches(matches) {
         const isSelective = m.match_mode === 'selective';
         const pfp = m.creator_pfp;
         const avatarHtml = pfp
-            ? `<img src="${esc(pfp)}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
-            : `<div style="width:24px;height:24px;border-radius:50%;background:#2a2a3a;display:flex;align-items:center;justify-content:center;font-size:0.55rem;color:#888894;flex-shrink:0;">${esc(handle[0]?.toUpperCase() || '?')}</div>`;
+            ? `<img src="${esc(pfp)}" style="width:24px;height:24px;object-fit:cover;flex-shrink:0;border:1px solid #333333;">`
+            : `<div style="width:24px;height:24px;background:#333333;display:flex;align-items:center;justify-content:center;font-size:0.55rem;color:#888888;flex-shrink:0;border:1px solid #333333;">${esc(handle[0]?.toUpperCase() || '?')}</div>`;
         const handleHtml = handle !== 'Anon'
             ? `<a href="https://x.com/${esc(handle)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;" onclick="event.stopPropagation();">@${esc(handle)}</a>`
             : 'Anon';
@@ -2120,7 +2120,7 @@ async function pollWaitingRoom(matchId) {
                     joinerAvatarEl.style.background = `url(${m.joiner_pfp}) center/cover`;
                 } else {
                     joinerAvatarEl.style.background = avatarColor(joinerHandle);
-                    joinerAvatarEl.style.color = '#0a0a0f';
+                    joinerAvatarEl.style.color = '#000000';
                     joinerAvatarEl.textContent = avatarInitial(joinerHandle);
                 }
             }
@@ -2139,8 +2139,8 @@ async function pollWaitingRoom(matchId) {
             els.wrJoinerName.textContent = 'OPEN CHALLENGE';
             els.wrJoinerRecord.textContent = 'No one has taken this yet';
             if (joinerAvatarEl) {
-                joinerAvatarEl.style.background = '#2a2a3a';
-                joinerAvatarEl.style.color = '#55555f';
+                joinerAvatarEl.style.background = '#333333';
+                joinerAvatarEl.style.color = '#888888';
                 joinerAvatarEl.textContent = '?';
             }
             if (els.wrJoinerStatus) {
@@ -2157,7 +2157,7 @@ async function pollWaitingRoom(matchId) {
             depositBtn.style.display = showDeposit ? 'block' : 'none';
             depositBtn.textContent = `LOCK IN ${wrAmt} ${wrToken}`;
             depositBtn.disabled = false;
-            depositBtn.style.background = '#00ff66';
+            depositBtn.style.background = '#ffcc00';
         }
 
         // === Selective mode UI ===
@@ -2479,7 +2479,7 @@ export function connectWagerMatch(matchId) {
                 if (!overlay) {
                     overlay = document.createElement('div');
                     overlay.id = 'wagerDcOverlay';
-                    overlay.style.cssText = 'position:fixed;top:20%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#ff4444;padding:1rem 2rem;border:1px solid #ff4444;font-family:Inter,system-ui,sans-serif;font-size:0.9rem;z-index:9999;text-align:center;border-radius:4px;';
+                    overlay.style.cssText = 'position:fixed;top:20%;left:50%;transform:translateX(-50%);background:#000000;color:#ff3333;padding:1rem 2rem;border:1px solid #ff3333;font-family:"Courier New",monospace;font-size:0.9rem;z-index:9999;text-align:center;';
                     document.body.appendChild(overlay);
                 }
                 overlay.textContent = 'Opponent disconnected \u2014 ' + msg.remaining + 's to rejoin';
