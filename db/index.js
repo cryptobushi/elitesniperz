@@ -64,7 +64,8 @@ const _getMatchHistory = db.prepare(`
 
 // Leaderboard
 const _getLeaderboard = db.prepare(`
-  SELECT id, twitter_handle, display_name, wins, losses, draws, total_earned, total_wagered, elo
+  SELECT id, twitter_handle, display_name, profile_picture, wins, losses, draws, total_earned, total_wagered, elo,
+  (COALESCE(wins,0) + COALESCE(losses,0) + COALESCE(draws,0)) as matches
   FROM users ORDER BY wins DESC LIMIT ?
 `);
 
