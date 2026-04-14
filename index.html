@@ -419,6 +419,126 @@
             font-size: 0.95rem;
         }
 
+        /* === SCROLL LEADERBOARD === */
+        .scroll-container {
+            max-width: 700px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .scroll-rod {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 28px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .scroll-bar {
+            flex: 1;
+            height: 14px;
+            background: linear-gradient(180deg, #8B6914 0%, #6B4F10 30%, #4a3508 70%, #6B4F10 100%);
+            border-top: 1px solid #aa8822;
+            border-bottom: 1px solid #332200;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+        }
+
+        .scroll-knob {
+            width: 32px;
+            height: 32px;
+            background: radial-gradient(circle at 40% 35%, #aa8822, #6B4F10 60%, #4a3508);
+            border: 2px solid #aa8822;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.6), inset 0 1px 2px rgba(255,220,100,0.3);
+            flex-shrink: 0;
+        }
+
+        .scroll-body {
+            position: relative;
+            background: linear-gradient(180deg,
+                #d4c4a0 0%,
+                #e8dcc4 3%,
+                #f2e8d0 10%,
+                #efe5c8 50%,
+                #e8dcc4 90%,
+                #d4c4a0 97%,
+                #c8b890 100%
+            );
+            margin: -4px 14px;
+            padding: 1.5rem 1.2rem;
+            box-shadow:
+                inset 4px 0 12px rgba(0,0,0,0.15),
+                inset -4px 0 12px rgba(0,0,0,0.15),
+                0 0 20px rgba(0,0,0,0.3);
+            border-left: 2px solid #b8a878;
+            border-right: 2px solid #b8a878;
+        }
+
+        .scroll-torn-top,
+        .scroll-torn-bottom {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 8px;
+            z-index: 1;
+        }
+        .scroll-torn-top {
+            top: -2px;
+            background: linear-gradient(180deg, rgba(139,105,20,0.3), transparent);
+        }
+        .scroll-torn-bottom {
+            bottom: -2px;
+            background: linear-gradient(0deg, rgba(139,105,20,0.3), transparent);
+        }
+
+        .scroll-title {
+            font-family: 'MedievalSharp', cursive;
+            font-size: 1.4rem;
+            font-weight: 700;
+            text-align: center;
+            color: #3a2a0a;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            text-shadow: 0 1px 0 rgba(255,255,200,0.4);
+        }
+
+        /* Parchment-themed table overrides */
+        .scroll-table th {
+            background: rgba(180,160,120,0.4);
+            color: #5a4a2a;
+            border-bottom: 1px solid #b8a878;
+            font-size: 0.65rem;
+        }
+
+        .scroll-table td {
+            background: transparent;
+            color: #3a2a0a;
+            border-bottom: 1px solid rgba(180,160,120,0.3);
+            font-size: 0.82rem;
+        }
+
+        .scroll-table tbody tr:hover td {
+            background: rgba(180,160,120,0.25);
+        }
+
+        .scroll-table tbody tr td:first-child {
+            color: #8a7a5a;
+            font-weight: 700;
+        }
+
+        /* Override link colors inside scroll */
+        .scroll-table a {
+            color: #6B3A0A !important;
+            text-decoration: none;
+            font-weight: 700;
+        }
+        .scroll-table a:hover {
+            color: #3a2a0a !important;
+            text-decoration: underline;
+        }
+
         .duel-handle {
             color: var(--text-primary);
             font-weight: 700;
@@ -884,6 +1004,12 @@
 
             .duel-table th:nth-child(3),
             .duel-table td:nth-child(3) { display: none; }
+
+            .scroll-body { padding: 1rem 0.8rem; margin: -4px 8px; }
+            .scroll-knob { width: 24px; height: 24px; }
+            .scroll-bar { height: 10px; }
+            .scroll-rod { height: 22px; }
+            .scroll-title { font-size: 1.1rem; }
         }
 
         /* === END LANDING PAGE CSS === */
@@ -1676,25 +1802,44 @@
 
         <!-- LEADERBOARD -->
         <section class="section" style="padding-top:2rem;">
-            <div class="section-header">
-                <h2 class="section-title">LEADERBOARD</h2>
-            </div>
-            <div style="overflow-x:auto;">
-                <table class="duel-table" id="leaderboardTable">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>PLAYER</th>
-                            <th>W</th>
-                            <th>L</th>
-                            <th>MATCHES</th>
-                            <th>PnL</th>
-                        </tr>
-                    </thead>
-                    <tbody id="leaderboardBody">
-                        <tr><td colspan="6" style="text-align:center;color:#888;">Loading...</td></tr>
-                    </tbody>
-                </table>
+            <div class="scroll-container">
+                <!-- Top scroll rod -->
+                <div class="scroll-rod scroll-rod-top">
+                    <div class="scroll-knob scroll-knob-left"></div>
+                    <div class="scroll-bar"></div>
+                    <div class="scroll-knob scroll-knob-right"></div>
+                </div>
+
+                <!-- Scroll body (parchment) -->
+                <div class="scroll-body">
+                    <div class="scroll-torn-top"></div>
+                    <h2 class="scroll-title">LEADERBOARD</h2>
+                    <div style="overflow-x:auto;">
+                        <table class="duel-table scroll-table" id="leaderboardTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>PLAYER</th>
+                                    <th>W</th>
+                                    <th>L</th>
+                                    <th>MATCHES</th>
+                                    <th>PnL</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboardBody">
+                                <tr><td colspan="6" style="text-align:center;color:#554433;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="scroll-torn-bottom"></div>
+                </div>
+
+                <!-- Bottom scroll rod -->
+                <div class="scroll-rod scroll-rod-bottom">
+                    <div class="scroll-knob scroll-knob-left"></div>
+                    <div class="scroll-bar"></div>
+                    <div class="scroll-knob scroll-knob-right"></div>
+                </div>
             </div>
         </section>
 
@@ -1737,7 +1882,7 @@
                         const wagered = p.total_wagered || 0;
                         const pnl = earned - wagered;
                         const pnlSol = pnl / 1e9;
-                        const pnlColor = pnl > 0 ? '#00ff44' : pnl < 0 ? '#ff3333' : '#888';
+                        const pnlColor = pnl > 0 ? '#2a6b1a' : pnl < 0 ? '#8b1a1a' : '#8a7a5a';
                         const pnlDisplay = pnl === 0 ? '-' : (pnl > 0 ? '+' : '') + pnlSol.toFixed(4) + ' SOL';
                         const pfp = p.profile_picture;
                         const avatarHtml = pfp
@@ -1747,12 +1892,12 @@
                             ? '<a href="https://x.com/' + handle + '" target="_blank" rel="noopener" style="color:#ffcc00;text-decoration:none;font-family:MedievalSharp,cursive;">@' + handle + '</a>'
                             : '<span style="font-family:MedievalSharp,cursive;">Anon</span>';
                         return '<tr>' +
-                            '<td style="color:#888;">' + (i + 1) + '</td>' +
+                            '<td>' + (i + 1) + '</td>' +
                             '<td>' + avatarHtml + twitterLink + '</td>' +
-                            '<td style="color:#00ff44;">' + wins + '</td>' +
-                            '<td style="color:#ff3333;">' + losses + '</td>' +
+                            '<td style="color:#2a6b1a;font-weight:700;">' + wins + '</td>' +
+                            '<td style="color:#8b1a1a;font-weight:700;">' + losses + '</td>' +
                             '<td>' + matches + '</td>' +
-                            '<td style="color:' + pnlColor + ';">' + pnlDisplay + '</td>' +
+                            '<td style="color:' + pnlColor + ';font-weight:700;">' + pnlDisplay + '</td>' +
                             '</tr>';
                     }).join('');
                 })
