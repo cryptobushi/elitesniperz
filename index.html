@@ -14,19 +14,24 @@
     <style>
         /* === CSS CUSTOM PROPERTIES === */
         :root {
-            --accent: #00ff66;
-            --accent-dim: #00ff6622;
-            --accent-mid: #00ff6644;
-            --base-darkest: #0a0a0f;
-            --base-dark: #12121a;
-            --base-elevated: #1a1a25;
-            --base-border: #25252f;
-            --text-primary: #e8e8ec;
-            --text-secondary: #888894;
-            --text-muted: #55555f;
-            --danger: #ff3344;
-            --warning: #ff8800;
+            --accent: #15FF63;
+            --accent-dim: rgba(21,255,99,0.13);
+            --accent-mid: rgba(21,255,99,0.27);
+            --base-darkest: #05060B;
+            --base-dark: #0B1020;
+            --base-panel: #101526;
+            --base-elevated: #151C32;
+            --base-border: #1A1F35;
+            --border-bright: #252B45;
+            --text-primary: #F2F0EA;
+            --text-secondary: #B9B6AE;
+            --text-muted: #6B6860;
+            --danger: #FF3B3B;
+            --warning: #FF8800;
             --blue: #3388ff;
+            --brand-gold: #FFB13B;
+            --brand-glow: #FFDB7A;
+            --brand-blue: #142A6B;
             --font-body: 'Inter', system-ui, -apple-system, sans-serif;
             --font-display: 'Oswald', 'Impact', sans-serif;
         }
@@ -81,6 +86,7 @@
             text-align: center;
             padding: 2rem 1.5rem 4rem;
             overflow: hidden;
+            background: var(--base-darkest);
         }
 
         /* Dark grid background */
@@ -104,7 +110,7 @@
             transform: translate(-50%, -50%);
             font-size: 30vw;
             font-weight: 100;
-            color: rgba(0, 255, 102, 0.015);
+            color: rgba(21, 255, 99, 0.012);
             font-family: var(--font-body);
             pointer-events: none;
         }
@@ -124,7 +130,14 @@
             height: 100%;
             pointer-events: none;
             z-index: 0;
-            opacity: 0.4;
+            opacity: 0.25;
+        }
+
+        .hero-logo {
+            display: block;
+            max-width: 200px;
+            margin: 0 auto 1.2rem;
+            filter: drop-shadow(0 0 24px rgba(255,177,59,0.25)) drop-shadow(0 0 48px rgba(255,219,122,0.10));
         }
 
         .hero-tag {
@@ -145,12 +158,8 @@
             line-height: 0.95;
             letter-spacing: -0.01em;
             text-transform: uppercase;
-            color: var(--text-primary);
+            color: var(--brand-gold);
             margin-bottom: 0.6rem;
-        }
-
-        .hero h1 span {
-            color: var(--accent);
         }
 
         .hero-sub {
@@ -166,7 +175,7 @@
         .hero-desc {
             font-size: 0.95rem;
             line-height: 1.6;
-            color: var(--text-secondary);
+            color: var(--text-muted);
             max-width: 520px;
             margin: 0 auto 2rem;
         }
@@ -188,7 +197,7 @@
             color: var(--text-muted);
         }
         .proof-item { white-space: nowrap; }
-        .proof-val { color: var(--accent); font-weight: 700; }
+        .proof-val { color: var(--brand-gold); font-weight: 700; }
         .proof-hot { color: var(--warning); }
         .proof-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
         @media (max-width: 500px) {
@@ -199,10 +208,10 @@
         .btn {
             font-family: var(--font-display);
             font-size: 0.95rem;
-            font-weight: 600;
-            letter-spacing: 0.1em;
+            font-weight: 700;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            padding: 0.85rem 2rem;
+            padding: 12px 28px;
             border-radius: 2px;
             cursor: pointer;
             transition: all 0.15s;
@@ -212,7 +221,7 @@
 
         .btn-outline {
             background: transparent;
-            border: 1.5px solid var(--text-muted);
+            border: 1px solid var(--border-bright);
             color: var(--text-primary);
         }
         .btn-outline:hover {
@@ -224,11 +233,10 @@
         .btn-filled {
             background: var(--accent);
             color: var(--base-darkest);
-            border: 1.5px solid var(--accent);
+            border: none;
         }
         .btn-filled:hover {
-            background: #00dd55;
-            box-shadow: 0 0 30px var(--accent-dim), 0 0 60px rgba(0,255,102,0.1);
+            box-shadow: 0 0 20px rgba(21,255,99,0.3);
         }
 
         /* === LIVE TICKER STRIP === */
@@ -237,7 +245,7 @@
             bottom: 0;
             left: 0;
             width: 100%;
-            background: var(--base-dark);
+            background: rgba(5,6,11,0.85);
             border-top: 1px solid var(--base-border);
             border-bottom: 1px solid var(--base-border);
             overflow: hidden;
@@ -259,7 +267,7 @@
             letter-spacing: 0.02em;
         }
 
-        .ticker-item .accent { color: var(--accent); }
+        .ticker-item .accent { color: var(--brand-gold); }
         .ticker-item .hot { color: var(--warning); }
         .ticker-item .user { color: var(--text-secondary); }
 
@@ -351,7 +359,8 @@
 
         .duel-table {
             width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0 4px;
         }
 
         .duel-table th {
@@ -368,36 +377,31 @@
         .duel-table td {
             font-size: 0.8rem;
             padding: 0.7rem 0.75rem;
-            border-bottom: 1px solid rgba(255,255,255,0.03);
             color: var(--text-secondary);
+            background: var(--base-panel);
         }
+        .duel-table td:first-child { border-radius: 2px 0 0 2px; }
+        .duel-table td:last-child { border-radius: 0 2px 2px 0; }
 
         .duel-table tr {
             cursor: pointer;
             transition: background 0.1s;
         }
-        .duel-table tbody tr:hover {
-            background: rgba(0, 255, 102, 0.03);
+        .duel-table tbody tr:hover td {
+            background: var(--base-elevated);
         }
-        .duel-table tbody tr.row-live {
-            background: rgba(255, 51, 68, 0.03);
-            border-left: 2px solid var(--danger);
-        }
-        .duel-table tbody tr.row-hot {
-            background: rgba(255, 136, 0, 0.03);
-            border-left: 2px solid var(--warning);
-        }
-        .duel-table tbody tr.row-highstake {
-            background: rgba(255, 136, 0, 0.05);
-        }
+        .duel-table tbody tr.row-open td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+        .duel-table tbody tr.row-live td:first-child { box-shadow: inset 2px 0 0 var(--danger); }
+        .duel-table tbody tr.row-hot td:first-child { box-shadow: inset 2px 0 0 var(--brand-gold); }
+        .duel-table tbody tr.row-new td:first-child { box-shadow: inset 2px 0 0 var(--blue); }
         .duel-table tbody tr.row-highstake .duel-stake {
             font-size: 0.95rem;
-            text-shadow: 0 0 8px rgba(0, 255, 102, 0.3);
+            text-shadow: 0 0 8px rgba(21, 255, 99, 0.3);
         }
 
         .duel-handle {
             color: var(--text-primary);
-            font-weight: 600;
+            font-weight: 700;
             font-size: 0.82rem;
         }
 
@@ -407,8 +411,8 @@
         .duel-wr.low { color: var(--danger); }
 
         .duel-stake {
-            font-weight: 600;
-            color: var(--text-primary);
+            font-weight: 700;
+            color: var(--accent);
             font-variant-numeric: tabular-nums;
         }
 
@@ -421,10 +425,10 @@
             border-radius: 2px;
             text-transform: uppercase;
         }
-        .badge-open { background: rgba(0,255,102,0.12); color: var(--accent); }
-        .badge-live { background: rgba(255,51,68,0.15); color: var(--danger); animation: badgePulse 1.5s ease-in-out infinite; }
-        .badge-hot { background: rgba(255,136,0,0.15); color: var(--warning); }
-        .badge-new { background: rgba(51,136,255,0.12); color: var(--blue); }
+        .badge-open { background: rgba(21,255,99,0.12); color: var(--accent); }
+        .badge-live { background: rgba(255,59,59,0.12); color: var(--danger); animation: badgePulse 1.5s ease-in-out infinite; }
+        .badge-hot { background: rgba(255,177,59,0.12); color: var(--brand-gold); }
+        .badge-new { background: rgba(20,42,107,0.3); color: var(--blue); }
 
         @keyframes badgePulse {
             0%, 100% { opacity: 1; }
@@ -439,14 +443,15 @@
         }
 
         .player-card {
-            background: var(--base-dark);
+            background: var(--base-panel);
             border: 1px solid var(--base-border);
             border-radius: 4px;
             padding: 1.5rem;
             transition: border-color 0.15s;
+            box-shadow: inset 0 0 20px rgba(255,177,59,0.03);
         }
         .player-card:hover {
-            border-color: var(--accent-mid);
+            border-color: var(--border-bright);
         }
 
         .player-card-top {
@@ -469,11 +474,14 @@
             color: var(--base-darkest);
             flex-shrink: 0;
         }
+        .player-avatar.avatar-elite {
+            border: 2px solid var(--brand-gold);
+        }
 
         .player-handle {
-            font-weight: 600;
+            font-weight: 700;
             font-size: 0.95rem;
-            color: var(--text-primary);
+            color: var(--brand-gold);
         }
 
         .player-tier {
@@ -483,7 +491,7 @@
             letter-spacing: 0.08em;
             margin-top: 0.15rem;
         }
-        .tier-elite { color: var(--accent); }
+        .tier-elite { color: var(--brand-gold); }
         .tier-trusted { color: var(--blue); }
         .tier-rising { color: var(--warning); }
 
@@ -529,14 +537,14 @@
         }
 
         .feature-card {
-            background: var(--base-dark);
+            background: var(--base-panel);
             border: 1px solid var(--base-border);
             border-radius: 4px;
             padding: 1.5rem;
             transition: border-color 0.15s;
         }
         .feature-card:hover {
-            border-color: var(--accent-mid);
+            border-color: var(--border-bright);
         }
 
         .feature-title {
@@ -545,7 +553,7 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            color: var(--text-primary);
+            color: var(--brand-gold);
             margin-bottom: 0.5rem;
         }
 
@@ -559,7 +567,7 @@
         .feed-list {
             display: flex;
             flex-direction: column;
-            gap: 0;
+            gap: 4px;
         }
 
         .feed-item {
@@ -567,11 +575,12 @@
             align-items: center;
             gap: 0.75rem;
             padding: 0.7rem 0.75rem;
-            border-bottom: 1px solid rgba(255,255,255,0.03);
+            background: var(--base-panel);
+            border-radius: 2px;
             transition: background 0.1s;
         }
         .feed-item:hover {
-            background: rgba(255,255,255,0.02);
+            background: var(--base-elevated);
         }
 
         .feed-bar {
@@ -582,7 +591,7 @@
         }
         .feed-bar.win { background: var(--accent); }
         .feed-bar.loss { background: var(--danger); }
-        .feed-bar.streak { background: var(--warning); }
+        .feed-bar.streak { background: var(--brand-gold); }
         .feed-bar.info { background: var(--blue); }
 
         .feed-text {
@@ -590,7 +599,7 @@
             color: var(--text-secondary);
             flex: 1;
         }
-        .feed-text strong { color: var(--text-primary); font-weight: 600; }
+        .feed-text strong { color: var(--text-primary); font-weight: 700; }
 
         .feed-time {
             font-size: 0.7rem;
@@ -607,15 +616,27 @@
         }
 
         .mode-card {
-            background: var(--base-dark);
+            background: var(--base-panel);
             border: 1px solid var(--base-border);
             border-radius: 4px;
             padding: 1.5rem;
             text-align: center;
             transition: border-color 0.15s;
+            border-left: 3px solid var(--base-border);
         }
         .mode-card:hover {
-            border-color: var(--accent-mid);
+            border-color: var(--border-bright);
+        }
+        .mode-card.mode-wager {
+            border-left-color: var(--accent);
+            border-color: var(--accent);
+            box-shadow: 0 0 20px rgba(21,255,99,0.05);
+        }
+        .mode-card.mode-free {
+            border-left-color: var(--brand-gold);
+        }
+        .mode-card.mode-team {
+            border-left-color: var(--blue);
         }
 
         .mode-label {
@@ -644,8 +665,8 @@
             text-transform: uppercase;
             margin-bottom: 0.6rem;
         }
-        .mode-tag-free { background: rgba(0,255,102,0.1); color: var(--accent); }
-        .mode-tag-stakes { background: rgba(255,136,0,0.1); color: var(--warning); }
+        .mode-tag-free { background: rgba(255,177,59,0.1); color: var(--brand-gold); }
+        .mode-tag-stakes { background: rgba(21,255,99,0.1); color: var(--accent); }
         .mode-tag-team { background: rgba(51,136,255,0.1); color: var(--blue); }
 
         /* === FINAL CTA === */
@@ -653,6 +674,7 @@
             text-align: center;
             padding: 5rem 1.5rem;
             position: relative;
+            background: var(--base-darkest);
         }
 
         .final-cta h2 {
@@ -661,7 +683,7 @@
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: -0.01em;
-            color: var(--text-primary);
+            color: var(--brand-gold);
             margin-bottom: 1.5rem;
         }
 
@@ -677,11 +699,19 @@
 
         /* === FOOTER === */
         .landing-footer {
+            background: var(--base-darkest);
             text-align: center;
             padding: 2rem 1.5rem;
             border-top: 1px solid var(--base-border);
             font-size: 0.7rem;
             color: var(--text-muted);
+        }
+
+        .footer-logo {
+            display: block;
+            max-width: 48px;
+            margin: 0 auto 0.6rem;
+            opacity: 0.5;
         }
 
         /* === USERNAME MODAL (Free Play overlay) === */
@@ -690,7 +720,7 @@
             top: 0; left: 0;
             width: 100%; height: 100%;
             z-index: 2000;
-            background: rgba(10, 10, 15, 0.85);
+            background: rgba(5, 6, 11, 0.88);
             backdrop-filter: blur(8px);
             display: flex;
             align-items: center;
@@ -700,7 +730,7 @@
         #usernameModal.hidden { display: none !important; }
 
         .modal-box {
-            background: var(--base-dark);
+            background: var(--base-panel);
             border: 1px solid var(--base-border);
             border-radius: 6px;
             padding: 2rem;
@@ -802,7 +832,7 @@
         }
         .modeBtn:hover { color: var(--text-secondary); }
         .modeBtn.selected {
-            background: rgba(0,255,102,0.08);
+            background: rgba(21,255,99,0.08);
             border-color: var(--accent);
             color: var(--accent);
         }
@@ -1585,10 +1615,10 @@
             <!-- 3D Sniper characters -->
             <canvas id="heroCanvas"></canvas>
             <div class="hero-content">
-                <div class="hero-tag">WC3-Inspired Arena Combat</div>
-                <h1>Risk-to-earn<br>sniper <span>duels.</span></h1>
+                <img src="/images/sniperz_logo_nobg.png" alt="sNiPeRz" class="hero-logo">
+                <h1>RISK-TO-EARN<br>SNIPER DUELS</h1>
                 <p class="hero-sub">Play free or wager on Solana.</p>
-                <p class="hero-desc">WC3-inspired arena combat. 1v1 wagers. 5v5 multiplayer. Your reputation is your record.</p>
+                <p class="hero-desc">WC3-inspired arena combat. 1v1 wagers. 5v5 multiplayer.</p>
                 <div class="hero-buttons">
                     <button class="btn btn-filled" id="enterWagerBtn">ENTER WAGER LOBBY</button>
                     <button class="btn btn-outline" id="playFreeBtn">PLAY FREE</button>
@@ -1668,7 +1698,7 @@
                                 <td><span class="duel-stake">1.0 SOL</span></td>
                                 <td><span class="badge badge-hot">HOT</span></td>
                             </tr>
-                            <tr>
+                            <tr class="row-open">
                                 <td><span class="duel-handle">@voidcat</span></td>
                                 <td><span class="duel-wr mid">52%</span></td>
                                 <td>67</td>
@@ -1682,7 +1712,7 @@
                                 <td><span class="duel-stake">2.5 SOL</span></td>
                                 <td><span class="badge badge-live">LIVE</span></td>
                             </tr>
-                            <tr>
+                            <tr class="row-open">
                                 <td><span class="duel-handle">@snipegod</span></td>
                                 <td><span class="duel-wr mid">61%</span></td>
                                 <td>203</td>
@@ -1696,28 +1726,28 @@
                                 <td><span class="duel-stake">5.0 SOL</span></td>
                                 <td><span class="badge badge-hot">HOT</span></td>
                             </tr>
-                            <tr>
+                            <tr class="row-live">
                                 <td><span class="duel-handle">@coldshot</span></td>
                                 <td><span class="duel-wr high">71%</span></td>
                                 <td>118</td>
                                 <td><span class="duel-stake">0.5 SOL</span></td>
                                 <td><span class="badge badge-live">LIVE</span></td>
                             </tr>
-                            <tr>
+                            <tr class="row-new">
                                 <td><span class="duel-handle">@rookie_x</span></td>
                                 <td><span class="duel-wr mid">50%</span></td>
                                 <td>4</td>
                                 <td><span class="duel-stake">0.05 SOL</span></td>
                                 <td><span class="badge badge-new">NEW</span></td>
                             </tr>
-                            <tr>
+                            <tr class="row-open">
                                 <td><span class="duel-handle">@nightowl</span></td>
                                 <td><span class="duel-wr mid">58%</span></td>
                                 <td>76</td>
                                 <td><span class="duel-stake">0.3 SOL</span></td>
                                 <td><span class="badge badge-open">OPEN</span></td>
                             </tr>
-                            <tr>
+                            <tr class="row-live">
                                 <td><span class="duel-handle">@sol_slayer</span></td>
                                 <td><span class="duel-wr high">66%</span></td>
                                 <td>91</td>
@@ -1731,7 +1761,7 @@
         </section>
 
         <!-- ARENA FEED (moved up) -->
-        <section class="section" style="padding-top:2rem;padding-bottom:2rem;">
+        <section class="section" style="padding-top:2rem;padding-bottom:2rem;background:var(--base-darkest);">
             <div class="section-header">
                 <div class="pulse-dot"></div>
                 <h2 class="section-title">ARENA FEED</h2>
@@ -1790,7 +1820,7 @@
                 <!-- Card 1 -->
                 <div class="player-card">
                     <div class="player-card-top">
-                        <div class="player-avatar" style="background: var(--accent);">B</div>
+                        <div class="player-avatar avatar-elite" style="background: var(--accent);">B</div>
                         <div>
                             <div class="player-handle">@bushi</div>
                             <div class="player-tier tier-elite">Elite</div>
@@ -1901,17 +1931,17 @@
                     <h2 class="section-title">GAME MODES</h2>
                 </div>
                 <div class="modes-grid">
-                    <div class="mode-card" style="border-color:var(--accent);box-shadow:0 0 20px rgba(0,255,102,0.05);">
+                    <div class="mode-card mode-wager">
                         <div class="mode-tag mode-tag-stakes">Stakes</div>
                         <div class="mode-label">1v1 Wager Duels</div>
                         <div class="mode-desc">Real SOL on the line. Rep-driven matchmaking. Winner takes the pot.</div>
                     </div>
-                    <div class="mode-card">
+                    <div class="mode-card mode-free">
                         <div class="mode-tag mode-tag-free">Free</div>
                         <div class="mode-label">Free Play</div>
                         <div class="mode-desc">Learn positioning. No stakes. Practice against bots or live players.</div>
                     </div>
-                    <div class="mode-card">
+                    <div class="mode-card mode-team">
                         <div class="mode-tag mode-tag-team">Team</div>
                         <div class="mode-label">5v5 Multiplayer</div>
                         <div class="mode-desc">Team chaos. Live action. First to the kill limit wins.</div>
@@ -1921,7 +1951,7 @@
         </section>
 
         <!-- WHY SNIPERZ (moved after game modes) -->
-        <section class="section" style="padding-top:2rem;padding-bottom:2rem;">
+        <section class="section" style="padding-top:2rem;padding-bottom:2rem;background:var(--base-darkest);">
             <div class="section-header">
                 <h2 class="section-title">WHY SNIPERZ</h2>
             </div>
@@ -1958,6 +1988,7 @@
 
         <!-- FOOTER -->
         <footer class="landing-footer">
+            <img src="/images/sniperz_logo_nobg.png" alt="sNiPeRz" class="footer-logo">
             sNiPeRz &mdash; Built on Solana
         </footer>
     </div>
