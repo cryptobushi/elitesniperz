@@ -5,6 +5,7 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 const {
     MAP_SIZE, SHOOT_RANGE, SHOOT_COOLDOWN, SPAWN_PROTECTION,
     MAX_PLAYERS, TICK_RATE, SEND_RATE, BOT_NAMES, SHOP_ITEMS,
@@ -63,7 +64,7 @@ async function recoverStuckMatches() {
                             const result = await escrow.sendPayout(user.privy_wallet, match.stake_amount, match.stake_token);
                             if (result && result.signature) {
                                 db.createTransaction({
-                                    id: require('uuid').v4(), match_id: match.id, user_id: userId,
+                                    id: uuidv4(), match_id: match.id, user_id: userId,
                                     tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
                                     tx_signature: result.signature, from_wallet: 'escrow', to_wallet: user.privy_wallet
                                 });
@@ -87,7 +88,7 @@ async function recoverStuckMatches() {
                         const payoutResult = await escrow.sendPayout(winner.privy_wallet, payout, match.stake_token);
                         if (payoutResult && payoutResult.signature) {
                             db.createTransaction({
-                                id: require('uuid').v4(), match_id: match.id, user_id: match.winner_id,
+                                id: uuidv4(), match_id: match.id, user_id: match.winner_id,
                                 tx_type: 'payout', amount: payout, token: match.stake_token,
                                 tx_signature: payoutResult.signature, from_wallet: 'escrow', to_wallet: winner.privy_wallet
                             });
@@ -875,7 +876,7 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
                     const result = await escrow.sendPayout(creator.privy_wallet, match.stake_amount, match.stake_token);
                     if (result && result.signature) {
                         db.createTransaction({
-                            id: require('uuid').v4(), match_id: matchId, user_id: match.creator_id,
+                            id: uuidv4(), match_id: matchId, user_id: match.creator_id,
                             tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
                             tx_signature: result.signature, from_wallet: 'escrow', to_wallet: creator.privy_wallet
                         });
@@ -890,7 +891,7 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
                     const result = await escrow.sendPayout(joiner.privy_wallet, match.stake_amount, match.stake_token);
                     if (result && result.signature) {
                         db.createTransaction({
-                            id: require('uuid').v4(), match_id: matchId, user_id: match.joiner_id,
+                            id: uuidv4(), match_id: matchId, user_id: match.joiner_id,
                             tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
                             tx_signature: result.signature, from_wallet: 'escrow', to_wallet: joiner.privy_wallet
                         });
@@ -992,7 +993,7 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
             const payoutResult = await escrow.sendPayout(winner.privy_wallet, payout, match.stake_token);
             if (payoutResult && payoutResult.signature) {
                 db.createTransaction({
-                    id: require('uuid').v4(), match_id: matchId, user_id: winnerId,
+                    id: uuidv4(), match_id: matchId, user_id: winnerId,
                     tx_type: 'payout', amount: payout, token: match.stake_token,
                     tx_signature: payoutResult.signature, from_wallet: 'escrow', to_wallet: winner.privy_wallet
                 });
@@ -1003,7 +1004,7 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
             const rakeResult = await escrow.sendRake(rake, match.stake_token);
             if (rakeResult && rakeResult.signature) {
                 db.createTransaction({
-                    id: require('uuid').v4(), match_id: matchId, user_id: null,
+                    id: uuidv4(), match_id: matchId, user_id: null,
                     tx_type: 'rake', amount: rake, token: match.stake_token,
                     tx_signature: rakeResult.signature, from_wallet: 'escrow', to_wallet: 'treasury'
                 });

@@ -3,8 +3,16 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
-const { authMiddleware } = require('./auth');
+const { authMiddleware, ALLOW_DEV_TOKENS } = require('./auth');
 const db = require('../db/index');
+const escrow = require('./escrow');
+const {
+    Connection, Transaction, PublicKey, SystemProgram, LAMPORTS_PER_SOL
+} = require('@solana/web3.js');
+const {
+    getAssociatedTokenAddress, createAssociatedTokenAccountInstruction,
+    createTransferInstruction, getAccount: getTokenAccount
+} = require('@solana/spl-token');
 
 const router = express.Router();
 
@@ -336,7 +344,6 @@ router.post('/matches/:id/cancel', authMiddleware, async (req, res) => {
                 try {
                     const result = await escrow.sendPayout(creator.privy_wallet, match.stake_amount, match.stake_token);
                     if (result?.signature) {
-                        const { v4: uuidv4 } = require('uuid');
                         db.createTransaction({
                             id: uuidv4(), match_id: match.id, user_id: match.creator_id,
                             tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
@@ -530,9 +537,6 @@ router.get('/leaderboard', (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /matches/:id/deposit-tx — get unsigned deposit transaction
 // ---------------------------------------------------------------------------
-const escrow = require('./escrow');
-const { ALLOW_DEV_TOKENS } = require('./auth');
-
 router.get('/matches/:id/deposit-tx', authMiddleware, async (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
@@ -637,7 +641,6 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
         const isDevToken = (ALLOW_DEV_TOKENS && token.startsWith('dev:')) || pending.creator.transaction === 'dev-mock' || pending.joiner.transaction === 'dev-mock';
 
         if (!isDevToken) {
-            const { Connection, Transaction, PublicKey } = require('@solana/web3.js');
             const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
 
             // Validate blockhashes before submitting
@@ -679,7 +682,6 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
             console.log('[LOCK-IN] Both confirmed on-chain');
 
             // Log transactions
-            const { v4: uuidv4 } = require('uuid');
             db.createTransaction({ id: uuidv4(), match_id: match.id, user_id: match.creator_id, tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token, tx_signature: creatorSig, from_wallet: creatorUser.privy_wallet, to_wallet: 'escrow' });
             db.createTransaction({ id: uuidv4(), match_id: match.id, user_id: match.joiner_id, tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token, tx_signature: joinerSig, from_wallet: joinerUser.privy_wallet, to_wallet: 'escrow' });
         }
@@ -720,7 +722,6 @@ router.post('/matches/:id/submit-signed-tx', authMiddleware, async (req, res) =>
 
         if (!escrow.isReady()) return res.status(503).json(fail('Escrow not configured'));
 
-        const { Connection, Transaction, PublicKey } = require('@solana/web3.js');
         const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
 
         // Reconstruct the transaction and add the user's signature
@@ -745,7 +746,6 @@ router.post('/matches/:id/submit-signed-tx', authMiddleware, async (req, res) =>
 
         // Now do the confirm-deposit logic
         const isCreator = userId === match.creator_id;
-        const { v4: uuidv4 } = require('uuid');
         db.createTransaction({
             id: uuidv4(), match_id: match.id, user_id: userId,
             tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token,
@@ -813,7 +813,6 @@ router.post('/matches/:id/confirm-deposit', authMiddleware, async (req, res) => 
         }
 
         // Log transaction
-        const { v4: uuidv4 } = require('uuid');
         db.createTransaction({
             id: uuidv4(), match_id: match.id, user_id: userId,
             tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token,
@@ -879,7 +878,6 @@ router.post('/wallet/withdraw-tx', authMiddleware, async (req, res) => {
         const user = db.getUser(req.privyUserId);
         if (!user?.privy_wallet) return res.status(400).json(fail('No wallet'));
 
-        const { Connection, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } = require('@solana/web3.js');
         const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
 
         const fromPubkey = new PublicKey(user.privy_wallet);
@@ -898,11 +896,10 @@ router.post('/wallet/withdraw-tx', authMiddleware, async (req, res) => {
             const lamports = Math.round(amount * LAMPORTS_PER_SOL);
             tx.add(SystemProgram.transfer({ fromPubkey, toPubkey, lamports }));
         } else {
-            const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = require('@solana/spl-token');
             const fromAta = await getAssociatedTokenAddress(escrow.USDC_MINT, fromPubkey);
             const toAta = await getAssociatedTokenAddress(escrow.USDC_MINT, toPubkey);
             // Check if destination ATA exists
-            try { await require('@solana/spl-token').getAccount(conn, toAta); } catch(e) {
+            try { await getTokenAccount(conn, toAta); } catch(e) {
                 tx.add(createAssociatedTokenAccountInstruction(fromPubkey, toAta, toPubkey, escrow.USDC_MINT));
             }
             const baseUnits = Math.round(amount * 1e6);
@@ -930,7 +927,6 @@ router.post('/wallet/submit-withdraw', authMiddleware, async (req, res) => {
         const { transaction: txBase64, signature: sigBase64 } = req.body;
         if (!txBase64 || !sigBase64) return res.status(400).json(fail('Missing transaction or signature'));
 
-        const { Connection, Transaction, PublicKey } = require('@solana/web3.js');
         const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
 
         const user = db.getUser(req.privyUserId);
