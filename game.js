@@ -1945,43 +1945,6 @@ function showStreakPopup(text, color) {
     if (!popup) return;
     popup.innerHTML = `<div class="streak-text" style="color:${color || '#fff'}">${text}</div>`;
 }
-function updateShopUI() {
-    const gold = gameState.gold || 0;
-    const shopGold = document.getElementById('shopGold');
-    if (shopGold) shopGold.textContent = `Gold: ${gold}`;
-    const itemsEl = document.getElementById('shopItems');
-    if (!itemsEl || !gameState.player) return;
-    let html = '';
-    Object.entries(SHOP_ITEMS).forEach(([id, item]) => {
-        const owned = gameState.player.inventory && gameState.player.inventory[id];
-        const canAfford = gold >= item.cost;
-        const locked = item.requires && !(gameState.player.inventory && gameState.player.inventory[item.requires]);
-        let status = '';
-        if (owned && !item.stackable) status = ' [OWNED]';
-        else if (locked) status = ' [LOCKED]';
-        else if (!canAfford) status = ' [NEED GOLD]';
-        const dimClass = (owned && !item.stackable) || locked || !canAfford ? 'opacity:0.4;' : 'cursor:pointer;';
-        html += `<div class="shop-item" data-item="${id}" style="${dimClass}">
-            <span class="shop-icon">${item.icon}</span>
-            <span class="shop-name">${item.name}</span>
-            <span class="shop-cost">${item.cost}g</span>
-            <span class="shop-desc">${item.desc}${status}</span>
-        </div>`;
-    });
-    itemsEl.innerHTML = html;
-    itemsEl.querySelectorAll('.shop-item').forEach(el => {
-        el.addEventListener('click', () => {
-            const itemId = el.dataset.item;
-            if (gameState.player && gameState.player.buyItem) gameState.player.buyItem(itemId);
-        });
-    });
-}
-function checkShopProximity() {
-
-    if (!gameState.player || gameState.player.health <= 0) return;
-    const shopBtn = document.querySelector('#shopBtn');
-    if (shopBtn) shopBtn.style.opacity = '1';
-}
 function showGoldPopup(text) {
 
     const el = document.createElement('div');
