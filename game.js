@@ -2190,7 +2190,6 @@ function updateShopUI() {
         };
     });
 }
-function checkShopProximity() {}
 function showStreakPopup(text, color) {
     const boosts = {
         'FIRST BLOOD':2, 'KILLING SPREE':3, 'RAMPAGE':5, 'DOMINATING':8,
@@ -2851,7 +2850,6 @@ function animate() {
     for (let i = 0; i < _windMaterials.length; i++) {
         _windMaterials[i].uniforms.uTime.value = windTime;
     }
-    checkShopProximity();
     if (gameState.multiKillTimer > 0) {
         gameState.multiKillTimer -= deltaTime;
         if (gameState.multiKillTimer <= 0) {
