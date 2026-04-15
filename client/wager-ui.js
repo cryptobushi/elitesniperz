@@ -46,17 +46,20 @@ const STYLES = `
     width: 100%;
     max-width: 640px;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     padding: 0.6rem 1rem;
     border-bottom: 1px solid #333333;
     background: #1a1a1a;
     flex-shrink: 0;
+    gap: 0.4rem;
 }
 .wl-topbar .wl-user-group {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
 }
 .wl-topbar .wl-user {
     color: #ffcc00;
@@ -65,14 +68,22 @@ const STYLES = `
     font-family: 'MedievalSharp', 'Courier New', cursive;
 }
 .wl-topbar .wl-balance {
-    color: #888888;
-    font-size: 0.65rem;
-    font-weight: 500;
-    background: #1a1a1a;
-    padding: 0.15rem 0.5rem;
-    border: 1px solid #333333;
-    font-family: 'MedievalSharp', 'Courier New', cursive;
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
 }
+.wl-topbar .wl-bal-pill {
+    color: #aaa;
+    font-size: 0.6rem;
+    font-weight: 500;
+    background: #111;
+    padding: 0.15rem 0.4rem;
+    border: 1px solid #333333;
+    font-family: 'Courier New', monospace;
+    white-space: nowrap;
+}
+.wl-topbar .wl-bal-pill .wl-bal-amount { color: #ccc; font-weight: 700; }
+.wl-topbar .wl-bal-pill .wl-bal-token { color: #666; font-size: 0.55rem; }
 .wl-topbar .wl-btn {
     background: #1a1a1a;
     border: 1px solid #333333;
@@ -851,7 +862,8 @@ const STYLES = `
 @media (max-width: 768px), (max-height: 500px) {
     .wl-topbar { padding: 0.4rem 0.6rem; }
     .wl-topbar .wl-user { font-size: 0.6rem; }
-    .wl-topbar .wl-balance { font-size: 0.55rem; }
+    .wl-topbar .wl-bal-pill { font-size: 0.55rem; padding: 0.1rem 0.3rem; }
+    .wl-topbar .wl-bal-pill .wl-bal-token { font-size: 0.5rem; }
     .wl-topbar .wl-btn { font-size: 0.55rem; padding: 0.2rem 0.5rem; }
     .wl-header { padding: 0.8rem 0.6rem 0.4rem; }
     .wl-title { font-size: clamp(1rem, 4vw, 1.3rem); }
@@ -1132,7 +1144,7 @@ function buildDOM() {
         <div class="wl-topbar">
             <div class="wl-user-group">
                 <span class="wl-user" id="wlUser">---</span>
-                <span class="wl-balance" id="wlBalance">-- SOL | -- USDC</span>
+                <div class="wl-balance" id="wlBalance"></div>
             </div>
             <div style="display:flex;gap:0.3rem;">
                 <button class="wl-btn" id="wlWithdrawBtn">WITHDRAW</button>
@@ -1675,14 +1687,26 @@ function hideLobby() {
     _returnToLandingPage();
 }
 
+function _fmtBal(val, decimals) {
+    if (typeof val !== 'number') return '--';
+    if (val >= 1e9) return (val / 1e9).toFixed(1) + 'B';
+    if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M';
+    if (val >= 1e5) return (val / 1e3).toFixed(0) + 'K';
+    if (val >= 1e4) return (val / 1e3).toFixed(1) + 'K';
+    if (val >= 1000) return val.toFixed(0);
+    return val.toFixed(decimals);
+}
+function _renderBalPill(amount, token, decimals) {
+    return `<span class="wl-bal-pill"><span class="wl-bal-amount">${_fmtBal(amount, decimals)}</span> <span class="wl-bal-token">${token}</span></span>`;
+}
 async function refreshBalance() {
     try {
         const bal = await checkBalance();
         if (bal) {
-            const sol = typeof bal.sol === 'number' ? bal.sol.toFixed(3) : '--';
-            const usdc = typeof bal.usdc === 'number' ? bal.usdc.toFixed(2) : '--';
-            const snz = typeof bal.sniperz === 'number' ? bal.sniperz.toFixed(0) : '--';
-            els.wlBalance.textContent = `${sol} SOL | ${usdc} USDC | ${snz} SNIPERZ`;
+            els.wlBalance.innerHTML =
+                _renderBalPill(bal.sol, 'SOL', 3) +
+                _renderBalPill(bal.usdc, 'USDC', 2) +
+                _renderBalPill(bal.sniperz, 'SNIPERZ', 0);
             const guide = document.getElementById('wlFundingGuide');
             const walletBox = document.getElementById('wlWalletBox');
             if (guide && bal.sol === 0 && bal.usdc === 0 && (bal.sniperz ?? 0) === 0) {
