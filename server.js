@@ -8,7 +8,7 @@ const path = require('path');
 const {
     MAP_SIZE, SHOOT_RANGE, SHOOT_COOLDOWN, SPAWN_PROTECTION,
     MAX_PLAYERS, TICK_RATE, SEND_RATE, BOT_NAMES, SHOP_ITEMS,
-    terrainY, spawnPos, isNearSpawn
+    terrainY, spawnPos, isNearSpawn, BYTES_PER_PLAYER
 } = require('./shared/constants');
 const { collidesWithWall, hasLineOfSight } = require('./shared/collision');
 
@@ -245,6 +245,14 @@ const disconnectedPlayers = new Map();
 const AFK_TIMEOUT = 120; // seconds before AFK player becomes bot-controlled
 const REJOIN_WINDOW = 300; // seconds to rejoin and recover state
 
+/**
+ * Create a player (human or bot). See shared/types.js Player & BotPlayer.
+ * @param {number} id
+ * @param {string} name
+ * @param {'red'|'blue'} team
+ * @param {boolean} isBot
+ * @returns {import('./shared/types').Player & import('./shared/types').BotFields}
+ */
 function createPlayer(id, name, team, isBot) {
     let pos = spawnPos(team);
     for (let tries = 0; tries < 10 && collidesWithWall(pos.x, pos.z, 0.8); tries++) {
@@ -281,7 +289,7 @@ console.log(`Initialized ${players.size} bots`);
 
 // === BINARY STATE ENCODING ===
 // Per-player: id(2) + x(f32) + z(f32) + rot(f32) + health(1) + kills(i16) + deaths(i16) + price(f32) + flags(1) + streak(i16) + gold(i16) = 28 bytes
-const BYTES_PER_PLAYER = 28;
+// BYTES_PER_PLAYER imported from shared/constants
 
 // Track which enemies each team has seen (for hysteresis)
 const _teamVisible = { red: new Set(), blue: new Set() };

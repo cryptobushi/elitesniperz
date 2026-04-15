@@ -1,10 +1,14 @@
 // server/wager-match.js — Isolated 1v1 wager match instance (CommonJS)
 // Replicates game logic from server.js without importing it.
+// See shared/types.js for Player and match data type definitions.
+
+/** @typedef {import('../shared/types').Player} Player */
+/** @typedef {import('../shared/types').WinReason} WinReason */
 
 const {
     MAP_SIZE, SHOOT_RANGE, SHOOT_COOLDOWN, SPAWN_PROTECTION,
     TICK_RATE, SEND_RATE, terrainY, spawnPos, isNearSpawn,
-    WAGER_AFK_TIMEOUT, WAGER_DISCONNECT_TIMEOUT
+    WAGER_AFK_TIMEOUT, WAGER_DISCONNECT_TIMEOUT, BYTES_PER_PLAYER
 } = require('../shared/constants');
 const { collidesWithWall, hasLineOfSight } = require('../shared/collision');
 
@@ -13,7 +17,7 @@ const AFK_TIMEOUT = WAGER_AFK_TIMEOUT || 30;
 const DISCONNECT_TIMEOUT = WAGER_DISCONNECT_TIMEOUT || 30;
 const TIME_LIMIT = 10 * 60;       // 10 minutes
 const RESPAWN_DELAY = 3000;       // 3s respawn in 1v1
-const BYTES_PER_PLAYER = 28;      // Same binary format as main server
+// BYTES_PER_PLAYER imported from shared/constants (28 bytes — same binary format as main server)
 
 // === HELPER ===
 function dist(a, b) {
@@ -22,6 +26,9 @@ function dist(a, b) {
 
 /**
  * Creates a fresh player object matching server.js createPlayer() structure.
+ * @param {number} id
+ * @param {'red'|'blue'} team
+ * @returns {Player}
  */
 function createPlayer(id, team) {
     const pos = spawnPos(team);
@@ -48,10 +55,10 @@ function createPlayer(id, team) {
 class WagerMatch {
     /**
      * @param {string} matchId - Unique match identifier
-     * @param {string} creatorUserId - Creator's user ID
-     * @param {string} joinerUserId - Joiner's user ID
+     * @param {string} creatorUserId - Creator's user ID (Privy DID)
+     * @param {string} joinerUserId - Joiner's user ID (Privy DID)
      * @param {number} killTarget - Kills needed to win
-     * @param {function} onEnd - Callback: onEnd(winnerId, reason, stats)
+     * @param {(winnerId: string|null, reason: WinReason, stats: Object) => void} onEnd - Settlement callback
      */
     constructor(matchId, creatorUserId, joinerUserId, killTarget, onEnd) {
         this.matchId = matchId;
