@@ -75,7 +75,7 @@ const TOKEN_CONFIG = {
     USDC:    { decimals: 6, minStake: 1000000,     maxStake: 10000000000,
                mint: { mainnet: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', devnet: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU' } },
     SNIPERZ: { decimals: 6, minStake: 1000000,     maxStake: 100000000000000,
-               mint: { mainnet: 'PASTE_CONTRACT_ADDRESS_HERE', devnet: 'PASTE_CONTRACT_ADDRESS_HERE' } },
+               mint: { mainnet: 'Djaty1isLeS4x9k8sP6KjNxP1f89FP87DLmznhbkpump', devnet: 'Djaty1isLeS4x9k8sP6KjNxP1f89FP87DLmznhbkpump' } },
 };
 
 /** @enum {string} Match status state machine — see shared/types.js for full docs */
