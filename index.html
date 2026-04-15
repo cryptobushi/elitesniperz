@@ -1172,11 +1172,9 @@
         }
         #scoreboard .sb-row.me { background: rgba(0,255,68,0.08); }
         #scoreboard .sb-ticker { color: #fff; font-weight: 700; }
-        #scoreboard .sb-price { color: #00ff44; font-weight: 700; }
         #scoreboard .sb-kd { color: #888; }
         #scoreboard .sb-team-red { border-left: 3px solid #ff0000; }
         #scoreboard .sb-team-blue { border-left: 3px solid #0088ff; }
-        #scoreboard .sb-chart { width: 80px; height: 24px; }
 
         /* === ABILITIES — compact command bar === */
         #abilities {
@@ -1274,23 +1272,6 @@
         @keyframes streakIn { from { opacity: 0; transform: scale(2.5); } to { opacity: 1; transform: scale(1); } }
         @keyframes streakPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
         @keyframes streakOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-20px); } }
-        @keyframes candleGrow { 0% { transform: scaleY(0); } 80% { transform: scaleY(1.1); } 100% { transform: scaleY(1); } }
-        @keyframes screenFlash { 0% { opacity: 0.3; } 100% { opacity: 0; } }
-        @keyframes particleBurst {
-            0% { opacity: 1; transform: translate(-50%,-50%) rotate(var(--a,0deg)) translateY(0) scale(1); }
-            100% { opacity: 0; transform: translate(-50%,-50%) rotate(var(--a,0deg)) translateY(-40px) scale(0); }
-        }
-
-        /* Flying candle */
-        .flying-candle {
-            position: fixed;
-            z-index: 9999;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
         /* === DARK SOULS DEATH SCREEN === */
         #deathPopup {
             position: fixed;
@@ -1708,14 +1689,9 @@
             #scoreboard .sb-title { font-size: 0.9rem; margin-bottom: 0.5rem; }
             #scoreboard .sb-table th { font-size: 0.5rem; padding: 3px 4px; }
             #scoreboard .sb-row td { font-size: 0.6rem; padding: 4px; }
-            #scoreboard .sb-chart { width: 50px; height: 18px; }
-            #scoreboard .sb-price span { display: none; }
-
             #deathPopup { padding: 0.5rem; }
             #deathText { font-size: clamp(1.8rem, 8vw, 3.5rem); }
             #deathKiller { font-size: clamp(0.6rem, 2.5vw, 0.9rem); }
-            #deathChart { width: 180px !important; height: 55px !important; }
-            #deathCandle { transform: scale(0.6); }
             #respawnBtn { font-size: clamp(0.65rem, 2vw, 0.85rem); padding: 0.4rem 1.2rem; margin-top: 0.5rem; }
 
             #shopPanel { padding: 0.6rem; }
@@ -1962,11 +1938,6 @@
                     <span style="color:#55555f;">GOLD <span id="goldCount" style="color:#ffd700;font-weight:700;font-size:0.85rem;">0</span></span>
                 </div>
             </div>
-            <!-- Hidden elements game.js writes to (kept so JS doesn't error) -->
-            <span id="ticker" style="display:none;"></span>
-            <span id="price" style="display:none;"></span>
-            <span id="pctChange" style="display:none;"></span>
-            <canvas id="hudChart" style="display:none;" width="1" height="1"></canvas>
             <!-- Top-right panel: FPS + MENU grouped -->
             <div id="topRightPanel">
                 <span class="trp-fps" id="trpFps">FPS: --</span>
