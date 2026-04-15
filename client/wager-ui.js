@@ -1143,6 +1143,26 @@ function buildDOM() {
             <div id="wlWalletAddr" style="background:#000000;border:1px solid #333333;padding:0.5rem;font-family:'Courier New',monospace;font-size:clamp(0.55rem,2vw,0.75rem);color:#ffcc00;word-break:break-all;cursor:pointer;user-select:all;-webkit-user-select:all;" title="Click to copy"></div>
             <div id="wlWalletCopied" style="color:#00ff44;font-size:0.55rem;margin-top:0.2rem;min-height:1em;"></div>
         </div>
+        <div id="wlFundingGuide" style="display:none;margin:0.8rem auto;max-width:560px;background:linear-gradient(180deg,#1a1a0a,#0d0d00);border:1px solid #ffcc00;padding:1rem 1.2rem;">
+            <div style="font-family:'MedievalSharp',cursive;color:#ffcc00;font-size:1rem;text-align:center;margin-bottom:0.8rem;">FUND YOUR WALLET TO WAGER</div>
+            <div style="color:#ccc;font-size:0.75rem;line-height:1.6;">
+                <div style="margin-bottom:0.6rem;">Your wallet is powered by <span style="color:#fff;font-weight:700;">Privy</span> — a secure embedded wallet created automatically when you sign in with X/Twitter. No extensions or seed phrases needed.</div>
+                <div style="margin-bottom:0.5rem;color:#ffcc00;font-weight:700;font-size:0.7rem;letter-spacing:0.05em;">HOW TO FUND:</div>
+                <div style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.4rem;">
+                    <span style="color:#ffcc00;font-weight:700;">1.</span>
+                    <span>Copy your wallet address above (click it)</span>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.4rem;">
+                    <span style="color:#ffcc00;font-weight:700;">2.</span>
+                    <span>Send SOL or USDC to that address from any Solana wallet or exchange</span>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.4rem;">
+                    <span style="color:#ffcc00;font-weight:700;">3.</span>
+                    <span>Your balance updates automatically — then create or join a wager</span>
+                </div>
+                <div style="margin-top:0.6rem;color:#888;font-size:0.65rem;text-align:center;">Minimum wager: 0.01 SOL or 1 USDC &middot; Withdraw anytime</div>
+            </div>
+        </div>
         <div id="wlWithdrawModal" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:10001;display:flex;align-items:center;justify-content:center;">
             <div style="background:#1a1a1a;border:1px solid #333333;padding:1.5rem;width:min(90%,360px);font-family:Arial,Helvetica,sans-serif;">
                 <div style="color:#ffcc00;font-weight:700;font-size:1rem;text-align:center;margin-bottom:1rem;font-family:'Courier New',monospace;letter-spacing:0.06em;text-transform:uppercase;">WITHDRAW FUNDS</div>
@@ -1601,6 +1621,14 @@ async function refreshBalance() {
             const sol = typeof bal.sol === 'number' ? bal.sol.toFixed(3) : '--';
             const usdc = typeof bal.usdc === 'number' ? bal.usdc.toFixed(2) : '--';
             els.wlBalance.textContent = `${sol} SOL | ${usdc} USDC`;
+            const guide = document.getElementById('wlFundingGuide');
+            const walletBox = document.getElementById('wlWalletBox');
+            if (guide && bal.sol === 0 && bal.usdc === 0) {
+                guide.style.display = '';
+                if (walletBox) walletBox.style.display = '';
+            } else if (guide) {
+                guide.style.display = 'none';
+            }
         }
     } catch (_) {}
 }
