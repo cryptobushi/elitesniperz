@@ -129,8 +129,6 @@ class AudioManager {
 
 const audioManager = new AudioManager();
 
-// === RUNESCAPE-STYLE PROCEDURAL SOUNDTRACK ===
-// Soundtrack removed
 
 // Three.js Setup
 const scene = new THREE.Scene();
@@ -149,7 +147,6 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-function updateCRT() {}
 
 // Lighting - Much brighter!
 const ambientLight = new THREE.AmbientLight(0x8888cc, 1.8); // Bright cool ambient
@@ -2006,7 +2003,7 @@ class Player {
                 hasSpecial = true;
             }
 
-            // Gold reward — scales with victim's price (killing whales pays more)
+            // Gold reward
             const baseGold = 50;
             const streakBonus = (killer._streak || 0) * 10;
             const victimBonus = Math.round(this.price * 10);
@@ -2015,7 +2012,6 @@ class Player {
             // Price pump for killer (absorb victim's value)
             const pumpAmount = 0.5 + this.price * 0.3;
             killer.price += pumpAmount;
-            if (killer.isPlayer) pumpPrice(pumpAmount);
 
             // Player-specific streak/multi-kill tracking
             if (killer.isPlayer) {
@@ -2091,7 +2087,6 @@ class Player {
         // Reset kill streak when dying
         if (this.isPlayer) {
             gameState.killStreak = 0;
-            resetStreakChart();
             gameState.gold = this.gold;
             updateGoldUI();
         }
@@ -2253,18 +2248,6 @@ function updateGoldUI() {
     if (el) el.textContent = gameState.gold;
 }
 
-// === TRADING TERMINAL — price tracking + HUD chart ===
-// Price system removed — stubs kept so callers don't error
-let _playerPrice = 1.00;
-let _priceHistory = [1.00];
-let _startPrice = 1.00;
-function updateTerminal() {}
-function drawHudChart() {}
-function pumpPrice() {}
-function dumpPrice() {}
-function spawnFlyingCandle() {}
-function resetStreakChart() {}
-function drawDeathChart() {}
 function showStreakPopup(text, color) {
     const popup = document.getElementById('streakPopup');
     if (!popup) return;
@@ -2317,305 +2300,7 @@ function showGoldPopup(text) {
     setTimeout(() => el.remove(), 1000);
 }
 
-/* --- REMOVED: updateTerminal, drawHudChart, pumpPrice, dumpPrice,
-   spawnFlyingCandle, resetStreakChart, drawDeathChart, flying candle system,
-   price tracking chart code --- */
 
-/* Old price/candle/chart code removed — block starts here
-if (false) {
-    const pct = ((_playerPrice - _startPrice) / _startPrice * 100);
-    const el = document.getElementById('price');
-    if (el) el.textContent = _playerPrice.toFixed(2);
-    const pctEl = document.getElementById('pctChange');
-    if (pctEl) {
-        pctEl.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
-        pctEl.style.color = pct >= 0 ? '#00ff44' : '#ff4444';
-    }
-    drawHudChart();
-}
-
-function drawHudChart() {
-    const canvas = document.getElementById('hudChart');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const w = canvas.width, h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-
-    if (_priceHistory.length < 2) return;
-
-    const prices = _priceHistory.slice(-60); // Last 60 data points
-    const min = Math.min(...prices) * 0.95;
-    const max = Math.max(...prices) * 1.05;
-    const range = max - min || 1;
-
-    // Draw line chart
-    ctx.beginPath();
-    ctx.strokeStyle = _playerPrice >= _startPrice ? '#00ff44' : '#ff4444';
-    ctx.lineWidth = 1.5;
-    prices.forEach((p, i) => {
-        const x = (i / (prices.length - 1)) * w;
-        const y = h - ((p - min) / range) * h;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-
-    // Fill under the line
-    const lastX = w;
-    const lastY = h - ((prices[prices.length - 1] - min) / range) * h;
-    ctx.lineTo(lastX, h);
-    ctx.lineTo(0, h);
-    ctx.closePath();
-    ctx.fillStyle = _playerPrice >= _startPrice ? 'rgba(0,255,68,0.08)' : 'rgba(255,68,68,0.08)';
-    ctx.fill();
-}
-
-function pumpPrice(amount) {
-    if (gameState.player) _playerPrice = gameState.player.price;
-    else _playerPrice += amount;
-    _priceHistory.push(_playerPrice);
-    updateTerminal();
-}
-
-function dumpPrice() {
-    if (gameState.player) _playerPrice = gameState.player.price;
-    else _playerPrice = Math.max(0.10, _playerPrice * 0.5);
-    _priceHistory.push(_playerPrice);
-    updateTerminal();
-}
-
-// Flying candle animation — spawns center, flies to HUD chart
-let _activeCandle = null;
-let _candleHoldTimer = null;
-let _streakCandleActive = false; // Prevents green candle from overriding streak candles
-
-function spawnFlyingCandle(text, color, boost) {
-    // If there's already a candle showing, send it flying immediately
-    if (_activeCandle) {
-        const old = _activeCandle;
-        clearTimeout(_candleHoldTimer);
-        old.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
-        const chart = document.getElementById('hudChart');
-        if (chart) {
-            const rect = chart.getBoundingClientRect();
-            old.style.left = rect.left + rect.width / 2 + 'px';
-            old.style.top = rect.top + rect.height / 2 + 'px';
-            old.style.transform = 'translate(-50%, -50%) scale(0.2)';
-            old.style.opacity = '0';
-        }
-        setTimeout(() => old.remove(), 500);
-        _activeCandle = null;
-    }
-
-    const candle = document.createElement('div');
-    candle.className = 'flying-candle';
-
-    const bodyH = Math.min(30 + boost * 3, 120);
-    const wickH = Math.round(bodyH * 0.35);
-    const bodyW = Math.min(16 + boost * 1.5, 40);
-    const glowSize = Math.min(bodyH, 60);
-
-    // Sparkle particles
-    let particles = '';
-    const numParticles = Math.floor(6 + boost);
-    for (let i = 0; i < numParticles; i++) {
-        const angle = (i / numParticles) * 360;
-        const dist = 15 + Math.random() * 30;
-        const size = 2 + Math.random() * 4;
-        const delay = Math.random() * 0.4;
-        const dur = 0.5 + Math.random() * 0.3;
-        particles += `<div style="position:absolute;width:${size}px;height:${size}px;background:${color};border-radius:50%;box-shadow:0 0 ${size*2}px ${color};left:50%;top:50%;opacity:0;animation:particleBurst ${dur}s ${delay}s ease-out forwards;transform:translate(-50%,-50%) rotate(${angle}deg) translateY(-${dist}px);"></div>`;
-    }
-
-    candle.innerHTML = `
-        <div style="position:relative;display:flex;flex-direction:column;align-items:center;">
-            ${particles}
-            <div style="width:3px;height:${wickH}px;background:linear-gradient(to top,${color},${color}cc);box-shadow:0 0 6px ${color};"></div>
-            <div style="width:${bodyW}px;height:${bodyH}px;background:linear-gradient(to top,${color}cc,${color});border-radius:2px;box-shadow:0 0 ${glowSize}px ${color},0 0 ${glowSize*2}px ${color}44;animation:candleGrow 0.12s cubic-bezier(0,0.8,0.2,1.3) forwards;transform-origin:bottom;"></div>
-            <div style="width:3px;height:${Math.round(wickH*0.3)}px;background:${color}88;margin-top:1px;"></div>
-        </div>
-        <div style="color:${color};font-size:clamp(1rem,4vw,1.8rem);font-weight:900;margin-top:8px;font-family:monospace;text-shadow:0 0 15px ${color},0 0 30px ${color}66;letter-spacing:0.05em;white-space:nowrap;">${text}</div>
-    `;
-
-    // Start at center — slam in big
-    candle.style.left = '50%';
-    candle.style.top = '35%';
-    candle.style.transform = 'translate(-50%, -50%) scale(2.5)';
-    candle.style.opacity = '1';
-    candle.style.transition = 'transform 0.15s cubic-bezier(0,0.8,0.2,1.2)';
-    document.body.appendChild(candle);
-    _activeCandle = candle;
-
-    // Pop to normal
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            candle.style.transform = 'translate(-50%, -50%) scale(1)';
-        });
-    });
-
-    // Hold 1s, then fly to chart
-    _candleHoldTimer = setTimeout(() => {
-        if (_activeCandle !== candle) return; // Replaced by newer candle
-        _activeCandle = null;
-        candle.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
-        const chart = document.getElementById('hudChart');
-        if (chart) {
-            const rect = chart.getBoundingClientRect();
-            candle.style.left = rect.left + rect.width / 2 + 'px';
-            candle.style.top = rect.top + rect.height / 2 + 'px';
-            candle.style.transform = 'translate(-50%, -50%) scale(0.2)';
-            candle.style.opacity = '0';
-        }
-        setTimeout(() => candle.remove(), 700);
-    }, 1000);
-}
-
-function showGoldPopup(text) {
-    const boost = parseFloat(text.replace(/[^0-9.]/g, '')) / 50 || 0.5;
-    pumpPrice(boost);
-    // Green candle for every kill — but skip if a streak candle is showing
-    if (!_streakCandleActive) {
-        spawnFlyingCandle(text, '#00ff44', boost * 8);
-    }
-}
-
-function drawDeathChart() {
-    const canvas = document.getElementById('deathChart');
-    if (!canvas || _priceHistory.length < 2) return;
-    const ctx = canvas.getContext('2d');
-    const w = canvas.width, h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-
-    const prices = _priceHistory.slice(-60);
-    const min = Math.min(...prices) * 0.9;
-    const max = Math.max(...prices) * 1.1;
-    const range = max - min || 1;
-    const toX = (i) => (i / (prices.length - 1)) * w;
-    const toY = (p) => h - ((p - min) / range) * h;
-    const crashIdx = Math.max(1, prices.length - 3);
-
-    // Green section (full line up to crash point)
-    ctx.beginPath();
-    ctx.strokeStyle = '#00ff44';
-    ctx.lineWidth = 2;
-    for (let i = 0; i <= crashIdx && i < prices.length; i++) {
-        if (i === 0) ctx.moveTo(toX(i), toY(prices[i]));
-        else ctx.lineTo(toX(i), toY(prices[i]));
-    }
-    ctx.stroke();
-
-    // Green fill
-    ctx.lineTo(toX(crashIdx), h);
-    ctx.lineTo(0, h);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(0,255,68,0.06)';
-    ctx.fill();
-
-    // Red crash section (connected from crash point to end)
-    if (prices.length > crashIdx) {
-        ctx.beginPath();
-        ctx.strokeStyle = '#ff2222';
-        ctx.lineWidth = 2.5;
-        ctx.moveTo(toX(crashIdx), toY(prices[crashIdx]));
-        for (let i = crashIdx + 1; i < prices.length; i++) {
-            ctx.lineTo(toX(i), toY(prices[i]));
-        }
-        ctx.stroke();
-
-        // Red fill under crash
-        ctx.lineTo(toX(prices.length - 1), h);
-        ctx.lineTo(toX(crashIdx), h);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(255,34,34,0.12)';
-        ctx.fill();
-    }
-}
-
-function resetStreakChart() {
-    dumpPrice();
-}
-
-function updateShopUI() {
-    const panel = document.getElementById('shopPanel');
-    if (!panel || !gameState.player) return;
-
-    const nearSpawn = gameState.player.isNearSpawn();
-    if (!nearSpawn) {
-        panel.classList.add('hidden');
-        return;
-    }
-    panel.classList.remove('hidden');
-
-    const inv = gameState.player.inventory;
-    const gold = gameState.player.gold;
-    const shopGold = document.getElementById('shopGold');
-    if (shopGold) shopGold.textContent = `Gold: ${gold}`;
-
-    let html = '';
-    for (const [id, item] of Object.entries(SHOP_ITEMS)) {
-        const owned = inv[id] && !item.stackable;
-        const canAfford = gold >= item.cost;
-        const needsReq = item.requires && !inv[item.requires];
-        const disabled = owned || !canAfford || needsReq;
-
-        let status = '';
-        if (owned) status = ' owned';
-        else if (needsReq) status = ` (need ${SHOP_ITEMS[item.requires].name})`;
-        else if (!canAfford) status = ' (need coins)';
-
-        html += `<div class="shop-item${disabled ? ' disabled' : ''}" data-item="${id}">
-            <span class="shop-icon">${item.icon}</span>
-            <span class="shop-name">${item.name}</span>
-            <span class="shop-cost">${item.cost}g</span>
-            <span class="shop-desc">${item.desc}${status}</span>
-        </div>`;
-    }
-    document.getElementById('shopItems').innerHTML = html;
-
-    // Bind click handlers
-    panel.querySelectorAll('.shop-item:not(.disabled)').forEach(el => {
-        el.onclick = () => {
-            const itemId = el.dataset.item;
-            if (gameState.player.buyItem(itemId)) {
-                audioManager.play('headshot'); // Reuse as buy sound
-                showGoldPopup(`Bought ${SHOP_ITEMS[itemId].name}!`);
-            }
-        };
-    });
-}
-
-// Check shop proximity every frame — only auto-CLOSE when leaving spawn
-function checkShopProximity() {
-    if (gameState.player && gameState.player.health > 0) {
-        const nearSpawn = gameState.player.isNearSpawn();
-        const panel = document.getElementById('shopPanel');
-        if (panel && !nearSpawn) {
-            panel.classList.add('hidden');
-        }
-    }
-}
-
-// UI Functions
-function showStreakPopup(text, color) {
-    const boosts = {
-        'FIRST BLOOD':2, 'KILLING SPREE':3, 'RAMPAGE':5, 'DOMINATING':8,
-        'UNSTOPPABLE':12, 'GODLIKE':20, 'DOUBLE KILL':2.5, 'MULTI KILL':4,
-        'MEGA KILL':6, 'ULTRA KILL':9, 'MONSTER KILL':13, 'LUDICROUS KILL':25,
-        'SHIELD BLOCKED!':0,
-    };
-    const boost = boosts[text] || 1;
-    pumpPrice(boost);
-
-    // Screen flash
-    const flash = document.createElement('div');
-    flash.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:${color};opacity:0.2;pointer-events:none;z-index:9998;animation:screenFlash 0.3s ease-out forwards;`;
-    document.body.appendChild(flash);
-    setTimeout(() => flash.remove(), 400);
-
-    // Big flying candle for streaks — mark active so green candle doesn't override
-    _streakCandleActive = true;
-    spawnFlyingCandle(text, color, boost * 5);
-End of removed price code block */
 
 function addKillFeed(killer, victim) {
     const killFeed = document.getElementById('killFeed');
@@ -2647,17 +2332,8 @@ function updateScoreboard() {
         if (gameState.player) all.push(gameState.player);
     }
 
-    // Sort by price descending
+    // Sort by kills descending
     all.sort((a, b) => b.kills - a.kills);
-
-    // Track price history per player for sparklines
-    all.forEach(p => {
-        if (!p._priceHist) p._priceHist = [1.0];
-        if (p._priceHist[p._priceHist.length - 1] !== p.price) {
-            p._priceHist.push(p.price);
-        }
-        if (p._priceHist.length > 30) p._priceHist.shift();
-    });
 
     let html = `<div class="sb-table-wrap">
         <div class="sb-title">SCOREBOARD</div>
@@ -2682,32 +2358,6 @@ function updateScoreboard() {
     html += '<div style="color:#444;font-size:0.6rem;margin-top:0.8rem;text-align:center;">TAB to close</div>';
     html += '</div>';
     sb.innerHTML = html;
-
-    // Draw sparkline charts
-    sb.querySelectorAll('.sb-chart').forEach(canvas => {
-        const idx = parseInt(canvas.dataset.playerIdx);
-        const p = all[idx];
-        if (!p || !p._priceHist || p._priceHist.length < 2) return;
-
-        const ctx = canvas.getContext('2d');
-        const w = canvas.width, h = canvas.height;
-        const prices = p._priceHist;
-        const min = Math.min(...prices) * 0.9;
-        const max = Math.max(...prices) * 1.1;
-        const range = max - min || 1;
-        const up = prices[prices.length - 1] >= prices[0];
-
-        ctx.beginPath();
-        ctx.strokeStyle = up ? '#00ff44' : '#ff4444';
-        ctx.lineWidth = 1.5;
-        prices.forEach((pr, i) => {
-            const x = (i / (prices.length - 1)) * w;
-            const y = h - ((pr - min) / range) * h;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-    });
 }
 
 // Abilities
@@ -3079,14 +2729,6 @@ document.getElementById('startBtn').addEventListener('click', () => {
     document.getElementById('hud')?.classList.remove('hidden');
     document.getElementById('abilities')?.classList.remove('hidden');
     document.querySelector('.minimap')?.classList.remove('hidden');
-
-    // Set ticker to player name
-    const tickerEl = document.getElementById('ticker');
-    if (tickerEl) tickerEl.textContent = '$' + username.toUpperCase().slice(0, 5);
-    _playerPrice = 1.00;
-    _priceHistory = [1.00];
-    _startPrice = 1.00;
-    updateTerminal();
 
     startGame();
 });
@@ -3507,7 +3149,6 @@ function animate() {
     });
 
     renderer.render(scene, camera);
-    updateCRT();
 }
 
 // Handle window resize — ignore mobile keyboard resize
@@ -3571,8 +3212,6 @@ Player.prototype.respawn = function() {
     }
 };
 
-// Smooth camera globals — used by mobile touch + minimap
-// smoothCam removed — camera moves directly via cameraTarget
 
 // === MOBILE TOUCH — drag anywhere to scroll camera, tap to move/attack ===
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('ontouchstart' in window);
@@ -3628,7 +3267,7 @@ if (isMobile) {
                 if (data.isDrag) {
                     const dx = t.clientX - data.lastX;
                     const dy = t.clientY - data.lastY;
-                    // Move camera directly — no smoothCam indirection
+                    // Move camera directly
                     gameState.cameraTarget.x -= dx * 0.06;
                     gameState.cameraTarget.z -= dy * 0.06;
                     camVelX = -dx * 0.06;
@@ -3975,13 +3614,9 @@ function handleBinaryState(buf) {
                 gameState.deaths = deaths;
                 gameState.gold = gold;
                 gameState.killStreak = streak;
-                _playerPrice = price;
                 document.getElementById('killCount').textContent = kills;
                 document.getElementById('deathCount').textContent = deaths;
                 updateGoldUI();
-                _priceHistory.push(price);
-                if (_priceHistory.length > 120) _priceHistory.shift();
-                updateTerminal();
             }
         } else {
             // Remote player
@@ -4206,7 +3841,6 @@ function handleJsonMessage(msg) {
                 void popup.offsetHeight;
                 popup.classList.remove('hidden');
                 setTimeout(() => popup.classList.add('hidden'), 5000);
-                resetStreakChart();
             }
 
             break;
@@ -4410,11 +4044,7 @@ function handleNewMatch(msg) {
         gameState.killStreak = 0;
         gameState.gold = 0;
         gameState.firstBlood = false;
-        _playerPrice = 1.0;
-        _priceHistory.length = 0;
-        _priceHistory.push(1.0);
         updateGoldUI();
-        updateTerminal();
     }
 
     // Reset remote players
