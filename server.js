@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const {
     MAP_SIZE, SHOOT_RANGE, SHOOT_COOLDOWN, SPAWN_PROTECTION,
     MAX_PLAYERS, TICK_RATE, SEND_RATE, BOT_NAMES, SHOP_ITEMS,
-    BYTES_PER_PLAYER, terrainY, spawnPos, isNearSpawn, dist
+    BYTES_PER_PLAYER, terrainY, spawnPos, isNearSpawn, dist, getRakePercent
 } = require('./shared/constants');
 const { collidesWithWall, hasLineOfSight } = require('./shared/collision');
 const {
@@ -82,7 +82,7 @@ async function recoverStuckMatches() {
                 const winner = match.winner_id ? db.getUser(match.winner_id) : null;
                 if (winner && winner.privy_wallet && escrow.isReady()) {
                     const totalPot = match.stake_amount * 2;
-                    const rake = Math.floor(totalPot * 0.05);
+                    const rake = Math.floor(totalPot * getRakePercent(match.stake_token));
                     const payout = totalPot - rake;
                     try {
                         const payoutResult = await escrow.sendPayout(winner.privy_wallet, payout, match.stake_token);
@@ -791,7 +791,7 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
 
     const loserId = winnerId === match.creator_id ? match.joiner_id : match.creator_id;
     const totalPot = match.stake_amount * 2;
-    const rake = Math.floor(totalPot * 0.05);
+    const rake = Math.floor(totalPot * getRakePercent(match.stake_token));
     const payout = totalPot - rake;
 
     // Extract kills/deaths from stats (keyed by userId)

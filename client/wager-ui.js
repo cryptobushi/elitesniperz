@@ -1238,12 +1238,13 @@ function buildDOM() {
             <h2>POST A DUEL</h2>
             <div class="cm-label" style="display:flex;justify-content:space-between;align-items:baseline;">Stake Amount <span id="cmAvailBal" style="font-size:0.55rem;color:#ffcc00;font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer;font-family:'Courier New',monospace;" title="Click to use max"></span></div>
             <input type="number" class="cm-input" id="cmStake" placeholder="e.g. 0.05" min="0.001" step="any">
-            <div class="cm-label">Token</div>
+            <div class="cm-label" style="display:flex;align-items:center;gap:6px;">Token <span class="cm-tooltip-wrap"><span class="cm-tooltip-trigger">?</span><span class="cm-tooltip-box"><strong>SOL / USDC</strong> — 5% rake on winnings.<br><br><strong>SNIPERZ</strong> — Only 1% rake. The native token of sNiPeRz. Best value for frequent players.</span></span></div>
             <div class="cm-toggle-group" id="cmTokenGroup">
                 <button class="cm-toggle selected" data-token="SOL">SOL</button>
                 <button class="cm-toggle" data-token="USDC">USDC</button>
                 <button class="cm-toggle" data-token="SNIPERZ">SNIPERZ</button>
             </div>
+            <div class="cm-mode-hint" id="cmRakeHint">5% rake on winnings</div>
             <div class="cm-label">Kill Target (First To)</div>
             <div class="cm-toggle-group" id="cmTargetGroup">
                 <button class="cm-toggle" data-target="1">1</button>
@@ -1546,6 +1547,10 @@ function setupCreateMatchEvents() {
             document.querySelectorAll('#cmTokenGroup .cm-toggle').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
             _updateCreateModalBalance();
+            const rakeHint = document.getElementById('cmRakeHint');
+            if (rakeHint) {
+                rakeHint.textContent = btn.dataset.token === 'SNIPERZ' ? '1% rake on winnings' : '5% rake on winnings';
+            }
         });
     });
     document.getElementById('cmAvailBal')?.addEventListener('click', () => {
