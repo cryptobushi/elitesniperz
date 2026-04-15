@@ -649,11 +649,6 @@ function broadcast(data) {
     });
 }
 
-function broadcastExcept(data, excludeWs) {
-    wss.clients.forEach(function(ws) {
-        if (ws.readyState === 1 && ws !== excludeWs && !ws._isWager) ws.send(data);
-    });
-}
 let tickCount = 0;
 const sendEvery = Math.round(TICK_RATE / SEND_RATE);
 
