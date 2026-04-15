@@ -4059,12 +4059,22 @@ requestAnimationFrame(function netLoop() {
 console.log('Multiplayer module loaded');
 
 // Expose for wager-ui "play while waiting"
-window.startGame = function() {
+window.startGame = function(opts) {
+    const username = (opts && opts.username) || gameState.username || 'Sniper';
+    const team = (opts && opts.team) || gameState.team || 'red';
     isOnlineMode = false;
+    gameState.username = username;
+    gameState.team = team;
     gameState.gameStarted = true;
     gameState.kills = 0;
     gameState.deaths = 0;
     gameState.killStreak = 0;
+    audioManager.init();
+    document.getElementById('usernameModal')?.classList.add('hidden');
+    document.getElementById('landingPage')?.classList.add('hidden');
+    document.getElementById('gameCanvas').style.display = 'block';
+    document.getElementById('ui').style.display = '';
+    document.body.classList.add('game-active');
     document.getElementById('hud')?.classList.remove('hidden');
     document.getElementById('abilities')?.classList.remove('hidden');
     document.querySelector('.minimap')?.classList.remove('hidden');

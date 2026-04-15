@@ -1424,21 +1424,13 @@ function bindEvents() {
         _bgMatchId = currentMatchId;
         _bgMatchRole = _waitingRoomRole;
 
-        // Hide waiting room, start a bot game
+        // Hide waiting room, start an offline bot game
         els.waiting.classList.add('hidden');
-        document.getElementById('landingPage')?.classList.add('hidden');
-
-        // Start offline bot game via game.js
         const user = getUser();
-        window.gameState = window.gameState || {};
-        window.gameState.username = user?.twitter_handle || 'Player';
-        window.gameState.team = 'red';
-        window.isOnlineMode = false;
-        window._isWagerMatch = false;
-        document.getElementById('gameCanvas').style.display = '';
-        document.getElementById('ui').style.display = '';
-        document.body.classList.add('game-active');
-        if (window.startGame) window.startGame();
+        if (window.startGame) window.startGame({
+            username: user?.twitter_handle || 'Player',
+            team: 'red'
+        });
 
         // Keep polling in background
         if (!_bgPollInterval) {
