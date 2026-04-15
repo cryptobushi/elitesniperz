@@ -1979,9 +1979,8 @@ function updateShopUI() {
 function checkShopProximity() {
 
     if (!gameState.player || gameState.player.health <= 0) return;
-    const near = gameState.player.isNearSpawn && gameState.player.isNearSpawn();
     const shopBtn = document.querySelector('#shopBtn');
-    if (shopBtn) shopBtn.style.opacity = near ? '1' : '0.4';
+    if (shopBtn) shopBtn.style.opacity = '1';
 }
 function showGoldPopup(text) {
 
@@ -2192,12 +2191,6 @@ function updateShopUI() {
     const panel = document.getElementById('shopPanel');
     if (!panel || !gameState.player) return;
 
-    const nearSpawn = gameState.player.isNearSpawn();
-    if (!nearSpawn) {
-        panel.classList.add('hidden');
-        return;
-    }
-    panel.classList.remove('hidden');
 
     const inv = gameState.player.inventory;
     const gold = gameState.player.gold;
@@ -2234,15 +2227,7 @@ function updateShopUI() {
         };
     });
 }
-function checkShopProximity() {
-    if (gameState.player && gameState.player.health > 0) {
-        const nearSpawn = gameState.player.isNearSpawn();
-        const panel = document.getElementById('shopPanel');
-        if (panel && !nearSpawn) {
-            panel.classList.add('hidden');
-        }
-    }
-}
+function checkShopProximity() {}
 function showStreakPopup(text, color) {
     const boosts = {
         'FIRST BLOOD':2, 'KILLING SPREE':3, 'RAMPAGE':5, 'DOMINATING':8,
@@ -2448,7 +2433,7 @@ document.addEventListener('keydown', (e) => {
     }
     if (e.key.toLowerCase() === 'b') {
         e.preventDefault();
-        if (gameState.player && gameState.player.isNearSpawn()) {
+        if (gameState.player) {
             const panel = document.getElementById('shopPanel');
             panel.classList.toggle('hidden');
             if (!panel.classList.contains('hidden')) updateShopUI();
@@ -2688,7 +2673,7 @@ document.querySelectorAll('.ability').forEach(el => {
         if (ability === 'windwalk') useWindwalk();
         if (ability === 'farsight') useFarsight();
         if (el.id === 'shopBtn') {
-            if (gameState.player && gameState.player.isNearSpawn()) {
+            if (gameState.player) {
                 const panel = document.getElementById('shopPanel');
                 panel.classList.toggle('hidden');
                 if (!panel.classList.contains('hidden')) updateShopUI();

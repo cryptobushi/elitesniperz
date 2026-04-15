@@ -316,7 +316,6 @@ function buyItem(p, itemId) {
     if (p.gold < item.cost) return false;
     if (p.inventory[itemId] && !item.stackable) return false;
     if (item.requires && !p.inventory[item.requires]) return false;
-    if (!isNearSpawn(p.x, p.z, p.team)) return false;
 
     p.gold -= item.cost;
     p.inventory[itemId] = true;
@@ -520,7 +519,7 @@ function updateBot(bot, dt) {
         bot.losTarget = null;
         bot.losTimer = 0;
     }
-    if (bot.gold >= 100 && isNearSpawn(bot.x, bot.z, bot.team)) {
+    if (bot.gold >= 100) {
         botShop(bot);
     }
 }
