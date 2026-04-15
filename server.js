@@ -19,14 +19,19 @@ const {
 
 const app = express();
 app.use(express.json());
-app.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+app.use((req, res, next) => {
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    next();
+});
 app.use((req, res, next) => {
     const blocked = ['/server/', '/db/', '/node_modules/', '/.env', '/.git', '/test-'];
     const lower = req.path.toLowerCase();
     if (blocked.some(b => lower.startsWith(b))) return res.status(403).send('Forbidden');
     next();
 });
-app.use(express.static(path.join(__dirname), { dotfiles: 'deny' }));
+app.use(express.static(path.join(__dirname), { dotfiles: 'deny', maxAge: 0, etag: false, lastModified: false }));
 
 app.get('/auth/callback', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
