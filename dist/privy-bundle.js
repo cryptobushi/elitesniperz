@@ -74,6 +74,8 @@ Resources:
 
                 <div id="authStatus" style="color:#888;font-size:0.65rem;margin:0.5rem 0;min-height:1.2em;"></div>
 
+                <div style="color:#666;font-size:0.55rem;line-height:1.5;margin-top:0.8rem;border-top:1px solid #333;padding-top:0.8rem;">Secured by <span style="color:#aaa;">Privy</span> \u2014 your wallet is created automatically. No extensions, no seed phrases. Your keys stay encrypted and only you can access your funds.</div>
+
                 <div id="authCancelBtn" style="color:#888;font-size:0.65rem;cursor:pointer;margin-top:1rem;">
                     Cancel
                 </div>
