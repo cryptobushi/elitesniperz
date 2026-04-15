@@ -99,9 +99,6 @@ const TX_TYPES = {
     REFUND: 'refund',
 };
 
-/** Per-player binary state encoding: 28 bytes */
-const BYTES_PER_PLAYER = 28;
-
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         MAP_SIZE, VISION_RADIUS, FARSIGHT_RADIUS, SHOOT_RANGE, SHOOT_COOLDOWN,
@@ -110,6 +107,6 @@ if (typeof module !== 'undefined' && module.exports) {
         stakeToHuman, stakeToBase, BYTES_PER_PLAYER,
         WAGER_KILL_TARGETS, WAGER_TIME_LIMIT, WAGER_AFK_TIMEOUT,
         WAGER_DISCONNECT_TIMEOUT, RAKE_PERCENT, MIN_STAKE_SOL, MIN_STAKE_USDC,
-        MATCH_STATUS, VALID_TOKENS, TX_TYPES, BYTES_PER_PLAYER
+        MATCH_STATUS, VALID_TOKENS, TX_TYPES
     };
 }

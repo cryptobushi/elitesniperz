@@ -37,7 +37,6 @@ const { verifyWsToken } = require('./server/auth');
 const WagerMatch = require('./server/wager-match');
 const escrow = require('./server/escrow');
 const db = require('./db/index');
-const { v4: uuidv4 } = require('uuid');
 app.use('/api', apiRouter);
 
 const activeWagerMatches = new Map();
