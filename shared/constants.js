@@ -1,10 +1,8 @@
-// shared/constants.js — Shared constants for client + server
-// CommonJS module. Client loads via fetch() or inline.
 
 const MAP_SIZE = 200;
 const VISION_RADIUS = 35;
 const FARSIGHT_RADIUS = 55;
-const SHOOT_RANGE = 25; // Shorter than vision — must close distance to shoot
+const SHOOT_RANGE = 25;
 const SHOOT_COOLDOWN = 1.0;
 const SPAWN_PROTECTION = 1.5;
 const MAX_PLAYERS = 10;
@@ -40,6 +38,33 @@ function isNearSpawn(x, z, team) {
     return Math.sqrt((x - s) * (x - s) + (z - s) * (z - s)) < 15;
 }
 
+function dist(a, b) {
+    return Math.sqrt((a.x - b.x) ** 2 + (a.z - b.z) ** 2);
+}
+
+/**
+ * Convert base-unit stake amount to human-readable.
+ * @param {number} amount - Amount in base units (lamports or USDC smallest)
+ * @param {string} token - 'SOL' or 'USDC'
+ * @returns {number}
+ */
+function stakeToHuman(amount, token) {
+    return token === 'SOL' ? amount / 1e9 : amount / 1e6;
+}
+
+/**
+ * Convert human-readable amount to base units.
+ * @param {number} amount - Human-readable amount
+ * @param {string} token - 'SOL' or 'USDC'
+ * @returns {number}
+ */
+function stakeToBase(amount, token) {
+    return Math.round(token === 'SOL' ? amount * 1e9 : amount * 1e6);
+}
+
+// Bytes per player in binary state encoding
+const BYTES_PER_PLAYER = 28;
+
 // Wager match constants
 const WAGER_KILL_TARGETS = [1, 5, 7, 10];
 const WAGER_TIME_LIMIT = 600; // 10 minutes in seconds
@@ -53,7 +78,8 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         MAP_SIZE, VISION_RADIUS, FARSIGHT_RADIUS, SHOOT_RANGE, SHOOT_COOLDOWN,
         SPAWN_PROTECTION, MAX_PLAYERS, TICK_RATE, SEND_RATE,
-        SHOP_ITEMS, BOT_NAMES, terrainY, spawnPos, isNearSpawn,
+        SHOP_ITEMS, BOT_NAMES, terrainY, spawnPos, isNearSpawn, dist,
+        stakeToHuman, stakeToBase, BYTES_PER_PLAYER,
         WAGER_KILL_TARGETS, WAGER_TIME_LIMIT, WAGER_AFK_TIMEOUT,
         WAGER_DISCONNECT_TIMEOUT, RAKE_PERCENT, MIN_STAKE_SOL, MIN_STAKE_USDC
     };

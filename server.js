@@ -8,15 +8,17 @@ const path = require('path');
 const {
     MAP_SIZE, SHOOT_RANGE, SHOOT_COOLDOWN, SPAWN_PROTECTION,
     MAX_PLAYERS, TICK_RATE, SEND_RATE, BOT_NAMES, SHOP_ITEMS,
-    terrainY, spawnPos, isNearSpawn
+    BYTES_PER_PLAYER, terrainY, spawnPos, isNearSpawn, dist
 } = require('./shared/constants');
 const { collidesWithWall, hasLineOfSight } = require('./shared/collision');
+const {
+    tickPlayerTimers, movePlayerToTarget,
+    computeVisibleEnemies, encodePlayerState, findShootTarget
+} = require('./shared/game-logic');
 
-// === EXPRESS + STATIC ===
 const app = express();
 app.use(express.json());
 app.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
-// Block access to server-side code and sensitive files
 app.use((req, res, next) => {
     const blocked = ['/server/', '/db/', '/node_modules/', '/.env', '/.git', '/test-'];
     const lower = req.path.toLowerCase();
@@ -25,23 +27,20 @@ app.use((req, res, next) => {
 });
 app.use(express.static(path.join(__dirname), { dotfiles: 'deny' }));
 
-// OAuth callback — serve index.html so the client JS handles it
 app.get('/auth/callback', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// === WAGER SYSTEM ===
 const apiRouter = require('./server/api');
 const { verifyWsToken } = require('./server/auth');
 const WagerMatch = require('./server/wager-match');
 const escrow = require('./server/escrow');
 const db = require('./db/index');
+const { v4: uuidv4 } = require('uuid');
 app.use('/api', apiRouter);
 
-// Active wager matches: matchId -> { match: WagerMatch, creatorWs, joinerWs }
 const activeWagerMatches = new Map();
 
-// === CRASH RECOVERY ===
 async function recoverStuckMatches() {
     try {
         const stuckMatches = db.getStuckMatches();
@@ -63,7 +62,7 @@ async function recoverStuckMatches() {
                             const result = await escrow.sendPayout(user.privy_wallet, match.stake_amount, match.stake_token);
                             if (result && result.signature) {
                                 db.createTransaction({
-                                    id: require('uuid').v4(), match_id: match.id, user_id: userId,
+                                    id: uuidv4(), match_id: match.id, user_id: userId,
                                     tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
                                     tx_signature: result.signature, from_wallet: 'escrow', to_wallet: user.privy_wallet
                                 });
@@ -77,7 +76,7 @@ async function recoverStuckMatches() {
                 db.updateMatch(match.id, { status: targetStatus, ended_at: Date.now() });
                 console.log('[RECOVERY] Match ' + match.id + ' set to ' + targetStatus);
             } else if (match.status === 'completed') {
-                // Completed = game ended but payout failed — retry payout
+        
                 const winner = match.winner_id ? db.getUser(match.winner_id) : null;
                 if (winner && winner.privy_wallet && escrow.isReady()) {
                     const totalPot = match.stake_amount * 2;
@@ -87,7 +86,7 @@ async function recoverStuckMatches() {
                         const payoutResult = await escrow.sendPayout(winner.privy_wallet, payout, match.stake_token);
                         if (payoutResult && payoutResult.signature) {
                             db.createTransaction({
-                                id: require('uuid').v4(), match_id: match.id, user_id: match.winner_id,
+                                id: uuidv4(), match_id: match.id, user_id: match.winner_id,
                                 tx_type: 'payout', amount: payout, token: match.stake_token,
                                 tx_signature: payoutResult.signature, from_wallet: 'escrow', to_wallet: winner.privy_wallet
                             });
@@ -102,7 +101,7 @@ async function recoverStuckMatches() {
                     console.log('[RECOVERY] Match ' + match.id + ' completed but no winner wallet — skipping');
                 }
             } else if (match.status === 'submitting') {
-                // Submitting state is transient — treat as cancelled
+        
                 db.updateMatch(match.id, { status: 'cancelled', ended_at: Date.now() });
                 console.log('[RECOVERY] Match ' + match.id + ' (submitting) set to cancelled');
             }
@@ -114,10 +113,8 @@ async function recoverStuckMatches() {
         console.error('[RECOVERY] Error:', e.message);
     }
 }
-// Run recovery once at startup
 recoverStuckMatches();
 
-// === TLS (Let's Encrypt) ===
 const CERT_DIR = '/etc/letsencrypt/live/sniperz.fun';
 let server, hasTLS = false;
 try {
@@ -132,7 +129,6 @@ try {
 }
 const wss = new WebSocketServer({ server });
 
-// /debug needs wss defined
 app.get('/debug', (req, res) => {
     if (!process.env.ADMIN_SECRET || req.query.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'forbidden' });
     const list = [];
@@ -140,10 +136,10 @@ app.get('/debug', (req, res) => {
     res.json({ players: list, total: players.size, clients: wss.clients.size });
 });
 
-// === DELAYED SPECTATOR FEED (30s delay, safe for hero background) ===
-const SPECTATOR_DELAY = 30; // seconds
-const _spectatorBuffer = []; // ring buffer of snapshots
-const SPECTATOR_SNAPSHOT_RATE = 500; // ms between snapshots
+// 30s-delayed spectator feed for landing page background
+const SPECTATOR_DELAY = 30;
+const _spectatorBuffer = [];
+const SPECTATOR_SNAPSHOT_RATE = 500;
 
 setInterval(() => {
     const snapshot = [];
@@ -151,13 +147,11 @@ setInterval(() => {
         snapshot.push({ id, team: p.team, x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10, alive: p.health > 0 });
     });
     _spectatorBuffer.push({ t: Date.now(), players: snapshot });
-    // Trim buffer to keep only last 60 seconds
     const cutoff = Date.now() - 60000;
     while (_spectatorBuffer.length > 0 && _spectatorBuffer[0].t < cutoff) _spectatorBuffer.shift();
 }, SPECTATOR_SNAPSHOT_RATE);
 
 app.get('/spectate', (req, res) => {
-    // Return the snapshot from 30 seconds ago
     const targetTime = Date.now() - SPECTATOR_DELAY * 1000;
     let best = null;
     for (let i = _spectatorBuffer.length - 1; i >= 0; i--) {
@@ -169,9 +163,6 @@ app.get('/spectate', (req, res) => {
 
 console.log('Collision walls loaded from shared/collision.js');
 
-// === TEST MODE ===
-// GET /test-mode?on=1  → enter test mode (1 passive bot at center, verbose logs)
-// GET /test-mode?on=0  → exit test mode (restore normal 5v5)
 app.get('/test-mode', (req, res) => {
     if (!process.env.ADMIN_SECRET || req.query.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'forbidden' });
     if (req.query.on === '1') {
@@ -190,19 +181,16 @@ function enterTestMode() {
     // Spawn one passive bot near map center on enemy team (blue)
     const dummy = createPlayer(nextId++, 'TargetDummy', 'blue', true);
     dummy.x = -3; dummy.z = -3; dummy.y = terrainY(-3, -3) + 0.6;
-    dummy._passive = false; // Uses normal bot AI — moves and explores but won't shoot player (god mode)
+    dummy._passive = false;
     players.set(dummy.id, dummy);
-    // Broadcast roster update
     broadcastRoster();
     console.log('[TEST MODE] Entered — 1 passive bot at center');
 }
 
 function exitTestMode() {
     TEST_MODE = false;
-    // Remove passive bots
     players.clear();
     nextId = 1;
-    // Re-init normal 5v5
     for (let i = 0; i < MAX_PLAYERS; i++) {
         const team = i < 5 ? 'red' : 'blue';
         const bot = createPlayer(nextId++, BOT_NAMES[i], team, true);
@@ -219,31 +207,22 @@ function broadcastRoster() {
     });
     broadcast(JSON.stringify({ t: 'roster', r: roster }));
 }
-
-// === HELPER ===
-function dist(a, b) {
-    return Math.sqrt((a.x - b.x) ** 2 + (a.z - b.z) ** 2);
-}
-
-// === MATCH CONFIG ===
 const KILL_LIMIT = 50;
-const TIME_LIMIT = 20 * 60; // 20 minutes in seconds
-const RESTART_DELAY = 12; // seconds between match end and new match
+const TIME_LIMIT = 20 * 60;
+const RESTART_DELAY = 12;
 
-// === STATE ===
-const players = new Map(); // id -> state
+const players = new Map();
 let nextId = 1;
 let firstBlood = false;
 let teamKills = { red: 0, blue: 0 };
 let matchStartTime = Date.now();
 let matchOver = false;
 let matchTimer = null;
-let TEST_MODE = false; // Activated via ?test — single passive bot, verbose logging
+let TEST_MODE = false;
 
-// Track disconnected players for rejoin (username -> saved state)
 const disconnectedPlayers = new Map();
-const AFK_TIMEOUT = 120; // seconds before AFK player becomes bot-controlled
-const REJOIN_WINDOW = 300; // seconds to rejoin and recover state
+const AFK_TIMEOUT = 120;
+const REJOIN_WINDOW = 300;
 
 function createPlayer(id, name, team, isBot) {
     let pos = spawnPos(team);
@@ -262,16 +241,13 @@ function createPlayer(id, name, team, isBot) {
         hasShield: false, goldMultiplier: 1.0,
         inventory: {},
         moveTarget: null,
-        // Bot AI
         botState: 'explore', botTarget: null, campTimer: 0, stuckFrames: 0,
         lastX: pos.x, lastZ: pos.z,
-        // AFK tracking (humans only)
         lastInput: Date.now(),
         afk: false
     };
 }
 
-// Init bots: 5 red, 5 blue
 for (let i = 0; i < MAX_PLAYERS; i++) {
     const team = i < 5 ? 'red' : 'blue';
     const bot = createPlayer(nextId++, BOT_NAMES[i], team, true);
@@ -279,21 +255,15 @@ for (let i = 0; i < MAX_PLAYERS; i++) {
 }
 console.log(`Initialized ${players.size} bots`);
 
-// === BINARY STATE ENCODING ===
-// Per-player: id(2) + x(f32) + z(f32) + rot(f32) + health(1) + kills(i16) + deaths(i16) + price(f32) + flags(1) + streak(i16) + gold(i16) = 28 bytes
-const BYTES_PER_PLAYER = 28;
-
-// Track which enemies each team has seen (for hysteresis)
 const _teamVisible = { red: new Set(), blue: new Set() };
 
 function encodeState(viewerTeam) {
-    // Determine which enemies are visible in FOW (with hysteresis)
     const enemyVisible = new Set();
     const prevVisible = _teamVisible[viewerTeam];
     players.forEach(function(p) {
         if (p.team === viewerTeam || p.health <= 0) return;
         if (p.windwalk) return;
-        // Hysteresis: 50 units to enter vision, 53 to leave (small buffer)
+        // Hysteresis: wider exit range prevents flicker at vision edge
         var enterRange = SHOOT_RANGE, exitRange = SHOOT_RANGE + 3;
         var wasVisible = prevVisible.has(p.id);
         var vr = wasVisible ? exitRange : enterRange;
@@ -311,43 +281,11 @@ function encodeState(viewerTeam) {
     });
     _teamVisible[viewerTeam] = enemyVisible;
 
-    // Always send ALL players — client uses inFog flag to hide position
     const all = [];
     players.forEach(function(p) { all.push(p); });
-
-    const count = all.length;
-    const ab = new ArrayBuffer(2 + count * BYTES_PER_PLAYER);
-    const view = new DataView(ab);
-    view.setUint16(0, count, true);
-    let off = 2;
-    for (let i = 0; i < all.length; i++) {
-        const p = all[i];
-        const isEnemy = p.team !== viewerTeam;
-        const inFog = isEnemy && p.health > 0 && !enemyVisible.has(p.id);
-
-        view.setUint16(off, p.id, true); off += 2;
-        view.setFloat32(off, inFog ? 0 : p.x, true); off += 4;
-        view.setFloat32(off, inFog ? 0 : p.z, true); off += 4;
-        view.setFloat32(off, inFog ? 0 : p.rot, true); off += 4;
-        view.setUint8(off, p.health > 0 ? 1 : 0); off += 1;
-        view.setInt16(off, p.kills, true); off += 2;
-        view.setInt16(off, p.deaths, true); off += 2;
-        view.setFloat32(off, p.price, true); off += 4;
-        // flags: bit0=windwalk, bit1=spawnProt, bit2=isBot, bit3=blue team, bit4=inFog
-        let flags = 0;
-        if (p.windwalk) flags |= 1;
-        if (p.spawnProt > 0) flags |= 2;
-        if (p.isBot) flags |= 4;
-        if (p.team === 'blue') flags |= 8;
-        if (inFog) flags |= 16;
-        view.setUint8(off, flags); off += 1;
-        view.setInt16(off, p.streak, true); off += 2;
-        view.setInt16(off, Math.min(p.gold, 32767), true); off += 2;
-    }
-    return Buffer.from(ab);
+    return encodePlayerState(all, viewerTeam, enemyVisible);
 }
 
-// === APPLY ITEMS ===
 function applyItems(p) {
     p.normalSpeed = 8;
     p.shootRange = SHOOT_RANGE;
@@ -382,10 +320,7 @@ function buyItem(p, itemId) {
     return true;
 }
 
-// === BOT AI ===
-
 function pickTarget(bot) {
-    // 60% chance to patrol center area (where combat happens), 40% wider map
     var centerBias = Math.random() < 0.6;
     for (var i = 0; i < 20; i++) {
         var tx, tz;
@@ -402,14 +337,11 @@ function pickTarget(bot) {
         if (collidesWithWall(tx, tz, 1.0)) continue;
         return { x: tx, z: tz };
     }
-    // Fallback to center
     return { x: (Math.random()-0.5) * 30, z: (Math.random()-0.5) * 30 };
 }
 
-// Try to move bot from current pos toward (nx, nz). Returns true if moved.
-var BOT_RADIUS = 0.8; // Slightly smaller than 1.0 so bots fit through gaps
+var BOT_RADIUS = 0.8;
 function tryMove(bot, nx, nz) {
-    // Clamp to map
     nx = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nx));
     nz = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nz));
 
@@ -417,11 +349,9 @@ function tryMove(bot, nx, nz) {
     if (!collidesWithWall(nx, nz, BOT_RADIUS)) {
         bot.x = nx; bot.z = nz; return true;
     }
-    // Wall slide X
     if (!collidesWithWall(nx, bot.z, BOT_RADIUS)) {
         bot.x = nx; return true;
     }
-    // Wall slide Z
     if (!collidesWithWall(bot.x, nz, BOT_RADIUS)) {
         bot.z = nz; return true;
     }
@@ -432,15 +362,13 @@ function updateBot(bot, dt) {
     if (bot.health <= 0) return;
     if (bot._passive) return;
 
-    // Track real movement — if barely moved in 0.75s, pick totally new target
     if (!bot._lastRealX) { bot._lastRealX = bot.x; bot._lastRealZ = bot.z; bot._idleTicks = 0; }
     var moved = Math.abs(bot.x - bot._lastRealX) > 0.5 || Math.abs(bot.z - bot._lastRealZ) > 0.5;
     if (moved) {
         bot._lastRealX = bot.x; bot._lastRealZ = bot.z; bot._idleTicks = 0;
     } else {
         bot._idleTicks++;
-        if (bot._idleTicks > 48) { // ~0.75 seconds — give up fast
-            // Pick a random direction that's clear, not a strategic target
+        if (bot._idleTicks > 48) {
             for (var attempt = 0; attempt < 10; attempt++) {
                 var escAngle = Math.random() * Math.PI * 2;
                 var escDist = 10 + Math.random() * 20;
@@ -459,7 +387,7 @@ function updateBot(bot, dt) {
         }
     }
 
-    // If bot is inside a wall, aggressively push it out
+    // Push bot out if stuck inside a wall
     if (collidesWithWall(bot.x, bot.z, BOT_RADIUS)) {
         var escaped = false;
         for (var radius = 1; radius <= 8 && !escaped; radius++) {
@@ -471,14 +399,13 @@ function updateBot(bot, dt) {
                 }
             }
         }
-        // If still stuck after trying 8 units out, teleport to spawn
+        // Last resort: teleport to spawn
         if (!escaped) {
             var pos = spawnPos(bot.team);
             bot.x = pos.x; bot.z = pos.z;
         }
     }
 
-    // Find closest enemy
     var closestEnemy = null, closestDist = Infinity;
     players.forEach(function(e) {
         if (e !== bot && e.team !== bot.team && e.health > 0 && !e.windwalk) {
@@ -487,14 +414,12 @@ function updateBot(bot, dt) {
         }
     });
 
-    // Chase enemy in vision range
     if (closestEnemy && closestDist < SHOOT_RANGE * 1.5) {
         if (hasLineOfSight(bot.x, bot.z, closestEnemy.x, closestEnemy.z)) {
             bot.botTarget = { x: closestEnemy.x, z: closestEnemy.z };
             bot.chaseDetour = false;
             bot.stuckFrames = 0;
         } else if (!bot.chaseDetour || bot.stuckFrames > 10) {
-            // Try to go around — test both sides, pick the one that's clear
             var angle = Math.atan2(closestEnemy.z - bot.z, closestEnemy.x - bot.x);
             var detourDist = 6 + Math.random() * 8;
             var bestWP = null;
@@ -518,14 +443,11 @@ function updateBot(bot, dt) {
         }
     }
 
-    // Pick new target when needed
     if (!bot.botTarget || dist(bot, bot.botTarget) < 3) {
         bot.botTarget = pickTarget(bot);
         bot.chaseDetour = false;
         bot.stuckFrames = 0;
     }
-
-    // Move toward target
     var dx = bot.botTarget.x - bot.x;
     var dz = bot.botTarget.z - bot.z;
     var d = Math.sqrt(dx * dx + dz * dz);
@@ -567,10 +489,8 @@ function updateBot(bot, dt) {
         bot.y = terrainY(bot.x, bot.z) + 0.6;
         bot.rot = Math.atan2(dx, dz);
     }
-
-    // Aim at closest enemy — bot must turn to face + reaction delay before shooting
     if (closestEnemy && closestDist <= bot.shootRange && hasLineOfSight(bot.x, bot.z, closestEnemy.x, closestEnemy.z)) {
-        // Reaction delay: when first spotting an enemy, wait before shooting
+
         if (!bot.losTarget || bot.losTarget !== closestEnemy.id) {
             bot.losTarget = closestEnemy.id;
             bot.losTimer = 1.0 + Math.random() * 1.5; // 1.0–2.5s reaction time
@@ -580,7 +500,7 @@ function updateBot(bot, dt) {
         }
 
         var targetRot = Math.atan2(closestEnemy.x - bot.x, closestEnemy.z - bot.z);
-        // Turn toward enemy gradually (~120°/sec)
+
         var turnSpeed = 2.0 * dt;
         var diff = targetRot - bot.rot;
         while (diff > Math.PI) diff -= 2 * Math.PI;
@@ -590,16 +510,12 @@ function updateBot(bot, dt) {
         } else {
             bot.rot += (diff > 0 ? 1 : -1) * turnSpeed;
         }
-
-        // Only allow shooting after reaction delay expires
         bot.aimRot = (bot.losTimer <= 0) ? bot.rot : bot.rot + Math.PI; // aim away until ready
     } else {
         bot.aimRot = bot.rot;
         bot.losTarget = null;
         bot.losTimer = 0;
     }
-
-    // Auto-buy
     if (bot.gold >= 100 && isNearSpawn(bot.x, bot.z, bot.team)) {
         botShop(bot);
     }
@@ -611,14 +527,10 @@ function botShop(bot) {
         buyItem(bot, id);
     }
 }
-
-// === SHOOTING ===
 function tryShoot(attacker) {
     if (attacker.health <= 0) return;
     if (attacker._passive) return; // Test dummy doesn't shoot
     if (attacker.shootCd > 0) return;
-
-    // Use aimRot (from client mouse/weapon aim) if available, otherwise movement rot
     const aimDir = attacker.aimRot !== undefined ? attacker.aimRot : attacker.rot;
 
     const isLog = TEST_MODE && !attacker.isBot; // Log human shots in test mode
@@ -630,13 +542,13 @@ function tryShoot(attacker) {
         if (p.windwalk) { if (isLog) console.log('  → ' + p.username + ' SKIP windwalk'); return; }
         if (p.spawnProt > 0) { if (isLog) console.log('  → ' + p.username + ' SKIP spawnProt'); return; }
         if (p.godMode) { if (isLog) console.log('  → ' + p.username + ' SKIP godMode'); return; }
-        // Must be within attacker's personal vision (same as client fog radius)
+
         var vdx = p.x - attacker.x, vdz = p.z - attacker.z;
         var visionDist2 = vdx * vdx + vdz * vdz;
         if (visionDist2 > SHOOT_RANGE * SHOOT_RANGE) { if (isLog) console.log('  → ' + p.username + ' SKIP vision dist=' + Math.sqrt(visionDist2).toFixed(1)); return; }
         const d = dist(attacker, p);
         if (d > attacker.shootRange) { if (isLog) console.log('  → ' + p.username + ' SKIP range dist=' + d.toFixed(1) + ' range=' + attacker.shootRange); return; }
-        // FOV cone: 30° for everyone
+
         const fovDeg = 30;
         const dx = p.x - attacker.x, dz = p.z - attacker.z;
         const angle = Math.atan2(dx, dz);
@@ -664,8 +576,6 @@ function tryShoot(attacker) {
     if (matchOver) return;
     if (isLog) console.log('  → KILL ' + closest.username + ' dist=' + closestDist.toFixed(1));
     attacker.shootCd = attacker.shootCooldownTime;
-
-    // Shield blocks one hit
     if (closest.hasShield) {
         closest.hasShield = false;
         delete closest.inventory['shield'];
@@ -673,13 +583,11 @@ function tryShoot(attacker) {
         broadcast(JSON.stringify({ t: 'shld', vi: closest.id }));
         return;
     }
-
-    // KILL
     closest.health = 0;
     closest.deaths++;
     closest.price = Math.max(0.1, closest.price * 0.5);
     closest.streak = 0;
-    // Lose items on death
+
     closest.inventory = {};
     applyItems(closest);
 
@@ -708,19 +616,15 @@ function tryShoot(attacker) {
         kt: attacker.team, vt: closest.team,
         rk: teamKills.red, bk: teamKills.blue
     }));
-
-    // Check win condition
     if (teamKills[attacker.team] >= KILL_LIMIT) {
         endMatch(attacker.team, 'kill_limit');
     }
-
-    // Respawn after 5s
     const deadId = closest.id;
     setTimeout(function() {
         const p = players.get(deadId);
         if (!p) return;
         let pos = spawnPos(p.team);
-        // Ensure spawn isn't inside a wall
+
         for (let tries = 0; tries < 10 && collidesWithWall(pos.x, pos.z, 0.8); tries++) {
             pos = spawnPos(p.team);
         }
@@ -749,8 +653,6 @@ function broadcastExcept(data, excludeWs) {
         if (ws.readyState === 1 && ws !== excludeWs && !ws._isWager) ws.send(data);
     });
 }
-
-// === GAME LOOP ===
 let tickCount = 0;
 const sendEvery = Math.round(TICK_RATE / SEND_RATE);
 
@@ -761,38 +663,7 @@ setInterval(function() {
     players.forEach(function(p) {
         if (p.health <= 0) return;
 
-        // Spawn protection countdown
-        if (p.spawnProt > 0) {
-            p.spawnProt -= dt;
-            if (!isNearSpawn(p.x, p.z, p.team)) p.spawnProt = 0;
-        }
-
-        // Shoot cooldown
-        if (p.shootCd > 0) p.shootCd -= dt;
-
-        // Ability cooldowns
-        if (p._wwCooldown > 0) p._wwCooldown -= dt;
-        if (p._fsCooldown > 0) p._fsCooldown -= dt;
-
-        // Windwalk timer
-        if (p.windwalk) {
-            p.windwalkTimer -= dt;
-            if (p.windwalkTimer <= 0) {
-                p.windwalk = false;
-                p.windwalkTimer = 0;
-            }
-        }
-
-        // Farsight timer
-        if (p.farsight) {
-            p.farsightTimer -= dt;
-            if (p.farsightTimer <= 0) {
-                p.farsight = false;
-                p.farsightTimer = 0;
-            }
-        }
-
-        // AFK detection for human players
+        tickPlayerTimers(p, dt, { wwCooldownKey: '_wwCooldown', fsCooldownKey: '_fsCooldown' });
         if (!p.isBot) {
             const idleTime = (Date.now() - p.lastInput) / 1000;
             if (idleTime >= AFK_TIMEOUT && !p.afk) {
@@ -803,39 +674,13 @@ setInterval(function() {
                 broadcast(JSON.stringify({ t: 'ch', n: 'Server', m: 'system', x: p.username + ' is back' }));
             }
         }
-
-        // Bot AI (or AFK human auto-pilot)
         if (p.isBot || p.afk) {
             updateBot(p, dt);
-        } else if (p.moveTarget) {
-            // Human player movement — smaller radius for smoother wall sliding
-            const dx = p.moveTarget.x - p.x;
-            const dz = p.moveTarget.z - p.z;
-            const d = Math.sqrt(dx * dx + dz * dz);
-            if (d < 1) {
-                p.moveTarget = null;
-            } else {
-                const spd = (p.windwalk ? p.windwalkSpeed : p.speed) * dt;
-                const nx = p.x + dx / d * spd;
-                const nz = p.z + dz / d * spd;
-                if (!collidesWithWall(nx, nz, 0.8)) {
-                    p.x = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nx));
-                    p.z = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nz));
-                } else if (!collidesWithWall(nx, p.z, 0.8)) {
-                    p.x = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nx));
-                } else if (!collidesWithWall(p.x, nz, 0.8)) {
-                    p.z = Math.max(-MAP_SIZE / 2 + 2, Math.min(MAP_SIZE / 2 - 2, nz));
-                }
-                p.y = terrainY(p.x, p.z) + 0.6;
-                p.rot = Math.atan2(dx, dz);
-            }
+        } else {
+            movePlayerToTarget(p, dt);
         }
-
-        // Auto-shoot
         if (p.shootCd <= 0) tryShoot(p);
     });
-
-    // Send state snapshots at lower rate
     if (tickCount % sendEvery === 0) {
         wss.clients.forEach(function(ws) {
             if (ws.readyState !== 1 || !ws.playerId || ws._isWager) return;
@@ -847,8 +692,6 @@ setInterval(function() {
     }
 }, 1000 / TICK_RATE);
 
-// === CONNECTIONS ===
-// === WAGER MATCH SETTLEMENT ===
 const _settlementInProgress = new Set();
 
 async function settleWagerMatch(matchId, winnerId, reason, stats) {
@@ -875,7 +718,7 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
                     const result = await escrow.sendPayout(creator.privy_wallet, match.stake_amount, match.stake_token);
                     if (result && result.signature) {
                         db.createTransaction({
-                            id: require('uuid').v4(), match_id: matchId, user_id: match.creator_id,
+                            id: uuidv4(), match_id: matchId, user_id: match.creator_id,
                             tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
                             tx_signature: result.signature, from_wallet: 'escrow', to_wallet: creator.privy_wallet
                         });
@@ -890,7 +733,7 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
                     const result = await escrow.sendPayout(joiner.privy_wallet, match.stake_amount, match.stake_token);
                     if (result && result.signature) {
                         db.createTransaction({
-                            id: require('uuid').v4(), match_id: matchId, user_id: match.joiner_id,
+                            id: uuidv4(), match_id: matchId, user_id: match.joiner_id,
                             tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
                             tx_signature: result.signature, from_wallet: 'escrow', to_wallet: joiner.privy_wallet
                         });
@@ -992,7 +835,7 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
             const payoutResult = await escrow.sendPayout(winner.privy_wallet, payout, match.stake_token);
             if (payoutResult && payoutResult.signature) {
                 db.createTransaction({
-                    id: require('uuid').v4(), match_id: matchId, user_id: winnerId,
+                    id: uuidv4(), match_id: matchId, user_id: winnerId,
                     tx_type: 'payout', amount: payout, token: match.stake_token,
                     tx_signature: payoutResult.signature, from_wallet: 'escrow', to_wallet: winner.privy_wallet
                 });
@@ -1003,7 +846,7 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
             const rakeResult = await escrow.sendRake(rake, match.stake_token);
             if (rakeResult && rakeResult.signature) {
                 db.createTransaction({
-                    id: require('uuid').v4(), match_id: matchId, user_id: null,
+                    id: uuidv4(), match_id: matchId, user_id: null,
                     tx_type: 'rake', amount: rake, token: match.stake_token,
                     tx_signature: rakeResult.signature, from_wallet: 'escrow', to_wallet: 'treasury'
                 });
@@ -1028,8 +871,6 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
         _settlementInProgress.delete(matchId);
     }
 }
-
-// === WAGER WEBSOCKET HANDLER ===
 function handleWagerWs(ws, userId, matchId) {
     const match = db.getMatch(matchId);
     if (!match) { ws.send(JSON.stringify({ t: 'error', msg: 'Match not found' })); ws.close(); return; }
@@ -1151,14 +992,12 @@ wss.on('connection', function(ws) {
                 let team = msg.m === 'blue' ? 'blue' : 'red';
 
                 if (TEST_MODE) {
-                    // Test mode: player always joins red, no bot removal needed
+
                     team = 'red';
                     const player = createPlayer(nextId++, name, team, false);
                     player.godMode = true; // Can't die in test mode
                     console.log('[TEST] ' + name + ' joined test mode (god mode ON)');
 
-                    // Skip normal bot removal / balance logic
-                    // Jump to player registration below
                     players.set(player.id, player);
                     ws.playerId = player.id;
                     const roster = [];
@@ -1175,15 +1014,15 @@ wss.on('connection', function(ws) {
                     return;
                 }
 
-                // Count players per team
+            
                 let redCount = 0, blueCount = 0;
                 players.forEach(p => { if (p.team === 'red') redCount++; else blueCount++; });
 
-                // Auto-balance: if requested team is full (5) or has more, put on other team
+        
                 if (team === 'red' && redCount >= 5 && blueCount < 5) team = 'blue';
                 else if (team === 'blue' && blueCount >= 5 && redCount < 5) team = 'red';
 
-                // Remove a bot from this team to make room (keep 5v5)
+        
                 let removed = false;
                 for (const [id, p] of players) {
                     if (p.isBot && p.team === team) {
@@ -1192,16 +1031,14 @@ wss.on('connection', function(ws) {
                         break;
                     }
                 }
-                // If no bot on that team, refuse join (server full for that team)
+        
                 if (!removed && (team === 'red' ? redCount : blueCount) >= 5) {
                     ws.send(JSON.stringify({ t: 'err', x: 'Team is full' }));
                     return;
                 }
 
                 const player = createPlayer(nextId++, name, team, false);
-                // God mode available via G key (desktop) or 'god' message
 
-                // Check for rejoin — restore saved state
                 const saved = disconnectedPlayers.get(name.toLowerCase());
                 if (saved && (Date.now() - saved.savedAt) < REJOIN_WINDOW * 1000 && saved.team === team) {
                     player.kills = saved.kills;
@@ -1218,8 +1055,6 @@ wss.on('connection', function(ws) {
 
                 players.set(player.id, player);
                 ws.playerId = player.id;
-
-                // Send join confirmation + roster
                 const roster = [];
                 players.forEach(function(p) {
                     roster.push({ id: p.id, n: p.username, m: p.team, b: p.isBot ? 1 : 0 });
@@ -1246,7 +1081,7 @@ wss.on('connection', function(ws) {
                 const p = players.get(ws.playerId);
                 if (p) {
                     p.aimRot = msg.r || 0; p.rot = msg.r || 0; p.lastInput = Date.now();
-                    // Throttled aim logging in test mode
+                
                     if (TEST_MODE && !p.isBot) {
                         const now = Date.now();
                         if (!p._lastAimLog || now - p._lastAimLog > 1000) {
@@ -1319,8 +1154,6 @@ wss.on('connection', function(ws) {
             }
         } catch (e) { /* ignore malformed messages */ }
     });
-
-    // Ping/pong for timeout detection
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
 
@@ -1332,28 +1165,24 @@ wss.on('connection', function(ws) {
                 players.delete(ws.playerId);
 
                 if (TEST_MODE) {
-                    // Test mode: just remove player, don't replace with bot
+
                     console.log('[TEST] ' + p.username + ' disconnected');
                     broadcast(JSON.stringify({ t: 'pl', n: p.username }));
                     return;
                 }
-
-                // Save state for potential rejoin
                 disconnectedPlayers.set(p.username.toLowerCase(), {
                     username: p.username, team: p.team,
                     kills: p.kills, deaths: p.deaths, price: p.price,
                     gold: p.gold, streak: p.streak, inventory: { ...p.inventory },
                     savedAt: Date.now()
                 });
-                // Replace with bot
-                // Pick a bot name not already in use
                 var usedNames = new Set();
                 players.forEach(function(pl) { usedNames.add(pl.username); });
                 var botName = BOT_NAMES.find(n => !usedNames.has(n)) || 'Bot' + nextId;
                 const bot = createPlayer(nextId++, botName, team, true);
                 players.set(bot.id, bot);
                 broadcast(JSON.stringify({ t: 'pl', n: p.username }));
-                // Broadcast full roster so clients register the new bot
+
                 var roster = [];
                 players.forEach(function(rp) { roster.push({ id: rp.id, n: rp.username, m: rp.team, b: rp.isBot ? 1 : 0 }); });
                 broadcast(JSON.stringify({ t: 'roster', roster: roster }));
@@ -1362,13 +1191,9 @@ wss.on('connection', function(ws) {
         }
     });
 });
-
-// === MATCH END / RESET ===
 function endMatch(winTeam, reason) {
     if (matchOver) return;
     matchOver = true;
-
-    // Collect final stats
     const stats = [];
     players.forEach(function(p) {
         stats.push({
@@ -1391,8 +1216,6 @@ function endMatch(winTeam, reason) {
     }));
 
     console.log('Match over — ' + winTeam + ' wins (' + reason + ') ' + teamKills.red + '-' + teamKills.blue + ' in ' + elapsed + 's');
-
-    // Auto-restart after delay
     matchTimer = setTimeout(resetMatch, RESTART_DELAY * 1000);
 }
 
@@ -1402,8 +1225,6 @@ function resetMatch() {
     teamKills = { red: 0, blue: 0 };
     matchStartTime = Date.now();
     disconnectedPlayers.clear();
-
-    // Reset all players in-place (keep connections, bots, teams)
     players.forEach(function(p) {
         const pos = spawnPos(p.team);
         p.x = pos.x; p.z = pos.z; p.y = terrainY(pos.x, pos.z) + 0.6;
@@ -1418,8 +1239,6 @@ function resetMatch() {
         p.moveTarget = null; p.botTarget = null; p.botState = 'explore';
         p.afk = false; p.lastInput = Date.now();
     });
-
-    // Send roster for new match
     const roster = [];
     players.forEach(function(p) {
         roster.push({ id: p.id, n: p.username, m: p.team, b: p.isBot ? 1 : 0 });
@@ -1446,7 +1265,7 @@ setInterval(function() {
         ws.isAlive = false;
         ws.ping();
     });
-    // Clean up expired rejoin states
+
     const now = Date.now();
     for (const [name, saved] of disconnectedPlayers) {
         if (now - saved.savedAt > REJOIN_WINDOW * 1000) disconnectedPlayers.delete(name);
@@ -1456,14 +1275,14 @@ setInterval(function() {
 // Stale match expiry — every 5 minutes
 setInterval(function() {
     try {
-        // Expire open matches older than 30 minutes
+
         const openResult = db.expireStaleMatches(Date.now() - 30 * 60 * 1000);
-        // Expire matched-status matches older than 15 minutes
+
         const matchedResult = db.db.prepare("UPDATE matches SET status = 'expired' WHERE status = 'matched' AND created_at < ?")
             .run(Date.now() - 15 * 60 * 1000);
         const total = (openResult?.changes || 0) + (matchedResult?.changes || 0);
         if (total > 0) {
-            // Expire challenge requests for any expired matches
+
             const expiredMatches = db.db.prepare("SELECT id FROM matches WHERE status = 'expired'").all();
             for (const em of expiredMatches) {
                 db.expireChallengeRequests(em.id);
@@ -1478,10 +1297,10 @@ setInterval(function() {
 const PORT = process.env.PORT || 3000;
 
 if (hasTLS) {
-    // HTTPS + WSS on 443
+
     server.listen(443, '0.0.0.0', () =>
         console.log('HTTPS + WSS on :443 (' + players.size + ' bots, ' + TICK_RATE + 'hz tick, ' + SEND_RATE + 'hz send)'));
-    // HTTP :80 → redirect to HTTPS
+
     const redirect = express();
     redirect.all('/{*splat}', (req, res) => res.redirect('https://' + req.headers.host + req.url));
     http.createServer(redirect).listen(80, '0.0.0.0', () => console.log('HTTP :80 → HTTPS redirect'));

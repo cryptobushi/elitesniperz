@@ -1,7 +1,3 @@
-/**
- * privy-client.js — Privy auth for sniperz wager system
- * Bundled via esbuild to dist/privy-bundle.js
- */
 import { Buffer } from 'buffer';
 if (typeof window !== 'undefined' && !window.Buffer) window.Buffer = Buffer;
 
@@ -42,8 +38,6 @@ function _notifyListeners() {
         try { cb(authed, _user); } catch (e) { console.error('Auth listener error:', e); }
     }
 }
-
-// Initialize embedded wallet iframe proxy
 let _walletIframeReady = false;
 function _initWalletIframe() {
     if (!_privyClient) return;
@@ -71,7 +65,7 @@ function _initWalletIframe() {
             }
         };
 
-        // Listen for messages from the iframe
+    
         window.addEventListener('message', (e) => {
             try {
                 if (_privyClient && _privyClient.embeddedWallet) {
@@ -85,8 +79,6 @@ function _initWalletIframe() {
         console.warn('[Privy] Wallet iframe init error:', e.message);
     }
 }
-
-// Wait for wallet iframe to be ready (with timeout)
 function _waitForWalletIframe(timeoutMs = 5000) {
     if (_walletIframeReady) return Promise.resolve(true);
     return new Promise((resolve) => {
@@ -99,8 +91,6 @@ function _waitForWalletIframe(timeoutMs = 5000) {
         check();
     });
 }
-
-// Register with our server
 async function _registerWithServer(accessToken, profilePicture) {
     const res = await fetch('/api/auth/verify', {
         method: 'POST',
@@ -112,9 +102,6 @@ async function _registerWithServer(accessToken, profilePicture) {
     return body.success ? body.data : null;
 }
 
-/**
- * Initialize Privy
- */
 export function initPrivy(appId) {
     _appId = appId;
     const restored = _loadSession();
@@ -126,7 +113,7 @@ export function initPrivy(appId) {
         });
         console.log('[Privy] SDK initialized');
 
-        // Initialize embedded wallet iframe proxy
+        
         _initWalletIframe();
     } catch (e) {
         console.warn('[Privy] SDK init failed:', e.message);
@@ -134,7 +121,7 @@ export function initPrivy(appId) {
 
     if (restored) {
         setTimeout(() => _notifyListeners(), 0);
-        // Re-initialize Privy session so _privyClient.user is populated
+    
         if (_privyClient) {
             _privyClient.initialize().then(() => {
                 console.log('[Privy] Session restored, user:', _privyClient.user ? 'loaded' : 'null');
@@ -143,16 +130,10 @@ export function initPrivy(appId) {
             });
         }
     }
-
-    // Check for OAuth callback after SDK is ready
     handleOAuthCallback();
 
     return { authenticated: restored, user: _user };
 }
-
-/**
- * Login via Twitter/X using Privy OAuth
- */
 export async function login() {
     if (!_privyClient) {
         console.warn('[Privy] No client, falling back to dev login');
@@ -245,8 +226,6 @@ export async function login() {
         setTimeout(() => document.getElementById('authHandleInput')?.focus(), 100);
     });
 }
-
-// Handle OAuth callback (called on page load if URL has callback params)
 export async function handleOAuthCallback() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('privy_oauth_code') || params.get('code');
@@ -272,8 +251,6 @@ export async function handleOAuthCallback() {
         if (session) {
             const user = session.user || session;
             console.log('[Privy] User:', JSON.stringify(user).slice(0, 200));
-
-            // Get or create Solana wallet
             let solanaWallet = null;
             try {
                 solanaWallet = getUserEmbeddedSolanaWallet(user);
@@ -305,14 +282,14 @@ export async function handleOAuthCallback() {
             if (accessToken) {
                 _token = accessToken;
 
-                // Extract twitter info from linked accounts
+    
                 const twitterAccount = user.linked_accounts?.find(a => a.type === 'twitter_oauth');
                 const profilePic = twitterAccount?.profile_picture_url || twitterAccount?.profilePictureUrl || null;
                 console.log('[Privy] Twitter pfp:', profilePic ? profilePic.slice(0, 50) + '...' : 'none');
 
                 const serverUser = await _registerWithServer(accessToken, profilePic);
                 if (serverUser) {
-                    // Enrich with wallet address from Privy
+        
                     if (solanaWallet?.address && !serverUser.privy_wallet) {
                         serverUser.privy_wallet = solanaWallet.address;
                     }
@@ -334,8 +311,6 @@ export async function handleOAuthCallback() {
     window.location.href = '/';
     return false;
 }
-
-// Dev mode login
 async function _doDevLogin(handle) {
     const userId = _mockUserId(handle);
     const wallet = _mockWallet(handle);
@@ -378,7 +353,6 @@ function _mockWallet(handle) {
     for (let i = 0; i < 44; i++) { s = (s * 1103515245 + 12345) & 0x7fffffff; addr += b58[s % 58]; }
     return addr;
 }
-
 /**
  * Get the Privy Solana provider for signing transactions.
  * Returns a provider with signAndSendTransaction() or null.
@@ -392,7 +366,7 @@ export async function getSolanaProvider() {
         const accessToken = await _privyClient.getAccessToken();
         if (!accessToken) return null;
 
-        // Get the full Privy user object with linked_accounts
+    
         let privyUser = null;
         try {
             const result = await _privyClient.user.get();
@@ -413,13 +387,13 @@ export async function getSolanaProvider() {
         }
         console.log('[Privy] User loaded:', privyUser.linked_accounts.length, 'linked accounts');
 
-        // Find the embedded Solana wallet account
+    
         let solWallet = null;
         try {
             solWallet = getUserEmbeddedSolanaWallet(privyUser);
         } catch(e) {
             console.warn('[Privy] getUserEmbeddedSolanaWallet error:', e.message);
-            // Fallback: search linked_accounts manually
+
             if (privyUser.linked_accounts) {
                 solWallet = privyUser.linked_accounts.find(a =>
                     a.type === 'wallet' && a.chain_type === 'solana' && a.wallet_client_type === 'privy'
@@ -428,7 +402,7 @@ export async function getSolanaProvider() {
         }
 
         if (!solWallet) {
-            // Last resort: use the address from our DB
+
             const dbUser = getUser();
             if (dbUser?.privy_wallet) {
                 console.log('[Privy] Using wallet address from DB:', dbUser.privy_wallet);
@@ -442,7 +416,7 @@ export async function getSolanaProvider() {
         }
         console.log('[Privy] Found Solana wallet:', solWallet.address);
 
-        // Get entropy details — wrap in try/catch since user format may vary
+    
         let entropyId, entropyIdVerifier;
         try {
             const entropy = getEntropyDetailsFromUser(privyUser);
@@ -452,7 +426,7 @@ export async function getSolanaProvider() {
             console.warn('[Privy] Entropy details not available:', e.message);
         }
 
-        // Get Solana provider
+    
         const provider = await _privyClient.embeddedWallet.getSolanaProvider(
             solWallet, entropyId, entropyIdVerifier
         );
@@ -475,14 +449,6 @@ export function logout() {
 }
 
 export function getToken() {
-    // Try to get a fresh token from Privy SDK if available
-    if (_privyClient && _token) {
-        try {
-            // getAccessToken returns a promise but we need sync — use cached token
-            // The async refresh happens in refreshToken() below
-            return _token;
-        } catch(e) {}
-    }
     return _token;
 }
 
@@ -519,5 +485,3 @@ export async function refreshProfile() {
     } catch { /* ignore */ }
     return null;
 }
-
-// OAuth callback is checked after initPrivy() is called

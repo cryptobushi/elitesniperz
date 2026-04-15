@@ -6,6 +6,8 @@ const bcrypt = require('bcryptjs');
 const { authMiddleware } = require('./auth');
 const db = require('../db/index');
 
+const { stakeToHuman } = require('../shared/constants');
+
 const router = express.Router();
 
 const VALID_TOKENS = ['SOL', 'USDC'];
@@ -14,15 +16,13 @@ const BCRYPT_ROUNDS = 10;
 const MIN_STAKE = { SOL: 10000000, USDC: 1000000 }; // 0.01 SOL, 1 USDC in base units
 const MAX_STAKE = { SOL: 100000000000, USDC: 10000000000 }; // 100 SOL, 10000 USDC in base units
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 function success(data) {
     return { success: true, data };
 }
 
-// Check if user has enough balance for a match stake
+function fail(msg) {
+    return { success: false, error: msg };
+}
 async function checkBalance(userId, stakeAmount, stakeToken) {
     const user = db.getUser(userId);
     if (!user?.privy_wallet) return { ok: false, error: 'No wallet' };
@@ -30,20 +30,66 @@ async function checkBalance(userId, stakeAmount, stakeToken) {
     const balance = await escrow.getBalance(user.privy_wallet, stakeToken);
     if (balance === null) return { ok: true }; // Can't verify, allow
     if (balance < stakeAmount) {
-        const human = stakeToken === 'SOL' ? (stakeAmount / 1e9) : (stakeAmount / 1e6);
-        const has = stakeToken === 'SOL' ? (balance / 1e9) : (balance / 1e6);
+        const human = stakeToHuman(stakeAmount, stakeToken);
+        const has = stakeToHuman(balance, stakeToken);
         return { ok: false, error: `Insufficient balance. Need ${human} ${stakeToken}, have ${has.toFixed(4)} ${stakeToken}` };
     }
     return { ok: true };
 }
 
-function fail(msg) {
-    return { success: false, error: msg };
+/**
+ * Strip password_hash from match and add creator/joiner public info.
+ * @param {object} match - Raw match from DB
+ * @param {object} [opts] - { includeJoiner: true }
+ * @returns {object}
+ */
+function sanitizeMatch(match, opts) {
+    const { password_hash, ...rest } = match;
+    const result = { ...rest, passwordProtected: !!password_hash };
+    const creator = db.getUser(match.creator_id);
+    if (creator) {
+        result.creator_twitter = creator.twitter_handle || null;
+        result.creator_pfp = creator.profile_picture || null;
+        result.creator_wins = creator.wins || 0;
+        result.creator_losses = creator.losses || 0;
+        result.creator_elo = creator.elo || 1000;
+    }
+    if (opts && opts.includeJoiner && match.joiner_id) {
+        const joiner = db.getUser(match.joiner_id);
+        if (joiner) {
+            result.joiner_twitter = joiner.twitter_handle || null;
+            result.joiner_pfp = joiner.profile_picture || null;
+            result.joiner_wins = joiner.wins || 0;
+            result.joiner_losses = joiner.losses || 0;
+            result.joiner_elo = joiner.elo || 1000;
+        }
+    }
+    return result;
 }
 
-// ---------------------------------------------------------------------------
+/**
+ * Update match funding status after a deposit/lock-in.
+ * @param {string} matchId
+ * @param {boolean} isCreator
+ */
+function updateFundingStatus(matchId, isCreator) {
+    const currentStatus = db.getMatch(matchId).status;
+    if (isCreator) {
+        if (currentStatus === 'funded_joiner') {
+            db.updateMatch(matchId, { status: 'funded_both', funded_at: Date.now() });
+        } else if (['open', 'matched'].includes(currentStatus)) {
+            db.updateMatch(matchId, { status: 'funded_creator', funded_at: Date.now() });
+        }
+    } else {
+        if (currentStatus === 'funded_creator') {
+            db.updateMatch(matchId, { status: 'funded_both', funded_at: Date.now() });
+        } else if (['open', 'matched'].includes(currentStatus)) {
+            db.updateMatch(matchId, { status: 'funded_joiner', funded_at: Date.now() });
+        }
+    }
+}
+
 // POST /auth/verify — verify Privy token, upsert user, return profile
-// ---------------------------------------------------------------------------
 router.post('/auth/verify', authMiddleware, (req, res) => {
     try {
         const pu = req.privyUser;
@@ -84,9 +130,7 @@ router.post('/auth/verify', authMiddleware, (req, res) => {
     }
 });
 
-// ---------------------------------------------------------------------------
 // GET /profile/me — own full profile
-// ---------------------------------------------------------------------------
 router.get('/profile/me', authMiddleware, (req, res) => {
     try {
         const user = db.getUser(req.privyUserId);
@@ -98,9 +142,7 @@ router.get('/profile/me', authMiddleware, (req, res) => {
     }
 });
 
-// ---------------------------------------------------------------------------
 // GET /profile/:userId — public profile
-// ---------------------------------------------------------------------------
 router.get('/profile/:userId', (req, res) => {
     try {
         const user = db.getUser(req.params.userId);
@@ -126,9 +168,7 @@ router.get('/profile/:userId', (req, res) => {
     }
 });
 
-// ---------------------------------------------------------------------------
 // POST /matches — create wager match
-// ---------------------------------------------------------------------------
 router.post('/matches', authMiddleware, async (req, res) => {
     try {
         const { stakeAmount, stakeToken, killTarget, password, matchMode } = req.body || {};
@@ -140,18 +180,14 @@ router.post('/matches', authMiddleware, async (req, res) => {
             return res.status(400).json(fail(`stakeToken must be one of: ${VALID_TOKENS.join(', ')}`));
         }
         if (stakeAmount < MIN_STAKE[stakeToken]) {
-            const human = stakeToken === 'SOL' ? (MIN_STAKE[stakeToken] / 1e9) : (MIN_STAKE[stakeToken] / 1e6);
-            return res.status(400).json(fail(`Minimum stake is ${human} ${stakeToken}`));
+            return res.status(400).json(fail(`Minimum stake is ${stakeToHuman(MIN_STAKE[stakeToken], stakeToken)} ${stakeToken}`));
         }
         if (stakeAmount > MAX_STAKE[stakeToken]) {
-            const human = stakeToken === 'SOL' ? (MAX_STAKE[stakeToken] / 1e9) : (MAX_STAKE[stakeToken] / 1e6);
-            return res.status(400).json(fail(`Maximum stake is ${human} ${stakeToken}`));
+            return res.status(400).json(fail(`Maximum stake is ${stakeToHuman(MAX_STAKE[stakeToken], stakeToken)} ${stakeToken}`));
         }
         if (!VALID_KILL_TARGETS.includes(killTarget)) {
             return res.status(400).json(fail(`killTarget must be one of: ${VALID_KILL_TARGETS.join(', ')}`));
         }
-
-        // Limit open matches per user
         const openCount = db.db.prepare("SELECT COUNT(*) as cnt FROM matches WHERE creator_id = ? AND status IN ('open', 'matched', 'funded_creator', 'funded_joiner')").get(req.privyUserId)?.cnt || 0;
         if (openCount >= 5) {
             return res.status(429).json(fail('Maximum 5 open matches. Cancel existing matches first.'));
@@ -160,8 +196,6 @@ router.post('/matches', authMiddleware, async (req, res) => {
         if (!['open', 'selective'].includes(mode)) {
             return res.status(400).json(fail('matchMode must be "open" or "selective"'));
         }
-
-        // Balance check — creator must have enough to cover their stake
         const balCheck = await checkBalance(req.privyUserId, stakeAmount, stakeToken);
         if (!balCheck.ok) return res.status(400).json(fail(balCheck.error));
 
@@ -189,9 +223,7 @@ router.post('/matches', authMiddleware, async (req, res) => {
     }
 });
 
-// ---------------------------------------------------------------------------
 // GET /matches — list open matches
-// ---------------------------------------------------------------------------
 router.get('/matches', (req, res) => {
     try {
         const token = req.query.token || null;
@@ -201,22 +233,7 @@ router.get('/matches', (req, res) => {
         const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
         const matches = db.listOpenMatches({ token, minStake, maxStake, limit, offset });
-
-        // Strip password_hash, add passwordProtected boolean + creator info
-        const sanitized = matches.map((m) => {
-            const { password_hash, ...rest } = m;
-            const creator = db.getUser(m.creator_id);
-            return {
-                ...rest,
-                passwordProtected: !!password_hash,
-                creator_twitter: creator?.twitter_handle || null,
-                creator_pfp: creator?.profile_picture || null,
-                creator_wins: creator?.wins || 0,
-                creator_losses: creator?.losses || 0,
-                creator_elo: creator?.elo || 1000,
-            };
-        });
-
+        const sanitized = matches.map(m => sanitizeMatch(m));
         return res.json(success(sanitized));
     } catch (e) {
         console.error('GET /matches error:', e);
@@ -224,40 +241,20 @@ router.get('/matches', (req, res) => {
     }
 });
 
-// ---------------------------------------------------------------------------
 // GET /matches/:id — match details
-// ---------------------------------------------------------------------------
 router.get('/matches/:id', (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
         if (!match) return res.status(404).json(fail('Match not found'));
 
-        const { password_hash, ...rest } = match;
-        const creator = db.getUser(match.creator_id);
-        const joiner = match.joiner_id ? db.getUser(match.joiner_id) : null;
-        return res.json(success({
-            ...rest,
-            passwordProtected: !!password_hash,
-            creator_twitter: creator?.twitter_handle || null,
-            creator_pfp: creator?.profile_picture || null,
-            creator_wins: creator?.wins || 0,
-            creator_losses: creator?.losses || 0,
-            creator_elo: creator?.elo || 1000,
-            joiner_twitter: joiner?.twitter_handle || null,
-            joiner_pfp: joiner?.profile_picture || null,
-            joiner_wins: joiner?.wins || 0,
-            joiner_losses: joiner?.losses || 0,
-            joiner_elo: joiner?.elo || 1000,
-        }));
+        return res.json(success(sanitizeMatch(match, { includeJoiner: true })));
     } catch (e) {
         console.error('GET /matches/:id error:', e);
         return res.status(500).json(fail('Failed to fetch match'));
     }
 });
 
-// ---------------------------------------------------------------------------
 // POST /matches/:id/join — join a match
-// ---------------------------------------------------------------------------
 router.post('/matches/:id/join', authMiddleware, async (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
@@ -270,8 +267,6 @@ router.post('/matches/:id/join', authMiddleware, async (req, res) => {
         if (match.match_mode === 'selective') {
             return res.status(400).json(fail('This is a selective duel. Submit a challenge request instead.'));
         }
-
-        // Balance check
         const balCheck = await checkBalance(req.privyUserId, match.stake_amount, match.stake_token);
         if (!balCheck.ok) return res.status(400).json(fail(balCheck.error));
 
@@ -282,8 +277,6 @@ router.post('/matches/:id/join', authMiddleware, async (req, res) => {
         if (match.joiner_id) {
             return res.status(400).json(fail('Match already has a joiner'));
         }
-
-        // Password check
         if (match.password_hash) {
             const { password } = req.body || {};
             if (!password) {
@@ -296,26 +289,21 @@ router.post('/matches/:id/join', authMiddleware, async (req, res) => {
         }
 
         const updated = db.joinMatch(req.params.id, req.privyUserId);
-        // Move to 'matched' — both players are now connected
+
         db.updateMatch(req.params.id, { status: 'matched' });
         const refreshed = db.getMatch(req.params.id);
-        const { password_hash: pw, ...rest } = refreshed;
-        return res.json(success({ ...rest, passwordProtected: !!pw }));
+        return res.json(success(sanitizeMatch(refreshed, { includeJoiner: true })));
     } catch (e) {
         console.error('POST /matches/:id/join error:', e);
         return res.status(500).json(fail('Failed to join match'));
     }
 });
 
-// ---------------------------------------------------------------------------
 // POST /matches/:id/cancel — cancel a match (creator only)
-// ---------------------------------------------------------------------------
 router.post('/matches/:id/cancel', authMiddleware, async (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
         if (!match) return res.status(404).json(fail('Match not found'));
-
-        // Either player can cancel before match starts
         const userId = req.privyUserId;
         if (userId !== match.creator_id && userId !== match.joiner_id) {
             return res.status(403).json(fail('Not in this match'));
@@ -325,8 +313,6 @@ router.post('/matches/:id/cancel', authMiddleware, async (req, res) => {
         if (!cancellable.includes(match.status)) {
             return res.status(400).json(fail('Match cannot be cancelled in its current state'));
         }
-
-        // Refund if creator deposited
         if (match.status === 'funded_creator') {
             const creator = db.getUser(match.creator_id);
             const token = req.headers.authorization?.replace('Bearer ', '') || '';
@@ -336,7 +322,7 @@ router.post('/matches/:id/cancel', authMiddleware, async (req, res) => {
                 try {
                     const result = await escrow.sendPayout(creator.privy_wallet, match.stake_amount, match.stake_token);
                     if (result?.signature) {
-                        const { v4: uuidv4 } = require('uuid');
+
                         db.createTransaction({
                             id: uuidv4(), match_id: match.id, user_id: match.creator_id,
                             tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
@@ -359,9 +345,7 @@ router.post('/matches/:id/cancel', authMiddleware, async (req, res) => {
     }
 });
 
-// ---------------------------------------------------------------------------
 // POST /matches/:id/challenge — submit a challenge request (selective mode)
-// ---------------------------------------------------------------------------
 router.post('/matches/:id/challenge', authMiddleware, async (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
@@ -373,7 +357,7 @@ router.post('/matches/:id/challenge', authMiddleware, async (req, res) => {
         if (match.status !== 'open' && match.status !== 'funded_creator') {
             return res.status(400).json(fail('Match is not available for challenges'));
         }
-        // Balance check
+
         const balCheck = await checkBalance(req.privyUserId, match.stake_amount, match.stake_token);
         if (!balCheck.ok) return res.status(400).json(fail(balCheck.error));
 
@@ -408,9 +392,7 @@ router.post('/matches/:id/challenge', authMiddleware, async (req, res) => {
     }
 });
 
-// ---------------------------------------------------------------------------
 // GET /matches/:id/challenges — list pending challenge requests (creator only)
-// ---------------------------------------------------------------------------
 router.get('/matches/:id/challenges', authMiddleware, (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
@@ -428,9 +410,7 @@ router.get('/matches/:id/challenges', authMiddleware, (req, res) => {
     }
 });
 
-// ---------------------------------------------------------------------------
 // POST /matches/:id/challenges/:requestId/accept — accept a challenger
-// ---------------------------------------------------------------------------
 router.post('/matches/:id/challenges/:requestId/accept', authMiddleware, (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
@@ -463,17 +443,14 @@ router.post('/matches/:id/challenges/:requestId/accept', authMiddleware, (req, r
         db.expireChallengeRequests(req.params.id);
 
         const refreshed = db.getMatch(req.params.id);
-        const { password_hash: pw, ...rest } = refreshed;
-        return res.json(success({ ...rest, passwordProtected: !!pw }));
+        return res.json(success(sanitizeMatch(refreshed, { includeJoiner: true })));
     } catch (e) {
         console.error('POST /matches/:id/challenges/:requestId/accept error:', e);
         return res.status(500).json(fail('Failed to accept challenge'));
     }
 });
 
-// ---------------------------------------------------------------------------
 // POST /matches/:id/challenges/:requestId/decline — decline a challenger
-// ---------------------------------------------------------------------------
 router.post('/matches/:id/challenges/:requestId/decline', authMiddleware, (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
@@ -496,9 +473,7 @@ router.post('/matches/:id/challenges/:requestId/decline', authMiddleware, (req, 
     }
 });
 
-// ---------------------------------------------------------------------------
 // GET /matches/:id/my-challenge — get the current user's challenge for a match
-// ---------------------------------------------------------------------------
 router.get('/matches/:id/my-challenge', authMiddleware, (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
@@ -514,9 +489,7 @@ router.get('/matches/:id/my-challenge', authMiddleware, (req, res) => {
     }
 });
 
-// ---------------------------------------------------------------------------
 // GET /leaderboard — top 50 players by wins
-// ---------------------------------------------------------------------------
 router.get('/leaderboard', (req, res) => {
     try {
         const leaders = db.getLeaderboard(50);
@@ -527,9 +500,7 @@ router.get('/leaderboard', (req, res) => {
     }
 });
 
-// ---------------------------------------------------------------------------
 // GET /matches/:id/deposit-tx — get unsigned deposit transaction
-// ---------------------------------------------------------------------------
 const escrow = require('./escrow');
 const { ALLOW_DEV_TOKENS } = require('./auth');
 
@@ -543,7 +514,7 @@ router.get('/matches/:id/deposit-tx', authMiddleware, async (req, res) => {
             return res.status(403).json(fail('Not in this match'));
         }
 
-        // Dev mode: return a mock transaction
+    
         const token = req.headers.authorization?.replace('Bearer ', '') || '';
         if (ALLOW_DEV_TOKENS && token.startsWith('dev:')) {
             return res.json(success({ transaction: 'dev-mock-tx', devMode: true }));
@@ -565,13 +536,8 @@ router.get('/matches/:id/deposit-tx', authMiddleware, async (req, res) => {
         return res.status(500).json(fail('Failed to create deposit transaction'));
     }
 });
-
-// ---------------------------------------------------------------------------
-// In-memory storage for signed transactions pending both lock-ins
 const _pendingLockIns = new Map(); // matchId -> { creator: {tx,sig}, joiner: {tx,sig} }
 const _lockInProgress = new Set(); // matchId set to prevent concurrent lock-in races
-
-// POST /matches/:id/lock-in — store signed tx, submit BOTH when both locked
 router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
@@ -592,27 +558,23 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
         const balCheck = await checkBalance(userId, match.stake_amount, match.stake_token);
         if (!balCheck.ok) {
             _lockInProgress.delete(match.id);
-            // Kick them from the match if they're the joiner
+
             if (isJoiner) {
                 db.updateMatch(match.id, { status: 'open' });
                 db.db.prepare('UPDATE matches SET joiner_id = NULL WHERE id = ?').run(match.id);
             }
             return res.status(400).json(fail(balCheck.error));
         }
-
-        // Store the signed tx
         if (!_pendingLockIns.has(match.id)) _pendingLockIns.set(match.id, {});
         const pending = _pendingLockIns.get(match.id);
         const role = isCreator ? 'creator' : 'joiner';
         pending[role] = { transaction, signature };
-
-        // Update match status
         const currentStatus = db.getMatch(match.id).status;
         const otherRole = isCreator ? 'joiner' : 'creator';
         const bothLocked = pending[role] && pending[otherRole];
 
         if (!bothLocked) {
-            // Only one locked so far
+    
             if (isCreator) {
                 if (['open', 'matched'].includes(currentStatus)) {
                     db.updateMatch(match.id, { status: 'funded_creator', funded_at: Date.now() });
@@ -621,7 +583,7 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
                 if (['open', 'matched'].includes(currentStatus)) {
                     db.updateMatch(match.id, { status: 'funded_joiner', funded_at: Date.now() });
                 } else if (currentStatus === 'funded_creator') {
-                    // Will be set to funded_both below after submission
+
                 }
             }
             const newStatus = db.getMatch(match.id).status;
@@ -629,8 +591,6 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
             _lockInProgress.delete(match.id);
             return res.json(success({ status: newStatus, locked: role }));
         }
-
-        // Both locked — submit both transactions to Solana
         console.log('[LOCK-IN] Both locked for match', match.id, '— submitting to Solana...');
 
         const token = req.headers.authorization?.replace('Bearer ', '') || '';
@@ -640,7 +600,7 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
             const { Connection, Transaction, PublicKey } = require('@solana/web3.js');
             const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
 
-            // Validate blockhashes before submitting
+    
             const creatorTxCheck = Transaction.from(Buffer.from(pending.creator.transaction, 'base64'));
             const joinerTxCheck = Transaction.from(Buffer.from(pending.joiner.transaction, 'base64'));
 
@@ -656,35 +616,27 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
                 console.log('[LOCK-IN] Blockhash expired for match', match.id, 'creator:', creatorBhValid, 'joiner:', joinerBhValid);
                 return res.status(400).json(fail('Transaction expired. Please re-lock.'));
             }
-
-            // Submit creator's tx
             const creatorUser = db.getUser(match.creator_id);
             const creatorTx = Transaction.from(Buffer.from(pending.creator.transaction, 'base64'));
             creatorTx.addSignature(new PublicKey(creatorUser.privy_wallet), Buffer.from(pending.creator.signature, 'base64'));
             const creatorSig = await conn.sendRawTransaction(creatorTx.serialize(), { skipPreflight: false });
             console.log('[LOCK-IN] Creator tx submitted:', creatorSig);
-
-            // Submit joiner's tx
             const joinerUser = db.getUser(match.joiner_id);
             const joinerTx = Transaction.from(Buffer.from(pending.joiner.transaction, 'base64'));
             joinerTx.addSignature(new PublicKey(joinerUser.privy_wallet), Buffer.from(pending.joiner.signature, 'base64'));
             const joinerSig = await conn.sendRawTransaction(joinerTx.serialize(), { skipPreflight: false });
             console.log('[LOCK-IN] Joiner tx submitted:', joinerSig);
-
-            // Wait for both confirmations
             await Promise.all([
                 conn.confirmTransaction(creatorSig, 'confirmed'),
                 conn.confirmTransaction(joinerSig, 'confirmed'),
             ]);
             console.log('[LOCK-IN] Both confirmed on-chain');
 
-            // Log transactions
-            const { v4: uuidv4 } = require('uuid');
+    s
+    
             db.createTransaction({ id: uuidv4(), match_id: match.id, user_id: match.creator_id, tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token, tx_signature: creatorSig, from_wallet: creatorUser.privy_wallet, to_wallet: 'escrow' });
             db.createTransaction({ id: uuidv4(), match_id: match.id, user_id: match.joiner_id, tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token, tx_signature: joinerSig, from_wallet: joinerUser.privy_wallet, to_wallet: 'escrow' });
         }
-
-        // Both funded
         db.updateMatch(match.id, { status: 'funded_both', funded_at: Date.now() });
         _pendingLockIns.delete(match.id);
         console.log('[LOCK-IN] Match', match.id, 'fully funded');
@@ -697,14 +649,9 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
         return res.status(500).json(fail('Lock-in failed: ' + e.message));
     }
 });
-
-// Clean up pending lock-ins when matches are cancelled
 function cleanupPendingLockIn(matchId) {
     _pendingLockIns.delete(matchId);
 }
-
-// POST /matches/:id/submit-signed-tx — LEGACY, kept for compatibility
-// ---------------------------------------------------------------------------
 router.post('/matches/:id/submit-signed-tx', authMiddleware, async (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
@@ -722,8 +669,6 @@ router.post('/matches/:id/submit-signed-tx', authMiddleware, async (req, res) =>
 
         const { Connection, Transaction, PublicKey } = require('@solana/web3.js');
         const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
-
-        // Reconstruct the transaction and add the user's signature
         const txBytes = Buffer.from(txBase64, 'base64');
         const transaction = Transaction.from(txBytes);
 
@@ -733,19 +678,13 @@ router.post('/matches/:id/submit-signed-tx', authMiddleware, async (req, res) =>
         const userPubkey = new PublicKey(user.privy_wallet);
         const sigBuffer = Buffer.from(sigBase64, 'base64');
         transaction.addSignature(userPubkey, sigBuffer);
-
-        // Submit to Solana
         const rawTx = transaction.serialize();
         const txSignature = await conn.sendRawTransaction(rawTx, { skipPreflight: false });
         console.log('[DEPOSIT] Submitted tx:', txSignature);
-
-        // Wait for confirmation
         await conn.confirmTransaction(txSignature, 'confirmed');
         console.log('[DEPOSIT] Confirmed tx:', txSignature);
-
-        // Now do the confirm-deposit logic
         const isCreator = userId === match.creator_id;
-        const { v4: uuidv4 } = require('uuid');
+
         db.createTransaction({
             id: uuidv4(), match_id: match.id, user_id: userId,
             tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token,
@@ -753,21 +692,7 @@ router.post('/matches/:id/submit-signed-tx', authMiddleware, async (req, res) =>
         });
         db.confirmTransaction(txSignature, Date.now());
 
-        // Update match status
-        const currentStatus = db.getMatch(match.id).status;
-        if (isCreator) {
-            if (currentStatus === 'funded_joiner') {
-                db.updateMatch(match.id, { status: 'funded_both', funded_at: Date.now() });
-            } else if (['open', 'matched'].includes(currentStatus)) {
-                db.updateMatch(match.id, { status: 'funded_creator', funded_at: Date.now() });
-            }
-        } else {
-            if (currentStatus === 'funded_creator') {
-                db.updateMatch(match.id, { status: 'funded_both', funded_at: Date.now() });
-            } else if (['open', 'matched'].includes(currentStatus)) {
-                db.updateMatch(match.id, { status: 'funded_joiner', funded_at: Date.now() });
-            }
-        }
+        updateFundingStatus(match.id, isCreator);
 
         return res.json(success({ txSignature, status: db.getMatch(match.id).status }));
     } catch (e) {
@@ -776,9 +701,7 @@ router.post('/matches/:id/submit-signed-tx', authMiddleware, async (req, res) =>
     }
 });
 
-// ---------------------------------------------------------------------------
 // POST /matches/:id/confirm-deposit — confirm deposit tx signature
-// ---------------------------------------------------------------------------
 router.post('/matches/:id/confirm-deposit', authMiddleware, async (req, res) => {
     try {
         const match = db.getMatch(req.params.id);
@@ -800,20 +723,18 @@ router.post('/matches/:id/confirm-deposit', authMiddleware, async (req, res) => 
         if (!skipVerification) {
             if (!user || !user.privy_wallet) return res.status(400).json(fail('No wallet'));
 
-            // Verify on-chain
+    
             const result = await escrow.confirmDeposit(txSignature, match.stake_amount, match.stake_token, user.privy_wallet);
             if (!result || !result.confirmed) {
                 return res.status(400).json(fail('Deposit not confirmed: ' + (result?.error || 'unknown')));
             }
 
-            // Record funding wallet if first deposit
+    
             if (result.fromWallet && !user.funding_wallet) {
                 db.upsertUser({ id: userId, twitter_handle: user.twitter_handle, funding_wallet: result.fromWallet });
             }
         }
 
-        // Log transaction
-        const { v4: uuidv4 } = require('uuid');
         db.createTransaction({
             id: uuidv4(), match_id: match.id, user_id: userId,
             tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token,
@@ -821,24 +742,7 @@ router.post('/matches/:id/confirm-deposit', authMiddleware, async (req, res) => 
         });
         db.confirmTransaction(txSignature, Date.now());
 
-        // Update match status — track who has deposited
-        // States: open/matched → funded_creator (creator deposited) or funded_joiner (joiner deposited first)
-        //         funded_creator + joiner deposits → funded_both
-        //         funded_joiner + creator deposits → funded_both
-        const currentStatus = db.getMatch(match.id).status; // Re-read in case of race
-        if (isCreator) {
-            if (currentStatus === 'funded_joiner') {
-                db.updateMatch(match.id, { status: 'funded_both', funded_at: Date.now() });
-            } else if (['open', 'matched'].includes(currentStatus)) {
-                db.updateMatch(match.id, { status: 'funded_creator', funded_at: Date.now() });
-            }
-        } else if (isJoiner) {
-            if (currentStatus === 'funded_creator') {
-                db.updateMatch(match.id, { status: 'funded_both', funded_at: Date.now() });
-            } else if (['open', 'matched'].includes(currentStatus)) {
-                db.updateMatch(match.id, { status: 'funded_joiner', funded_at: Date.now() });
-            }
-        }
+        updateFundingStatus(match.id, isCreator);
 
         return res.json(success({ confirmed: true, status: db.getMatch(match.id).status }));
     } catch (e) {
@@ -847,9 +751,7 @@ router.post('/matches/:id/confirm-deposit', authMiddleware, async (req, res) => 
     }
 });
 
-// ---------------------------------------------------------------------------
 // GET /wallet/balance — user's Privy wallet balance
-// ---------------------------------------------------------------------------
 router.get('/wallet/balance', authMiddleware, async (req, res) => {
     try {
         const user = db.getUser(req.privyUserId);
@@ -866,9 +768,7 @@ router.get('/wallet/balance', authMiddleware, async (req, res) => {
     }
 });
 
-// ---------------------------------------------------------------------------
 // POST /wallet/withdraw-tx — create unsigned withdrawal transaction
-// ---------------------------------------------------------------------------
 router.post('/wallet/withdraw-tx', authMiddleware, async (req, res) => {
     try {
         const { destination, amount, token } = req.body;
@@ -901,7 +801,7 @@ router.post('/wallet/withdraw-tx', authMiddleware, async (req, res) => {
             const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = require('@solana/spl-token');
             const fromAta = await getAssociatedTokenAddress(escrow.USDC_MINT, fromPubkey);
             const toAta = await getAssociatedTokenAddress(escrow.USDC_MINT, toPubkey);
-            // Check if destination ATA exists
+
             try { await require('@solana/spl-token').getAccount(conn, toAta); } catch(e) {
                 tx.add(createAssociatedTokenAccountInstruction(fromPubkey, toAta, toPubkey, escrow.USDC_MINT));
             }
@@ -922,9 +822,7 @@ router.post('/wallet/withdraw-tx', authMiddleware, async (req, res) => {
     }
 });
 
-// ---------------------------------------------------------------------------
 // POST /wallet/submit-withdraw — submit signed withdrawal transaction
-// ---------------------------------------------------------------------------
 router.post('/wallet/submit-withdraw', authMiddleware, async (req, res) => {
     try {
         const { transaction: txBase64, signature: sigBase64 } = req.body;
@@ -952,8 +850,6 @@ router.post('/wallet/submit-withdraw', authMiddleware, async (req, res) => {
         return res.status(500).json(fail('Withdrawal failed: ' + e.message));
     }
 });
-
-// === LOCK-IN EXPIRY — every 60 seconds ===
 setInterval(() => {
     try {
         const stale = db.getStaleFundedMatches(Date.now() - 10 * 60 * 1000);

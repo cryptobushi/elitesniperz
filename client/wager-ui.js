@@ -1,14 +1,10 @@
-// wager-ui.js — Wager lobby, create match, waiting room, and in-game HUD
+
 import { isAuthenticated, getUser, getToken, getWalletAddress, login, logout } from '../dist/privy-bundle.js';
 import { requestDeposit, checkBalance } from './deposit-flow.js';
-
-// ── API helper ──────────────────────────────────────────────────────────────
 async function api(path, options = {}) {
     let token = getToken();
     const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) };
     let res = await fetch('/api' + path, { ...options, headers });
-
-    // If token expired, refresh from Privy and retry once
     if (res.status === 401 && token) {
         try {
             const { refreshToken } = await import('../dist/privy-bundle.js');
@@ -21,8 +17,6 @@ async function api(path, options = {}) {
     }
     return res.json();
 }
-
-// ── State ───────────────────────────────────────────────────────────────────
 let lobbyInterval = null;
 let waitingInterval = null;
 let wagerWs = null;
@@ -31,8 +25,6 @@ let currentMatchInfo = null; // { stakeAmount, stakeToken, killTarget, creatorTw
 let wagerReconnectAttempts = 0;
 const WAGER_MAX_RECONNECTS = 5;
 const WAGER_RECONNECT_DELAY = 2000;
-
-// ── Styles ──────────────────────────────────────────────────────────────────
 const STYLES = `
 /* === WAGER LOBBY === */
 #wagerLobby {
@@ -1114,8 +1106,6 @@ const STYLES = `
     margin-bottom: 0.5rem;
 }
 `;
-
-// ── Inject styles ───────────────────────────────────────────────────────────
 function injectStyles() {
     if (document.getElementById('wager-ui-styles')) return;
     const style = document.createElement('style');
@@ -1123,13 +1113,9 @@ function injectStyles() {
     style.textContent = STYLES;
     document.head.appendChild(style);
 }
-
-// ── DOM refs (created in init) ──────────────────────────────────────────────
 let els = {};
-
-// ── Build all DOM ───────────────────────────────────────────────────────────
 function buildDOM() {
-    // 1. Wager button on start screen
+
     const startBtn = document.getElementById('startBtn');
     if (startBtn && !document.getElementById('wagerBtn')) {
         const btn = document.createElement('button');
@@ -1137,8 +1123,6 @@ function buildDOM() {
         btn.textContent = 'WAGER 1v1';
         startBtn.parentNode.insertBefore(btn, startBtn.nextSibling);
     }
-
-    // 2. Wager lobby overlay
     const lobby = document.createElement('div');
     lobby.id = 'wagerLobby';
     lobby.className = 'hidden';
@@ -1211,8 +1195,6 @@ function buildDOM() {
         </div>
     `;
     document.body.appendChild(lobby);
-
-    // 3. Create match modal
     const createModal = document.createElement('div');
     createModal.id = 'createMatchModal';
     createModal.className = 'hidden';
@@ -1246,8 +1228,6 @@ function buildDOM() {
         </div>
     `;
     document.body.appendChild(createModal);
-
-    // 4. Waiting room
     const waiting = document.createElement('div');
     waiting.id = 'waitingRoom';
     waiting.className = 'hidden';
@@ -1285,8 +1265,6 @@ function buildDOM() {
         <button class="wr-cancel" id="wrCancel">Cancel Match</button>
     `;
     document.body.appendChild(waiting);
-
-    // 5. Wager HUD (in-game)
     const hud = document.createElement('div');
     hud.id = 'wagerHUD';
     hud.className = 'hidden';
@@ -1302,8 +1280,6 @@ function buildDOM() {
         </div>
     `;
     document.body.appendChild(hud);
-
-    // 6. Wager result
     const result = document.createElement('div');
     result.id = 'wagerResult';
     result.className = 'hidden';
@@ -1319,8 +1295,6 @@ function buildDOM() {
         </div>
     `;
     document.body.appendChild(result);
-
-    // Cache refs
     els = {
         lobby, createModal, waiting, hud, result,
         wlUser: document.getElementById('wlUser'),
@@ -1338,15 +1312,11 @@ function buildDOM() {
         wrCreatorStatus: document.getElementById('wrCreatorStatus'),
     };
 }
-
-// ── Event listeners ─────────────────────────────────────────────────────────
 function bindEvents() {
-    // Wager button on start screen
+
     document.getElementById('wagerBtn')?.addEventListener('click', () => {
         showLobby();
     });
-
-    // Lobby buttons
     document.getElementById('wlBack')?.addEventListener('click', () => {
         hideLobby();
     });
@@ -1357,11 +1327,7 @@ function bindEvents() {
     document.getElementById('wlCreateBtn')?.addEventListener('click', () => {
         showCreateMatch();
     });
-
-    // Create match modal
     setupCreateMatchEvents();
-
-    // Waiting room cancel
     document.getElementById('wrCancel')?.addEventListener('click', async () => {
         if (currentMatchId && _waitingRoomRole !== 'challenger') {
             // Creator or joiner cancels the match
@@ -1371,8 +1337,6 @@ function bindEvents() {
         hideWaitingRoom();
         showLobby();
     });
-
-    // Waiting room deposit
     document.getElementById('wrDepositBtn')?.addEventListener('click', async () => {
         const btn = document.getElementById('wrDepositBtn');
         if (!currentMatchId || btn.disabled) return;
@@ -1397,8 +1361,6 @@ function bindEvents() {
             btn.disabled = false;
         }
     });
-
-    // Waiting room share on X
     document.getElementById('wrShareBtn')?.addEventListener('click', () => {
         const info = currentMatchInfo || {};
         const user = getUser();
@@ -1411,14 +1373,10 @@ function bindEvents() {
         );
         window.open('https://twitter.com/intent/tweet?text=' + text, '_blank');
     });
-
-    // Result back button
     document.getElementById('wrResultBack')?.addEventListener('click', () => {
         els.result.classList.add('hidden');
         showLobby();
     });
-
-    // Withdraw modal
     document.getElementById('wlWithdrawBtn')?.addEventListener('click', () => {
         document.getElementById('wlWithdrawModal')?.classList.remove('hidden');
         document.getElementById('wdStatus').textContent = '';
@@ -1488,7 +1446,7 @@ function bindEvents() {
 }
 
 function setupCreateMatchEvents() {
-    // Token toggle
+
     document.querySelectorAll('#cmTokenGroup .cm-toggle').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('#cmTokenGroup .cm-toggle').forEach(b => b.classList.remove('selected'));
@@ -1496,8 +1454,6 @@ function setupCreateMatchEvents() {
             _updateCreateModalBalance();
         });
     });
-
-    // Click available balance to fill max
     document.getElementById('cmAvailBal')?.addEventListener('click', () => {
         const token = document.querySelector('#cmTokenGroup .cm-toggle.selected')?.dataset.token || 'SOL';
         const avail = token === 'SOL' ? _cachedBalance.sol : _cachedBalance.usdc;
@@ -1506,16 +1462,12 @@ function setupCreateMatchEvents() {
             if (input) input.value = avail >= 1 ? avail.toFixed(2) : avail.toFixed(4);
         }
     });
-
-    // Kill target toggle
     document.querySelectorAll('#cmTargetGroup .cm-toggle').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('#cmTargetGroup .cm-toggle').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
         });
     });
-
-    // Match mode toggle
     document.querySelectorAll('#cmModeGroup .cm-toggle').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('#cmModeGroup .cm-toggle').forEach(b => b.classList.remove('selected'));
@@ -1528,17 +1480,11 @@ function setupCreateMatchEvents() {
             }
         });
     });
-
-    // Cancel
     document.getElementById('cmCancel')?.addEventListener('click', () => {
         els.createModal.classList.add('hidden');
     });
-
-    // Submit
     document.getElementById('cmSubmit')?.addEventListener('click', handleCreateMatch);
 }
-
-// ── Create match handler ────────────────────────────────────────────────────
 async function handleCreateMatch() {
     const submitBtn = document.getElementById('cmSubmit');
     const stakeVal = parseFloat(document.getElementById('cmStake')?.value);
@@ -1579,8 +1525,6 @@ async function handleCreateMatch() {
         submitBtn.textContent = 'POST DUEL';
     }
 }
-
-// ── Show / Hide lobby ───────────────────────────────────────────────────────
 function _returnToLandingPage() {
     const landing = document.getElementById('landingPage');
     const canvas = document.getElementById('gameCanvas');
@@ -1606,13 +1550,11 @@ export async function showLobby() {
             return;
         }
     }
-
-    // Populate user info
     const user = getUser();
     if (user) {
         els.wlUser.textContent = '@' + (user.twitter_handle || user.display_name || 'unknown');
 
-        // Show wallet address
+    
         const walletBox = document.getElementById('wlWalletBox');
         const walletAddr = document.getElementById('wlWalletAddr');
         const walletCopied = document.getElementById('wlWalletCopied');
@@ -1634,16 +1576,12 @@ export async function showLobby() {
             };
         }
     }
-
-    // Fetch balance
     refreshBalance();
 
     els.lobby.classList.remove('hidden');
     // Hide start screen
     const startModal = document.getElementById('usernameModal');
     if (startModal) startModal.style.display = 'none';
-
-    // Start polling matches
     fetchMatches();
     lobbyInterval = setInterval(fetchMatches, 5000);
 }
@@ -1651,7 +1589,7 @@ export async function showLobby() {
 function hideLobby() {
     els.lobby.classList.add('hidden');
     if (lobbyInterval) { clearInterval(lobbyInterval); lobbyInterval = null; }
-    // Show start screen again
+
     const startModal = document.getElementById('usernameModal');
     if (startModal) startModal.style.display = '';
 }
@@ -1666,8 +1604,6 @@ async function refreshBalance() {
         }
     } catch (_) {}
 }
-
-// ── Fetch & render match list ───────────────────────────────────────────────
 async function fetchMatches() {
     try {
         const data = await api('/matches');
@@ -1681,8 +1617,6 @@ async function fetchMatches() {
 async function renderMatches(matches) {
     const tbody = els.wlMatches;
     const empty = els.wlEmpty;
-
-    // Render "My Duels" management section
     const me = getUser();
     const myId = me?.id;
     const myDuels = myId ? matches.filter(m =>
@@ -1704,7 +1638,7 @@ async function renderMatches(matches) {
 
             myDuelsListEl.innerHTML = myDuels.map(m => {
                 const token = m.stake_token || 'SOL';
-                const amt = token === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
+                const amt = stakeToHuman(m.stake_amount, token);
                 const target = m.kill_target || 7;
                 const hasJoiner = !!m.joiner_id;
                 const isSelective = m.match_mode === 'selective';
@@ -1735,7 +1669,7 @@ async function renderMatches(matches) {
                     </div>
                 </div>`;
             }).join('');
-            // Bind cancel buttons
+
             myDuelsListEl.querySelectorAll('.wl-my-duel-cancel').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const matchId = btn.dataset.matchId;
@@ -1747,7 +1681,7 @@ async function renderMatches(matches) {
                     fetchMatches();
                 });
             });
-            // Bind resume buttons
+
             myDuelsListEl.querySelectorAll('.wl-my-duel-resume').forEach(btn => {
                 btn.addEventListener('click', () => {
                     showWaitingRoom(btn.dataset.matchId);
@@ -1772,7 +1706,7 @@ async function renderMatches(matches) {
         const handle = m.creator_twitter || 'Anon';
         const record = `${m.creator_wins || 0}W-${m.creator_losses || 0}L`;
         const token = m.stake_token || 'USDC';
-        const amt = token === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
+        const amt = stakeToHuman(m.stake_amount, token);
         const stake = `${amt} ${token}`;
         const lock = m.passwordProtected ? ' <span class="wl-lock">&#x1f512;</span>' : '';
         const selectiveBadge = m.match_mode === 'selective' ? '<span class="wl-selective-badge">SELECTIVE</span>' : '';
@@ -1802,12 +1736,10 @@ async function renderMatches(matches) {
             <td>${actionBtn}</td>
         </tr>`;
     }).join('');
-
-    // Bind join buttons
     tbody.querySelectorAll('.wl-join-btn').forEach(btn => {
         btn.addEventListener('click', () => handleJoin(btn.dataset.matchId));
     });
-    // Bind challenge buttons (selective matches)
+
     tbody.querySelectorAll('.wl-challenge-btn').forEach(btn => {
         btn.addEventListener('click', () => handleChallenge(btn.dataset.matchId));
     });
@@ -1933,8 +1865,6 @@ async function handleJoin(matchId) {
         showErrorModal(err.message);
     }
 }
-
-// ── Challenge handler (selective matches) ──────────────────────────────────
 async function handleChallenge(matchId) {
     if (!matchId) return;
 
@@ -1961,16 +1891,12 @@ function showToast(message) {
     document.body.appendChild(toast);
     setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 4000);
 }
-
-// ── Create match modal ──────────────────────────────────────────────────────
 export function showCreateMatch() {
-    // Reset fields
+
     const stakeInput = document.getElementById('cmStake');
     if (stakeInput) stakeInput.value = '';
     const pwInput = document.getElementById('cmPassword');
     if (pwInput) pwInput.value = '';
-
-    // Reset mode toggle to OPEN
     document.querySelectorAll('#cmModeGroup .cm-toggle').forEach(b => {
         b.classList.toggle('selected', b.dataset.mode === 'open');
     });
@@ -1978,8 +1904,6 @@ export function showCreateMatch() {
     if (hint) hint.textContent = 'First come, first served';
 
     els.createModal.classList.remove('hidden');
-
-    // Show available balance
     _updateCreateModalBalance();
 }
 
@@ -1996,26 +1920,20 @@ async function _updateCreateModalBalance() {
     const formatted = typeof avail === 'number' ? (avail >= 1 ? avail.toFixed(2) : avail.toFixed(4)) : '--';
     balEl.textContent = `${formatted} ${token} available`;
 }
-
-// ── Waiting room ────────────────────────────────────────────────────────────
 let _waitingRoomRole = null; // 'creator', 'challenger', or null (joiner in open mode)
 let challengePollingInterval = null;
 
 export function showWaitingRoom(matchId, role) {
     currentMatchId = matchId;
     _waitingRoomRole = role || null;
-    // Hide lobby but don't restore start screen
+
     els.lobby.classList.add('hidden');
     if (lobbyInterval) { clearInterval(lobbyInterval); lobbyInterval = null; }
     els.waiting.classList.remove('hidden');
-
-    // Reset challenge UI
     const challengersEl = document.getElementById('wrChallengers');
     const challengeSubmittedEl = document.getElementById('wrChallengeSubmitted');
     if (challengersEl) challengersEl.classList.add('hidden');
     if (challengeSubmittedEl) challengeSubmittedEl.classList.add('hidden');
-
-    // Populate with current info from create form (best effort)
     pollWaitingRoom(matchId);
     waitingInterval = setInterval(() => pollWaitingRoom(matchId), 3000);
 }
@@ -2036,10 +1954,8 @@ async function pollWaitingRoom(matchId) {
         const m = data.data || data;
         const me = getUser();
         const amCreator = me && m.creator_id === me.id;
-
-        // Store match info for HUD and result screen
         const wrToken = m.stake_token || 'USDC';
-        const wrAmt = wrToken === 'SOL' ? (m.stake_amount / 1e9) : (m.stake_amount / 1e6);
+        const wrAmt = stakeToHuman(m.stake_amount, wrToken);
         currentMatchInfo = {
             stakeAmount: wrAmt,
             stakeToken: wrToken,
@@ -2052,13 +1968,9 @@ async function pollWaitingRoom(matchId) {
             opponentTwitter: amCreator ? m.joiner_twitter : m.creator_twitter,
         };
         els.wrInfo.innerHTML = `${wrAmt} ${wrToken} &bull; FIRST TO ${m.kill_target || 7}`;
-
-        // Determine who has deposited
         const creatorFunded = ['funded_creator', 'funded_both'].includes(m.status);
         const joinerFunded = ['funded_joiner', 'funded_both'].includes(m.status);
         const myDeposited = amCreator ? creatorFunded : joinerFunded;
-
-        // Status message
         let statusMsg = m.status;
         if (m.status === 'open' && m.match_mode === 'selective' && amCreator) statusMsg = 'SELECTIVE DUEL \u2014 REVIEWING CHALLENGERS';
         else if (m.status === 'open') statusMsg = 'OPEN CHALLENGE \u2014 WAITING FOR OPPONENT';
@@ -2070,16 +1982,7 @@ async function pollWaitingRoom(matchId) {
         const statusEl = document.getElementById('wrStatus');
         if (statusEl) statusEl.textContent = statusMsg;
 
-        // Helper: generate avatar initial + color
-        const avatarColor = (name) => {
-            const colors = ['#00ff66','#ff8800','#00bbff','#ff3366','#aa66ff','#ffcc00','#00ffcc'];
-            let hash = 0;
-            for (let i = 0; i < (name||'').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-            return colors[Math.abs(hash) % colors.length];
-        };
         const avatarInitial = (name) => (name || '?')[0].toUpperCase();
-
-        // Creator card
         const creatorHandle = m.creator_twitter || 'unknown';
         els.wrCreatorName.textContent = '@' + creatorHandle;
         els.wrCreatorRecord.textContent = `${m.creator_wins || 0}W - ${m.creator_losses || 0}L \u2022 ELO ${m.creator_elo || 1000}`;
@@ -2105,8 +2008,6 @@ async function pollWaitingRoom(matchId) {
             els.wrCreatorStatus.textContent = creatorFunded ? 'LOCKED IN \u2713' : (m.joiner_id ? 'AWAITING LOCK-IN' : 'STAKE NOT LOCKED');
             els.wrCreatorStatus.className = 'wr-status ' + (creatorFunded ? 'locked' : (m.joiner_id ? 'waiting' : 'not-locked'));
         }
-
-        // Joiner card
         const joinerAvatarEl = document.getElementById('wrJoinerAvatar');
         if (m.joiner_id) {
             const joinerHandle = m.joiner_twitter || 'unknown';
@@ -2148,8 +2049,6 @@ async function pollWaitingRoom(matchId) {
                 els.wrJoinerStatus.className = 'wr-status';
             }
         }
-
-        // Show/hide deposit button
         const depositBtn = document.getElementById('wrDepositBtn');
         if (depositBtn) {
             const hasOpponent = !!m.joiner_id;
@@ -2159,8 +2058,6 @@ async function pollWaitingRoom(matchId) {
             depositBtn.disabled = false;
             depositBtn.style.background = '#ffcc00';
         }
-
-        // === Selective mode UI ===
         const challengersEl = document.getElementById('wrChallengers');
         const challengeSubmittedEl = document.getElementById('wrChallengeSubmitted');
         const isSelective = m.match_mode === 'selective';
@@ -2218,8 +2115,6 @@ async function pollWaitingRoom(matchId) {
             if (challengeSubmittedEl) challengeSubmittedEl.classList.add('hidden');
             _waitingRoomRole = null; // Now we're a normal joiner
         }
-
-        // Both funded — start the match
         if (m.status === 'funded_both') {
             hideWaitingRoom();
             connectWagerMatch(matchId);
@@ -2234,8 +2129,6 @@ async function pollWaitingRoom(matchId) {
         console.warn('Waiting room poll error:', err);
     }
 }
-
-// ── Challenge list polling (for selective match creators) ───────────────────
 async function pollChallengersList(matchId) {
     try {
         const data = await api(`/matches/${matchId}/challenges`);
@@ -2277,8 +2170,6 @@ async function pollChallengersList(matchId) {
                 </div>
             </div>`;
         }).join('');
-
-        // Bind accept/decline buttons
         listEl.querySelectorAll('.wr-challenger-accept').forEach(btn => {
             btn.addEventListener('click', async () => {
                 btn.textContent = '...';
@@ -2314,8 +2205,6 @@ async function pollChallengersList(matchId) {
         console.warn('Failed to poll challengers:', err);
     }
 }
-
-// ── Wager HUD ───────────────────────────────────────────────────────────────
 export function showWagerHUD(matchData) {
     const whTarget = document.getElementById('whTarget');
     const whStake = document.getElementById('whStake');
@@ -2339,8 +2228,6 @@ window._updateWagerScoreFromKill = updateWagerScore;
 function hideWagerHUD() {
     els.hud.classList.add('hidden');
 }
-
-// ── Wager result ────────────────────────────────────────────────────────────
 export function showWagerResult(data) {
     hideWagerHUD();
 
@@ -2356,17 +2243,11 @@ export function showWagerResult(data) {
 
     titleEl.textContent = isDraw ? 'DRAW' : (won ? 'VICTORY' : 'DEFEAT');
     titleEl.className = 'wr-result-title ' + (isDraw ? 'draw' : (won ? 'victory' : 'defeat'));
-
-    // Background glow matches result
     const bgEl = document.getElementById('wrResultBg');
     if (bgEl) bgEl.className = 'wr-result-bg ' + (isDraw ? 'draw-bg' : (won ? 'victory-bg' : 'defeat-bg'));
-
-    // Score from wager HUD
     const myScore = document.getElementById('whYouScore')?.textContent || '0';
     const oppScore = document.getElementById('whOppScore')?.textContent || '0';
     scoreEl.textContent = `${myScore} - ${oppScore}`;
-
-    // Opponent info
     const oppEl = document.getElementById('wrResultOpponent');
     if (oppEl) oppEl.textContent = info.opponentTwitter ? 'vs @' + info.opponentTwitter : '';
 
@@ -2374,7 +2255,7 @@ export function showWagerResult(data) {
     const stakeTok = info.stakeToken || 'USDC';
     const potTotal = (parseFloat(stakeAmt) || 0) * 2;
     const payoutRaw = potTotal * 0.95;
-    // Smart formatting: show enough decimals to be meaningful
+
     const formatAmt = (v) => {
         if (v === 0) return '0';
         if (v >= 1) return v.toFixed(2);
@@ -2401,8 +2282,6 @@ export function showWagerResult(data) {
 
     els.result.classList.remove('hidden');
 }
-
-// ── WebSocket connection ────────────────────────────────────────────────────
 export function connectWagerMatch(matchId) {
     if (wagerWs) {
         try { wagerWs.close(); } catch (_) {}
@@ -2533,6 +2412,21 @@ function esc(str) {
     const d = document.createElement('div');
     d.textContent = String(str);
     return d.innerHTML;
+}
+
+const _avatarColors = ['#00ff66','#ff8800','#00bbff','#ff3366','#aa66ff','#ffcc00','#00ffcc'];
+function avatarColor(name) {
+    let hash = 0;
+    for (let i = 0; i < (name||'').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return _avatarColors[Math.abs(hash) % _avatarColors.length];
+}
+function avatarInitial(name) { return (name || '?')[0].toUpperCase(); }
+
+/**
+ * Convert base-unit stake amount to human-readable.
+ */
+function stakeToHuman(amount, token) {
+    return token === 'SOL' ? amount / 1e9 : amount / 1e6;
 }
 
 // ── Public init ─────────────────────────────────────────────────────────────

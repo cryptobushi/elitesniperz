@@ -1,4 +1,4 @@
-// server/escrow.js — Solana escrow for wager system (CommonJS)
+
 const {
     Connection, Keypair, PublicKey, SystemProgram,
     Transaction, LAMPORTS_PER_SOL, sendAndConfirmTransaction

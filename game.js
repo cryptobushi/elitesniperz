@@ -32,7 +32,7 @@ const gameState = {
     keys: {},
     attackWalk: false,
     targetLock: null,
-    // Camera controls
+
     cameraTarget: new THREE.Vector3(0, 0, 0),
     cameraOffset: new THREE.Vector3(0, 14, 14), // Zoomed in closer
     isDraggingCamera: false,
@@ -52,8 +52,6 @@ const gameState = {
         showFPS: true,
     }
 };
-
-// === SHOP ITEM DEFINITIONS ===
 const SHOP_ITEMS = {
     boots1:    { name: 'Swift Boots',      cost: 100, icon: '🥾', desc: '+20% speed',        stat: 'speed',     mult: 1.2, tier: 1, group: 'boots' },
     boots2:    { name: 'Windrider Boots',  cost: 300, icon: '💨', desc: '+50% speed',        stat: 'speed',     mult: 1.5, tier: 2, group: 'boots', requires: 'boots1' },
@@ -66,8 +64,6 @@ const SHOP_ITEMS = {
     rapidfire: { name: 'Hair Trigger',     cost: 250, icon: '⚡', desc: '-30% shot cooldown', stat: 'firerate',  mult: 0.7, tier: 1, group: 'firerate' },
     bounty:    { name: 'Bounty Hunter',    cost: 200, icon: '💰', desc: '+50% gold per kill', stat: 'goldMult',  mult: 1.5, tier: 1, group: 'bounty' },
 };
-
-// === AUDIO SYSTEM — Web Audio API for zero-skip playback ===
 class AudioManager {
     constructor() {
         this.ctx = null;
@@ -129,10 +125,6 @@ class AudioManager {
 
 const audioManager = new AudioManager();
 
-// === RUNESCAPE-STYLE PROCEDURAL SOUNDTRACK ===
-// Soundtrack removed
-
-// Three.js Setup
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1a0a2e);
 scene.fog = new THREE.Fog(0x1a1030, 120, 350);
@@ -150,8 +142,6 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 function updateCRT() {}
-
-// Lighting - Much brighter!
 const ambientLight = new THREE.AmbientLight(0x8888cc, 1.8); // Bright cool ambient
 scene.add(ambientLight);
 
@@ -165,17 +155,11 @@ dirLight.shadow.camera.bottom = -150;
 dirLight.shadow.mapSize.width = 2048;
 dirLight.shadow.mapSize.height = 2048;
 scene.add(dirLight);
-
-// Add a hemisphere light for better overall illumination
 const hemiLight = new THREE.HemisphereLight(0x88bbff, 0x44aa44, 1.0);
 scene.add(hemiLight);
-
-// Player vision light — follows player, illuminates revealed area
 const visionLight = new THREE.PointLight(0xfff8ee, 5.0, 120, 1.0);
 visionLight.position.set(0, 12, 0);
 scene.add(visionLight);
-
-// Add initial preview scene
 const previewGeometry = new THREE.PlaneGeometry(80, 80);
 const previewMaterial = new THREE.MeshStandardMaterial({
     color: 0x2a3a2a,
@@ -185,17 +169,13 @@ const previewGround = new THREE.Mesh(previewGeometry, previewMaterial);
 previewGround.rotation.x = -Math.PI / 2;
 previewGround.receiveShadow = true;
 scene.add(previewGround);
+const MAP_SIZE = 200;
 
-// Map Creation (inspired by StarCraft Snipers middle section)
-const MAP_SIZE = 200; // Much larger map!
-// Wind-animated foliage materials (updated in animate loop)
 const _windMaterials = [];
 
 const createMap = () => {
-    // ── GROUND with procedural shader ──────────────────────────────────
-    const groundGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE, 50, 50);
 
-    // Add height variation to ground (same formula for collision match)
+    const groundGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE, 50, 50);
     const vertices = groundGeometry.attributes.position.array;
     for (let i = 0; i < vertices.length; i += 3) {
         const x = vertices[i];
@@ -230,12 +210,8 @@ const createMap = () => {
             varying vec3 vWorldPos;
             varying vec3 vNormal;
             varying vec2 vUv;
-
-            // --- Three.js lighting uniforms ---
             #include <common>
             #include <lights_pars_begin>
-
-            // Simple hash-based noise
             float hash(vec2 p) {
                 return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
             }
@@ -261,32 +237,20 @@ const createMap = () => {
             }
 
             void main() {
-                // Height and slope
+
                 float height = vWorldPos.y;
                 float slope = 1.0 - dot(vNormal, vec3(0.0, 1.0, 0.0));
-
-                // Base colors
                 vec3 grassDark = vec3(0.18, 0.48, 0.12);
                 vec3 grassMid = vec3(0.25, 0.55, 0.14);
                 vec3 grassLight = vec3(0.32, 0.62, 0.16);
-
-                // Smooth noise for gentle color variation
                 float n1 = fbm(vWorldPos.xz * 0.05);
                 float n3 = fbm(vWorldPos.xz * 0.3 + 100.0);
-
-                // Three-tone grass blend — smooth, no dirt patches
                 vec3 col = n1 < 0.4
                     ? mix(grassDark, grassMid, n1 / 0.4)
                     : mix(grassMid, grassLight, (n1 - 0.4) / 0.6);
-
-                // Very subtle height tint
                 float heightFactor = smoothstep(-2.0, 2.0, height);
                 col = mix(col * 0.92, col * 1.06, heightFactor);
-
-                // Fine grain detail — subtle
                 col *= 0.95 + 0.05 * n3;
-
-                // Simple directional light shading
                 vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3));
                 float diff = max(dot(vNormal, lightDir), 0.0);
                 vec3 ambient = vec3(0.25, 0.28, 0.22);
@@ -301,23 +265,15 @@ const createMap = () => {
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
-
-    // Terrain height helper
     const terrainY = (x, z) => Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2;
-
-    // ── TREES with layered foliage + wind sway ─────────────────────────
     const createTree = (x, z) => {
         const treeGroup = new THREE.Group();
-
-        // Deterministic random from position
         const seed = Math.abs(x * 137.3 + z * 259.7);
         const rng = (offset) => fract(Math.sin(seed + offset) * 43758.5453);
         function fract(v) { return v - Math.floor(v); }
 
         const scaleFactor = 0.85 + rng(0) * 0.3; // 0.85 - 1.15
         const rotY = rng(1) * Math.PI * 2;
-
-        // Trunk with bark variation shader
         const trunkGeometry = new THREE.CylinderGeometry(0.25 * scaleFactor, 0.4 * scaleFactor, 3.2 * scaleFactor, 8);
         const trunkMaterial = new THREE.ShaderMaterial({
             vertexShader: `
@@ -338,7 +294,7 @@ const createMap = () => {
                     vec3 lightBark = vec3(0.50, 0.32, 0.16);
                     float n = hash(vec2(vPos.y * 8.0, atan(vPos.x, vPos.z) * 3.0));
                     vec3 col = mix(darkBark, lightBark, n);
-                    // Simple lighting
+
                     float diff = max(dot(vNormal, normalize(vec3(0.5, 0.8, 0.3))), 0.0);
                     col *= 0.4 + diff * 0.6;
                     gl_FragColor = vec4(col, 1.0);
@@ -349,8 +305,6 @@ const createMap = () => {
         trunk.position.y = 1.6 * scaleFactor;
         trunk.castShadow = true;
         treeGroup.add(trunk);
-
-        // Multi-layer foliage with wind sway
         const foliageLayers = [
             { y: 3.2, radius: 1.8, height: 2.2, colorShift: 0.0 },
             { y: 4.6, radius: 1.4, height: 1.8, colorShift: 0.05 },
@@ -361,14 +315,12 @@ const createMap = () => {
             const r = layer.radius * scaleFactor * (0.9 + rng(li + 2) * 0.2);
             const h = layer.height * scaleFactor;
             const foliageGeometry = new THREE.ConeGeometry(r, h, 7);
-
-            // Per-vertex color variation
             const colors = new Float32Array(foliageGeometry.attributes.position.count * 3);
             const pos = foliageGeometry.attributes.position.array;
             for (let i = 0; i < colors.length; i += 3) {
                 const vy = pos[i + 1];
                 const t = rng(li + i * 0.01) * 0.15;
-                // Vibrant green with variation
+
                 colors[i] = 0.12 + layer.colorShift + t * 0.2;     // R
                 colors[i + 1] = 0.50 + layer.colorShift * 0.5 + t; // G — much greener
                 colors[i + 2] = 0.08 + t * 0.15;                   // B
@@ -396,7 +348,7 @@ const createMap = () => {
                         vNormal = normalize(normalMatrix * normal);
                         vHeight = position.y;
                         vec3 pos = position;
-                        // Wind sway — stronger at top
+
                         float heightFactor = max(0.0, position.y) / 2.0;
                         float phase = uTreePos.x * 0.1 + uTreePos.y * 0.13;
                         pos.x += sin(uTime * 1.5 + phase) * uWindStrength * heightFactor;
@@ -411,10 +363,10 @@ const createMap = () => {
                     void main() {
                         vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3));
                         float diff = max(dot(vNormal, lightDir), 0.0);
-                        // Subsurface-ish effect: lighten from below too
+
                         float wrap = max(dot(vNormal, vec3(0.0, -1.0, 0.0)) * 0.3, 0.0);
                         vec3 col = vColor * (0.35 + diff * 0.55 + wrap * 0.15);
-                        // Darken interior (lower parts)
+
                         col *= 0.85 + 0.15 * smoothstep(-0.5, 1.0, vHeight);
                         gl_FragColor = vec4(col, 1.0);
                     }
@@ -434,45 +386,31 @@ const createMap = () => {
         scene.add(treeGroup);
         return treeGroup;
     };
-
-    // Static trees from map-data.json (matches server collision)
     const _staticTrees = [[-30,20],[25,-15],[-45,-30],[50,25],[-20,45],[35,-40],[-55,5],[15,50],[-10,-35],[60,-10],[-35,60],[40,45],[-50,-45],[20,-60],[-15,-50],[55,-35],[-40,25],[30,15],[-25,-15],[45,-5],[-60,40],[10,35],[-5,-55],[50,55],[-30,-60],[65,30],[-45,50],[20,-30],[-55,-15],[35,65],[-20,30],[55,-50],[-65,15],[40,-15],[-10,60],[25,-45],[-35,-25],[60,50],[-50,35],[15,-55],[-25,-45],[45,20],[-40,-10],[30,55],[-15,15],[50,-25],[-55,-50],[20,40],[-30,50],[65,-20],[-45,-5],[35,-55],[-60,55],[10,-40],[-5,25],[55,10]];
     _staticTrees.forEach(([x,z]) => createTree(x, z));
-
-    // ── ROCKS with moss + vertex color variation ───────────────────────
     const createRock = (x, z, size) => {
-        // Higher subdivision for smoother rocks
-        const rockGeometry = new THREE.IcosahedronGeometry(size, 2);
 
-        // Displace vertices slightly for organic shape + add vertex colors
+        const rockGeometry = new THREE.IcosahedronGeometry(size, 2);
         const rpos = rockGeometry.attributes.position.array;
         const rnormals = rockGeometry.attributes.normal.array;
         const rcolors = new Float32Array(rpos.length);
         const seedR = Math.abs(x * 73.7 + z * 157.3 + size * 311.1);
         for (let i = 0; i < rpos.length; i += 3) {
-            // Organic displacement
+
             const nx = rpos[i], ny = rpos[i+1], nz = rpos[i+2];
             const disp = (Math.sin(nx * 5.0 + seedR) * Math.cos(ny * 7.0) * Math.sin(nz * 6.0 + seedR * 0.5)) * size * 0.12;
             rpos[i] += rnormals[i] * disp;
             rpos[i+1] += rnormals[i+1] * disp;
             rpos[i+2] += rnormals[i+2] * disp;
-
-            // Color: stone base with moss on upward-facing surfaces
             const worldNy = rnormals[i+1]; // approximate
             const mossAmount = Math.max(0, worldNy) * 0.6;
             const stoneVariation = Math.sin(nx * 8.0 + seedR) * 0.08;
-
-            // Bright stone base
             let r = 0.52 + stoneVariation;
             let g = 0.48 + stoneVariation;
             let b = 0.42 + stoneVariation * 0.5;
-
-            // Vibrant moss on top-facing
             r = r * (1.0 - mossAmount) + 0.20 * mossAmount;
             g = g * (1.0 - mossAmount) + 0.55 * mossAmount;
             b = b * (1.0 - mossAmount) + 0.12 * mossAmount;
-
-            // Slight warm/cool random tint per vertex
             const tint = (Math.sin(seedR + i * 0.37) * 0.5 + 0.5) * 0.06;
             r += tint;
             g += tint * 0.5;
@@ -502,7 +440,7 @@ const createMap = () => {
                 void main() {
                     vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3));
                     float diff = max(dot(vNormal, lightDir), 0.0);
-                    // Ambient occlusion approximation
+
                     float ao = 0.5 + 0.5 * vNormal.y;
                     vec3 col = vColor * (0.3 + diff * 0.6) * (0.7 + ao * 0.3);
                     gl_FragColor = vec4(col, 1.0);
@@ -519,12 +457,8 @@ const createMap = () => {
         scene.add(rock);
         return rock;
     };
-
-    // Static rocks from map-data.json (matches server collision)
     const _staticRocks = [[-25,10,1.2],[30,-20,1.5],[-40,-35,0.9],[50,15,1.8],[-15,40,1.1],[35,-50,1.4],[-55,20,1.0],[20,55,1.6],[-10,-25,0.8],[60,-5,1.3],[-35,55,1.5],[45,35,1.0],[-50,-40,1.7],[15,-55,0.9],[-20,-50,1.2],[55,-30,1.1],[-45,15,1.4],[25,25,0.8],[-30,-10,1.6],[40,-40,1.3],[-60,45,1.0],[10,30,1.5],[-5,-45,1.2],[50,50,1.8],[-25,-55,0.9],[65,20,1.1],[-40,40,1.4],[20,-35,1.0],[-55,-20,1.3],[35,60,1.5]];
     _staticRocks.forEach(([x,z,s]) => createRock(x, z, s));
-
-    // ── WALLS with stone/brick shader ──────────────────────────────────
     const wallMaterial = new THREE.ShaderMaterial({
         vertexShader: `
             varying vec3 vPos;
@@ -545,28 +479,22 @@ const createMap = () => {
             float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
             void main() {
-                // Brick pattern based on world position
+
                 vec2 uv = vWorldPos.xz;
-                // Use Y for vertical faces
+
                 float absNx = abs(vNormal.x);
                 float absNz = abs(vNormal.z);
                 if (absNx > 0.5) uv = vWorldPos.zy;
                 else if (absNz > 0.5) uv = vWorldPos.xy;
-
-                // Brick grid
                 float brickW = 1.5;
                 float brickH = 0.75;
                 float mortarW = 0.08;
                 vec2 brickUV = uv / vec2(brickW, brickH);
-                // Offset every other row
+
                 float row = floor(brickUV.y);
                 brickUV.x += mod(row, 2.0) * 0.5;
                 vec2 brickFract = fract(brickUV);
-
-                // Mortar lines
                 float mortar = step(mortarW, brickFract.x) * step(mortarW, brickFract.y);
-
-                // Per-brick color variation
                 vec2 brickID = floor(brickUV);
                 float brickNoise = hash(brickID);
 
@@ -575,17 +503,13 @@ const createMap = () => {
                 vec3 mortarColor = vec3(0.30, 0.28, 0.24);
 
                 vec3 brickCol = mix(stoneDark, stoneBase, brickNoise);
-                // Subtle per-brick warm/cool shift
+
                 brickCol += vec3(0.03, -0.01, -0.02) * (hash(brickID + 7.0) - 0.5);
 
                 vec3 col = mix(mortarColor, brickCol, mortar);
-
-                // Lighting
                 vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3));
                 float diff = max(dot(vNormal, lightDir), 0.0);
                 col *= 0.35 + diff * 0.65;
-
-                // Darken near bottom for grounding
                 float bottomDark = smoothstep(-4.0, 0.0, vPos.y);
                 col *= 0.8 + 0.2 * bottomDark;
 
@@ -604,14 +528,10 @@ const createMap = () => {
         scene.add(wall);
         return wall;
     };
-
-    // Outer walls
     createWall(0, MAP_SIZE/2, MAP_SIZE, 2);
     createWall(0, -MAP_SIZE/2, MAP_SIZE, 2);
     createWall(MAP_SIZE/2, 0, 2, MAP_SIZE);
     createWall(-MAP_SIZE/2, 0, 2, MAP_SIZE);
-
-    // Center structure (inspired by WC3 map)
     createWall(0, 0, 15, 3);
     createWall(0, 10, 3, 10);
     createWall(0, -10, 3, 10);
@@ -619,12 +539,8 @@ const createMap = () => {
     createWall(-15, 8, 12, 3);
     createWall(15, -8, 12, 3);
     createWall(-15, -8, 12, 3);
-
-    // Static scattered walls from map-data.json (matches server collision)
     const _staticWalls = [[-45,35,6,4],[30,-50,5,7],[-60,-20,4,5],[55,40,7,3],[-25,55,5,6],[40,-25,3,8],[-50,-55,6,4],[60,15,4,5],[-35,-40,5,3],[25,60,7,4],[-55,10,4,6],[45,-60,5,5],[-20,-65,6,3],[35,30,3,7],[-40,65,5,4]];
     _staticWalls.forEach(([x,z,w,h]) => createWall(x, z, w, h));
-
-    // Team spawn markers
     const redSpawnGeometry = new THREE.CircleGeometry(5, 32);
     const redSpawnMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.3 });
     const redSpawn = new THREE.Mesh(redSpawnGeometry, redSpawnMaterial);
@@ -641,8 +557,6 @@ const createMap = () => {
 
 };
 
-// Fog of War — pure distance-based vision
-// Vision radius = shoot range. No canvas overlay tricks.
 const VISION_RADIUS = 35;
 const FARSIGHT_RADIUS = 55;
 
@@ -663,8 +577,6 @@ class FogOfWar {
             }
         `;
 
-        // Volumetric-style fog inspired by shadertoy.com/view/XtS3DD
-        // Colored fog with light scattering, density variation, warm edge glow
         const mainFogFrag = `
             uniform float uTime;
             uniform int uSourceCount;
@@ -685,8 +597,6 @@ class FogOfWar {
                 for (int i = 0; i < 5; i++) { v += a * noise(p); p = rot * p * 2.0; a *= 0.5; }
                 return v;
             }
-
-            // Domain-warped FBM — swirling volumetric density
             float cloudDensity(vec2 p) {
                 vec2 q = vec2(fbm(p), fbm(p + vec2(5.2, 1.3)));
                 vec2 r = vec2(
@@ -697,14 +607,12 @@ class FogOfWar {
             }
 
             void main() {
-                // Sample fog density at multiple scales
+
                 vec2 np = vWorldPos * 0.03;
                 float density = cloudDensity(np);
-                // Fine detail wisps
+
                 float detail = fbm(vWorldPos * 0.08 + uTime * vec2(0.03, -0.02));
                 density = density * 0.7 + detail * 0.3;
-
-                // Vision reveal
                 float reveal = 0.0;
                 float edgeGlow = 0.0;
                 for (int i = 0; i < 12; i++) {
@@ -715,46 +623,32 @@ class FogOfWar {
                     float normDist = dist / r;
 
                     if (normDist < 1.6) {
-                        // Wispy edge — use world-space noise to avoid atan seam
+
                         vec2 edgePos = vWorldPos * 0.06 + uTime * vec2(0.02, 0.015);
                         float edgeNoise = fbm(edgePos);
-
-                        // Threshold varies wildly — 0.3 to 1.2 of radius
                         float threshold = 0.3 + (density * 0.5 + edgeNoise * 0.5) * 0.9;
 
                         float innerClear = 1.0 - smoothstep(0.0, 0.4, normDist);
                         float wispyClear = 1.0 - smoothstep(threshold - 0.15, threshold + 0.15, normDist);
                         float localReveal = max(innerClear, wispyClear);
                         reveal = max(reveal, localReveal);
-
-                        // Light scattering glow at fog boundary
                         float glowZone = smoothstep(threshold + 0.15, threshold - 0.1, normDist)
                                        * smoothstep(threshold - 0.3, threshold, normDist);
                         edgeGlow = max(edgeGlow, glowZone * density);
                     }
                 }
 
-                // Volumetric fog color — not flat black
-                // Deep blue-grey in thick fog, warm amber glow at vision edges
                 vec3 fogDeep = vec3(0.02, 0.03, 0.06); // Deep blue-black
                 vec3 fogMid = vec3(0.05, 0.05, 0.08);  // Slightly lighter
                 vec3 fogColor = mix(fogDeep, fogMid, density);
-
-                // Warm light scatter at the boundary (like light hitting fog)
                 vec3 scatterColor = vec3(0.15, 0.08, 0.03); // Warm amber
                 fogColor += scatterColor * edgeGlow * 1.5;
-
-                // Final alpha — thick fog is more opaque
                 float fogAlpha = (0.4 + density * 0.3) * (1.0 - reveal);
-
-                // Saturation boost like the shadertoy reference
                 fogColor = fogColor * 0.5 + 0.5 * fogColor * fogColor * (3.0 - 2.0 * fogColor);
 
                 gl_FragColor = vec4(fogColor, fogAlpha);
             }
         `;
-
-        // Low wispy tendrils — volumetric parallax layer
         const wispFrag = `
             uniform float uTime;
             uniform int uSourceCount;
@@ -775,7 +669,7 @@ class FogOfWar {
             }
 
             void main() {
-                // Domain-warped wisps for organic tendrils
+
                 vec2 np = vWorldPos * 0.02;
                 vec2 q = vec2(fbm(np + uTime * 0.03), fbm(np + vec2(3.1, 7.2) + uTime * 0.02));
                 float wisps = fbm(np + 2.5 * q + uTime * 0.01);
@@ -787,15 +681,11 @@ class FogOfWar {
                     float d = length(vWorldPos - uSources[i].xy) / uSources[i].z;
                     reveal = max(reveal, 1.0 - smoothstep(0.3, 0.85, d));
                 }
-
-                // Slight blue-grey color, not pure black
                 vec3 wispColor = vec3(0.03, 0.04, 0.07) * (1.0 + wisps * 0.5);
                 float alpha = wisps * 0.2 * (1.0 - reveal);
                 gl_FragColor = vec4(wispColor, alpha);
             }
         `;
-
-        // Main fog layer
         const mainMat = new THREE.ShaderMaterial({
             vertexShader: fogVert, fragmentShader: mainFogFrag,
             transparent: true, depthWrite: false, depthTest: false,
@@ -811,8 +701,6 @@ class FogOfWar {
         mainMesh.renderOrder = 10000;
         scene.add(mainMesh);
         this.fogLayers.push(mainMesh);
-
-        // Wispy depth layer
         const wispMat = new THREE.ShaderMaterial({
             vertexShader: fogVert, fragmentShader: wispFrag,
             transparent: true, depthWrite: false, depthTest: false,
@@ -876,8 +764,6 @@ class FogOfWar {
 
 const fogOfWar = new FogOfWar();
 fogOfWar.init();
-
-// Player Class
 class Player {
     constructor(username, team, isPlayer = false) {
         this.username = username;
@@ -897,12 +783,8 @@ class Player {
         this.isWindwalking = false;
         this.farsightActive = false;
         this.farsightPosition = null;
-
-        // Auto-shoot cooldown
         this.shootCooldown = 0;
         this.shootCooldownTime = 1.0; // 1 second between shots
-
-        // Gold + Inventory
         this.gold = 0;
         this.inventory = {}; // { itemId: true }
         this.wardCharges = 0;
@@ -914,8 +796,6 @@ class Player {
 
         this.createMesh(team);
         this.position = this.mesh.position;
-
-        // Spawn position
         if (team === 'red') {
             const x = -70 + Math.random() * 10 - 5;
             const z = -70 + Math.random() * 10 - 5;
@@ -938,8 +818,6 @@ class Player {
         const robeLight = team === 'red' ? 0xff4444 : 0x4466ff;
         const cloth = new THREE.MeshStandardMaterial({ color: robeColor, roughness: 0.9 });
         const clothDark = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.9 });
-
-        // === LEGS — thin sticks under the robe ===
         const legGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.7, 4);
         const legMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
 
@@ -953,8 +831,6 @@ class Player {
 
         this.leftLeg = leftLeg;
         this.rightLeg = rightLeg;
-
-        // === POINTY SHOES ===
         const shoeGeo = new THREE.ConeGeometry(0.1, 0.35, 4);
         const shoeMat = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.8 });
 
@@ -969,55 +845,39 @@ class Player {
         rightShoe.rotation.x = -Math.PI / 2;
         group.add(rightShoe);
         this.rightShoe = rightShoe;
-
-        // === ROBE BODY — tapered cylinder, wider at bottom ===
         const robeGeo = new THREE.CylinderGeometry(0.2, 0.45, 1.1, 6);
         const robe = new THREE.Mesh(robeGeo, cloth);
         robe.position.y = 0.45;
         robe.castShadow = true;
         group.add(robe);
-
-        // Belt/sash
         const beltGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.08, 6);
         const beltMat = new THREE.MeshStandardMaterial({ color: 0x886622, roughness: 0.7, metalness: 0.3 });
         const belt = new THREE.Mesh(beltGeo, beltMat);
         belt.position.y = 0.2;
         group.add(belt);
-
-        // === WIZARD HAT — the head IS the hat ===
         const hatGroup = new THREE.Group();
         hatGroup.position.y = 1.05;
-
-        // Hat brim — wide flat disc
         const brimGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.06, 8);
         const hatMat = new THREE.MeshStandardMaterial({ color: robeDark, roughness: 0.8 });
         const brim = new THREE.Mesh(brimGeo, hatMat);
         brim.position.y = -0.05;
         hatGroup.add(brim);
-
-        // Hat cone — tall and pointy, slightly bent
         const coneGeo = new THREE.ConeGeometry(0.28, 0.9, 6);
         const cone = new THREE.Mesh(coneGeo, hatMat);
         cone.position.y = 0.4;
         cone.rotation.z = 0.15; // Slight tilt
         cone.castShadow = true;
         hatGroup.add(cone);
-
-        // Hat tip — small sphere at the bent tip
         const tipGeo = new THREE.SphereGeometry(0.06, 4, 4);
         const tipMat = new THREE.MeshStandardMaterial({ color: robeLight, roughness: 0.7, emissive: robeLight, emissiveIntensity: 0.3 });
         const tip = new THREE.Mesh(tipGeo, tipMat);
         tip.position.set(0.12, 0.85, 0);
         hatGroup.add(tip);
-
-        // Hat band — stripe of accent color
         const bandGeo = new THREE.CylinderGeometry(0.29, 0.29, 0.06, 6);
         const bandMat = new THREE.MeshStandardMaterial({ color: 0x886622, roughness: 0.6, metalness: 0.4 });
         const band = new THREE.Mesh(bandGeo, bandMat);
         band.position.y = 0.02;
         hatGroup.add(band);
-
-        // Visor glow — two small glowing eyes under the brim
         const eyeGeo = new THREE.SphereGeometry(0.04, 4, 4);
         const eyeMat = new THREE.MeshBasicMaterial({
             color: team === 'red' ? 0xff6666 : 0x66aaff,
@@ -1030,8 +890,6 @@ class Player {
         hatGroup.add(rightEye);
 
         group.add(hatGroup);
-
-        // === ARMS — thin sleeves ===
         const armGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.6, 4);
 
         const leftArm = new THREE.Mesh(armGeo, cloth);
@@ -1047,76 +905,52 @@ class Player {
         rightArm.castShadow = true;
         group.add(rightArm);
         this.rightArm = rightArm;
-
-        // === OVERSIZED SNIPER RIFLE ===
         const rifleGroup = new THREE.Group();
         const gunMetal = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3, metalness: 0.9 });
         const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2a10, roughness: 0.8, metalness: 0.1 });
-
-        // Barrel — extra long and thick
         const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.8, 6), gunMetal);
         barrel.rotation.x = Math.PI / 2;
         barrel.position.z = 1.2;
         barrel.castShadow = true;
         rifleGroup.add(barrel);
-
-        // Muzzle brake
         const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.06, 0.2, 6), gunMetal);
         muzzle.rotation.x = Math.PI / 2;
         muzzle.position.z = 2.7;
         rifleGroup.add(muzzle);
-
-        // Receiver body — chunky box
         const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.8), gunMetal);
         receiver.position.set(0, 0.02, 0.1);
         receiver.castShadow = true;
         rifleGroup.add(receiver);
-
-        // Scope — oversized
         const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.8, 6), new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.3, metalness: 0.9 }));
         scope.rotation.x = Math.PI / 2;
         scope.position.set(0, 0.2, 0.5);
         scope.castShadow = true;
         rifleGroup.add(scope);
-
-        // Scope lens
         const lens = new THREE.Mesh(new THREE.CircleGeometry(0.09, 8), new THREE.MeshStandardMaterial({
             color: 0x2244aa, roughness: 0.1, metalness: 1, emissive: 0x0000aa, emissiveIntensity: 0.3
         }));
         lens.position.set(0, 0.2, 0.91);
         rifleGroup.add(lens);
-
-        // Scope mount rings
         for (let i = 0; i < 2; i++) {
             const mount = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.02, 6, 8), gunMetal);
             mount.rotation.y = Math.PI / 2;
             mount.position.set(0, 0.2, 0.25 + i * 0.5);
             rifleGroup.add(mount);
         }
-
-        // Stock — big chunky wood
         const stock = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 0.7), woodMat);
         stock.position.set(0, 0, -0.4);
         stock.castShadow = true;
         rifleGroup.add(stock);
-
-        // Stock butt
         const stockEnd = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), woodMat);
         stockEnd.position.z = -0.75;
         stockEnd.scale.set(1.5, 2, 0.8);
         rifleGroup.add(stockEnd);
-
-        // Grip
         const grip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.2), woodMat);
         grip.position.set(0, -0.18, 0.2);
         rifleGroup.add(grip);
-
-        // Magazine — oversized box mag
         const mag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.35, 0.14), gunMetal);
         mag.position.set(0, -0.12, 0.05);
         rifleGroup.add(mag);
-
-        // Bolt handle
         const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.18), gunMetal);
         bolt.position.set(0.06, 0.05, 0);
         rifleGroup.add(bolt);
@@ -1127,8 +961,6 @@ class Player {
 
         this.rifleGroup = rifleGroup;
         this.weapon = rifleGroup;
-
-        // === CAPE — long flowing cape on all characters ===
         const capeShape = new THREE.Shape();
         capeShape.moveTo(-0.3, 0);
         capeShape.lineTo(0.3, 0);
@@ -1149,8 +981,6 @@ class Player {
         cape.castShadow = true;
         group.add(cape);
         this.cape = cape;
-
-        // === NAMEPLATE ===
         const canvas = document.createElement('canvas');
         canvas.width = 256;
         canvas.height = 64;
@@ -1169,8 +999,6 @@ class Player {
         group.add(sprite);
 
         this.healthBar = null;
-
-        // === PLAYER GROUND HALO ===
         if (this.isPlayer) {
             const haloGeometry = new THREE.RingGeometry(0.6, 0.8, 16);
             const haloMaterial = new THREE.MeshBasicMaterial({
@@ -1189,9 +1017,7 @@ class Player {
     }
 
     update(deltaTime) {
-        // Health (no bar — instant kill game)
 
-        // Windwalk effect
         if (this.isWindwalking) {
             this.mesh.children[0].material.transparent = true;
             this.mesh.children[0].material.opacity = 0.3;
@@ -1201,53 +1027,33 @@ class Player {
             this.mesh.children[0].material.opacity = 1.0;
             this.speed = this.normalSpeed;
         }
-
-        // Animation
         const isMoving = this.velocity.length() > 0.01;
         const time = Date.now() * 0.001;
 
         if (isMoving && this.leftLeg && this.rightLeg) {
             const runTime = time * 10;
-
-            // Leg swing
             this.leftLeg.rotation.x = Math.sin(runTime) * 0.6;
             this.rightLeg.rotation.x = Math.sin(runTime + Math.PI) * 0.6;
-
-            // Shoe follows leg
             if (this.leftShoe) this.leftShoe.rotation.x = -Math.PI / 2 + Math.sin(runTime) * 0.3;
             if (this.rightShoe) this.rightShoe.rotation.x = -Math.PI / 2 + Math.sin(runTime + Math.PI) * 0.3;
-
-            // Arm swing (opposite to legs)
             if (this.leftArm) this.leftArm.rotation.x = Math.sin(runTime + Math.PI) * 0.4;
             if (this.rightArm) this.rightArm.rotation.x = Math.sin(runTime) * 0.4;
-
-            // Body bob
             this.mesh.position.y += Math.sin(runTime * 2) * 0.025;
-
-            // Cape billows back when running
             if (this.cape) this.cape.rotation.x = 0.3 + Math.sin(runTime * 1.5) * 0.15;
         } else if (this.leftLeg && this.rightLeg) {
-            // Idle pose — gentle sway
+
             this.leftLeg.rotation.x = 0;
             this.rightLeg.rotation.x = 0;
             if (this.leftShoe) this.leftShoe.rotation.x = -Math.PI / 2;
             if (this.rightShoe) this.rightShoe.rotation.x = -Math.PI / 2;
-
-            // Gentle breathing sway
             if (this.leftArm) this.leftArm.rotation.x = Math.sin(time * 2) * 0.05;
             if (this.rightArm) this.rightArm.rotation.x = Math.sin(time * 2 + 0.5) * 0.05;
-
-            // Cape gentle sway
             if (this.cape) this.cape.rotation.x = 0.1 + Math.sin(time * 1.5) * 0.05;
-
-            // Idle bob
             this.mesh.position.y += Math.sin(time * 2) * 0.008;
         }
-
-        // Spawn protection countdown + visual
         if (this._spawnProtection > 0) {
             this._spawnProtection -= deltaTime;
-            // Flicker transparency to show invulnerability
+
             const flicker = Math.sin(Date.now() * 0.015) > 0;
             this.mesh.traverse(child => {
                 if (child.material && !child.isSprite) {
@@ -1264,25 +1070,19 @@ class Player {
             });
             this._spawnProtection = -1; // Don't keep resetting
         }
-
-        // Update shoot cooldown
         if (this.shootCooldown > 0) {
             this.shootCooldown -= deltaTime;
         }
-
-        // Auto-shoot at enemies in FOV (offline only — server handles shooting in online mode)
         if (!isOnlineMode && this.health > 0 && this.shootCooldown <= 0) {
             this.autoShootAtEnemies();
         }
-
-        // Bot AI
         if (!this.isPlayer) {
             this.botAI(deltaTime);
         }
     }
 
     autoShootAtEnemies() {
-        // Get all potential enemies
+
         const allEnemies = [...gameState.bots];
         if (gameState.player && gameState.player.team !== this.team) {
             allEnemies.push(gameState.player);
@@ -1297,8 +1097,6 @@ class Player {
         );
 
         if (visibleEnemies.length === 0) return;
-
-        // Get weapon direction (where the rifle is pointing)
         const weaponDirection = new THREE.Vector3(0, 0, 1);
         if (this.weapon) {
             weaponDirection.applyQuaternion(this.weapon.getWorldQuaternion(new THREE.Quaternion()));
@@ -1306,23 +1104,17 @@ class Player {
 
         const fovAngle = 30; // 30 degree FOV cone
         const fovRadians = (fovAngle * Math.PI) / 180;
-
-        // Check each enemy
         for (let enemy of visibleEnemies) {
             const toEnemy = new THREE.Vector3().subVectors(enemy.position, this.position).normalize();
             const angle = weaponDirection.angleTo(toEnemy);
-
-            // If enemy is within FOV cone and in range
             if (angle < fovRadians) {
                 const distance = this.position.distanceTo(enemy.position);
                 if (distance <= this.shootRange) {
-                    // Double-check fog of war visibility
+
                     const enemyVisible = fogOfWar.isVisible(enemy.position.x, enemy.position.z);
                     if (!enemyVisible) {
                         continue; // Skip this enemy, can't see them in fog
                     }
-
-                    // Check line of sight (walls blocking) — raycast from chest height
                     const raycaster = new THREE.Raycaster();
                     const eyePos = this.position.clone();
                     eyePos.y += 1.0;
@@ -1341,7 +1133,7 @@ class Player {
                     }
 
                     if (!blocked) {
-                        // SHOOT!
+
                         this.shoot(enemy);
                         this.shootCooldown = this.shootCooldownTime;
                         return; // Only shoot one target per check
@@ -1366,7 +1158,7 @@ class Player {
             if (tooClose) continue;
             return candidate;
         }
-        // Fallback to spawn
+
         const s = this.team === 'red' ? -70 : 70;
         return new THREE.Vector3(s + Math.random()*10-5, 0.5, s + Math.random()*10-5);
     }
@@ -1377,13 +1169,13 @@ class Player {
             this.position.z = newPos.z;
             return true;
         }
-        // Wall slide X
+
         const slideX = this.position.clone(); slideX.x = newPos.x;
         if (!this.checkCollision(slideX)) {
             this.position.x = slideX.x;
             return true;
         }
-        // Wall slide Z
+
         const slideZ = this.position.clone(); slideZ.z = newPos.z;
         if (!this.checkCollision(slideZ)) {
             this.position.z = slideZ.z;
@@ -1394,8 +1186,6 @@ class Player {
 
     botAI(deltaTime) {
         if (!this._stuckFrames) this._stuckFrames = 0;
-
-        // Nudge out of walls if stuck inside one
         if (this.checkCollision(this.position)) {
             for (let a = 0; a < Math.PI * 2; a += Math.PI / 12) {
                 for (let r = 1; r <= 5; r++) {
@@ -1410,8 +1200,6 @@ class Player {
                 }
             }
         }
-
-        // Find closest visible enemy
         const allEnemies = [...gameState.bots, gameState.player].filter(p =>
             p && p !== this && p.team !== this.team && p.health > 0 && p.mesh.visible
         );
@@ -1420,17 +1208,15 @@ class Player {
             const d = this.position.distanceTo(enemy.position);
             if (d < closestDistance && d < 50) { closestDistance = d; closestEnemy = enemy; }
         }
-
-        // Chase enemy — go direct if LOS clear, otherwise detour around wall
         if (closestEnemy && closestDistance < 50) {
-            // Check LOS using fog system (client-side)
+
             const hasLOS = fogOfWar.isVisible(closestEnemy.position.x, closestEnemy.position.z);
             if (hasLOS && !this.checkCollision(closestEnemy.position)) {
                 this.targetPosition = closestEnemy.position.clone();
                 this._chaseDetour = false;
                 this._stuckFrames = 0;
             } else if (!this._chaseDetour) {
-                // Wall between us — pick perpendicular waypoint
+
                 const toEnemy = new THREE.Vector3().subVectors(closestEnemy.position, this.position);
                 const angle = Math.atan2(toEnemy.z, toEnemy.x);
                 const side = (Math.random() < 0.5) ? 1 : -1;
@@ -1445,15 +1231,11 @@ class Player {
                 this._stuckFrames = 0;
             }
         }
-
-        // Pick new target when needed
         if (!this.targetPosition || this.position.distanceTo(this.targetPosition) < 3) {
             this.targetPosition = this._pickExploreTarget();
             this._chaseDetour = false;
             this._stuckFrames = 0;
         }
-
-        // Move toward target
         const direction = new THREE.Vector3().subVectors(this.targetPosition, this.position);
         direction.y = 0;
         const d = direction.length();
@@ -1469,7 +1251,7 @@ class Player {
                     this.targetPosition = this._pickExploreTarget();
                     this._stuckFrames = 0;
                 } else {
-                    // Perpendicular nudge
+
                     const angle = Math.atan2(direction.z, direction.x);
                     const side = (this._stuckFrames % 2 === 0) ? 1 : -1;
                     const nudge = this.position.clone();
@@ -1482,8 +1264,6 @@ class Player {
             }
             this.position.y = this.getTerrainHeight(this.position.x, this.position.z);
         }
-
-        // Aim weapon
         if (closestEnemy) {
             this.weapon.lookAt(closestEnemy.position);
         } else if (this.targetPosition) {
@@ -1492,7 +1272,7 @@ class Player {
     }
 
     getTerrainHeight(x, z) {
-        // Calculate terrain height based on the ground formula
+
         const height = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2;
         return height + 0.6; // Add character offset
     }
@@ -1524,24 +1304,22 @@ class Player {
         const newPos = this.position.clone().add(this.velocity);
 
         if (!this.checkCollision(newPos)) {
-            // Clear path — move directly
+
             this.position.x = newPos.x;
             this.position.z = newPos.z;
         } else {
-            // Wall hit — try sliding along it
-            // Try X axis only
             const slideX = this.position.clone();
             slideX.x += this.velocity.x;
             if (!this.checkCollision(slideX)) {
                 this.position.x = slideX.x;
             } else {
-                // Try Z axis only
+
                 const slideZ = this.position.clone();
                 slideZ.z += this.velocity.z;
                 if (!this.checkCollision(slideZ)) {
                     this.position.z = slideZ.z;
                 } else {
-                    // Try diagonal alternatives — slide 45 degrees each way
+
                     const angle1 = Math.atan2(direction.z, direction.x) + Math.PI / 4;
                     const alt1 = this.position.clone();
                     alt1.x += Math.cos(angle1) * speed;
@@ -1559,14 +1337,12 @@ class Player {
                         this.position.x = alt2.x;
                         this.position.z = alt2.z;
                     }
-                    // If all blocked, character stays put
+
                 }
             }
         }
 
         this.position.y = this.getTerrainHeight(this.position.x, this.position.z);
-
-        // Face movement direction
         if (this.rifleGroup) {
             const lookTarget = this.position.clone().add(direction.multiplyScalar(5));
             this.rifleGroup.lookAt(lookTarget);
@@ -1576,12 +1352,10 @@ class Player {
     }
 
     checkCollision(newPos) {
-        // Check bounds
+
         if (Math.abs(newPos.x) > MAP_SIZE / 2 - 2 || Math.abs(newPos.z) > MAP_SIZE / 2 - 2) {
             return true;
         }
-
-        // Check walls — raycast only against wall objects (not sprites)
         const dir = new THREE.Vector3().subVectors(newPos, this.position);
         if (dir.length() < 0.001) return false;
         dir.normalize();
@@ -1603,8 +1377,6 @@ class Player {
                 return true;
             }
         }
-
-        // Check bot-to-bot collision (bots only, not player)
         if (!this.isPlayer) {
             for (const other of gameState.bots) {
                 if (other === this || other.health <= 0) continue;
@@ -1617,14 +1389,12 @@ class Player {
     }
 
     shoot(target) {
-        // Can't shoot if dead
+
         if (this.health <= 0) return;
         if (!target || target.health <= 0) return;
 
         const distance = this.position.distanceTo(target.position);
         if (distance > this.shootRange) return;
-
-        // Check line of sight — from chest height
         const raycaster = new THREE.Raycaster();
         const eyePos = this.position.clone();
         eyePos.y += 1.0;
@@ -1639,29 +1409,19 @@ class Player {
                 return; // Wall blocking
             }
         }
-
-        // Play sniper fire sound
         audioManager.play('sniperFire');
-
-        // HUGE CANNON-LIKE SHOOTING ANIMATION
         this.createShootingEffect(target.position);
-
-        // Instant kill (classic snipers!) — goes through takeDamage for shield check
         target.takeDamage(999, this);
     }
 
     createShootingEffect(targetPos) {
-        // EXTREME rifle recoil animation
+
         if (this.weapon) {
             const originalPos = this.weapon.position.clone();
             const originalRot = this.weapon.rotation.clone();
-
-            // MASSIVE recoil - gun flies back
             this.weapon.position.z -= 0.8;
             this.weapon.rotation.x -= 0.3;
             this.weapon.position.y -= 0.2;
-
-            // Shake the whole character violently
             const originalCharPos = this.mesh.position.clone();
             this.mesh.position.z -= 0.3;
 
@@ -1673,16 +1433,12 @@ class Player {
                 this.mesh.position.copy(originalCharPos);
             }, 150);
         }
-
-        // Calculate muzzle position (end of barrel)
         const muzzleOffset = new THREE.Vector3(0, 0, 2.5);
         if (this.weapon) {
             muzzleOffset.applyQuaternion(this.weapon.quaternion);
         }
         const muzzlePos = this.position.clone().add(muzzleOffset);
         muzzlePos.y += 0.5;
-
-        // MASSIVE MUZZLE FLASH
         const flashGeometry = new THREE.SphereGeometry(2, 12, 12);
         const flashMaterial = new THREE.MeshBasicMaterial({
             color: 0xffdd00,
@@ -1692,8 +1448,6 @@ class Player {
         const flash = new THREE.Mesh(flashGeometry, flashMaterial);
         flash.position.copy(muzzlePos);
         scene.add(flash);
-
-        // Secondary flash (outer)
         const flash2Geometry = new THREE.SphereGeometry(3, 12, 12);
         const flash2Material = new THREE.MeshBasicMaterial({
             color: 0xff6600,
@@ -1703,13 +1457,9 @@ class Player {
         const flash2 = new THREE.Mesh(flash2Geometry, flash2Material);
         flash2.position.copy(muzzlePos);
         scene.add(flash2);
-
-        // INTENSE Flash light
         const flashLight = new THREE.PointLight(0xffaa00, 10, 40);
         flashLight.position.copy(muzzlePos);
         scene.add(flashLight);
-
-        // Multiple expanding smoke rings
         for (let i = 0; i < 3; i++) {
             setTimeout(() => {
                 const ringGeometry = new THREE.RingGeometry(0.5, 1, 16);
@@ -1723,8 +1473,6 @@ class Player {
                 ring.position.copy(muzzlePos);
                 ring.lookAt(targetPos);
                 scene.add(ring);
-
-                // Animate ring expansion
                 let ringScale = 1 + i * 0.5;
                 const ringInterval = setInterval(() => {
                     ringScale += 0.8;
@@ -1739,8 +1487,6 @@ class Player {
                 }, 30);
             }, i * 30);
         }
-
-        // Smoke particles
         for (let i = 0; i < 8; i++) {
             const smokeGeometry = new THREE.SphereGeometry(0.3, 6, 6);
             const smokeMaterial = new THREE.MeshBasicMaterial({
@@ -1769,8 +1515,6 @@ class Player {
                 }
             }, 40);
         }
-
-        // Remove flash quickly
         setTimeout(() => {
             scene.remove(flash);
             scene.remove(flash2);
@@ -1780,8 +1524,6 @@ class Player {
             flash2Geometry.dispose();
             flash2Material.dispose();
         }, 80);
-
-        // SUPER THICK bullet tracer with glow
         const bulletGeometry = new THREE.BufferGeometry().setFromPoints([
             muzzlePos.clone(),
             targetPos.clone()
@@ -1792,8 +1534,6 @@ class Player {
         });
         const bullet = new THREE.Line(bulletGeometry, bulletMaterial);
         scene.add(bullet);
-
-        // Multiple glowing tracer layers
         for (let i = 1; i <= 3; i++) {
             const tracerGeometry = new THREE.BufferGeometry().setFromPoints([
                 muzzlePos.clone(),
@@ -1820,18 +1560,14 @@ class Player {
             bulletGeometry.dispose();
             bulletMaterial.dispose();
         }, 200);
-
-        // EXTREME Camera shake if this is the player
         if (this.isPlayer) {
             this.cameraShake();
         }
-
-        // MASSIVE Impact explosion at target
         this.createImpactEffect(targetPos);
     }
 
     createImpactEffect(pos) {
-        // MASSIVE Impact flash
+
         const impactGeometry = new THREE.SphereGeometry(3, 12, 12);
         const impactMaterial = new THREE.MeshBasicMaterial({
             color: 0xff4400,
@@ -1841,8 +1577,6 @@ class Player {
         const impact = new THREE.Mesh(impactGeometry, impactMaterial);
         impact.position.copy(pos);
         scene.add(impact);
-
-        // Secondary impact flash
         const impact2Geometry = new THREE.SphereGeometry(4, 12, 12);
         const impact2Material = new THREE.MeshBasicMaterial({
             color: 0xff6600,
@@ -1852,13 +1586,9 @@ class Player {
         const impact2 = new THREE.Mesh(impact2Geometry, impact2Material);
         impact2.position.copy(pos);
         scene.add(impact2);
-
-        // HUGE Impact light
         const impactLight = new THREE.PointLight(0xff4400, 15, 50);
         impactLight.position.copy(pos);
         scene.add(impactLight);
-
-        // Expanding shockwave rings
         for (let i = 0; i < 3; i++) {
             setTimeout(() => {
                 const shockGeometry = new THREE.RingGeometry(1, 2, 24);
@@ -1887,8 +1617,6 @@ class Player {
                 }, 30);
             }, i * 40);
         }
-
-        // Impact debris/particles
         for (let i = 0; i < 12; i++) {
             const debrisGeometry = new THREE.SphereGeometry(0.2, 4, 4);
             const debrisMaterial = new THREE.MeshBasicMaterial({
@@ -1923,8 +1651,6 @@ class Player {
                 }
             }, 30);
         }
-
-        // Expanding impact wave
         let impactScale = 1;
         const impactInterval = setInterval(() => {
             impactScale += 0.8;
@@ -1968,25 +1694,25 @@ class Player {
     }
 
     takeDamage(damage, attacker) {
-        // In online mode, all damage is server-authoritative
+
         if (isOnlineMode) return;
-        // Spawn protection
+
         if (this._spawnProtection > 0) return;
-        // Shield blocks one shot (check before god mode so it still consumes)
+
         if (this.hasShield) {
             this.hasShield = false;
             delete this.inventory['shield'];
             if (this.isPlayer) showStreakPopup('SHIELD BLOCKED!', '#44aaff');
             return;
         }
-        // God mode — player can't die
+
         if (this.isPlayer && gameState.debug.godMode) return;
-        // Instant kill - no health system
+
         this.die(attacker);
     }
 
     die(killer) {
-        // Prevent dying twice
+
         if (this.health <= 0) return;
 
         this.health = 0; // Set health to 0 immediately
@@ -1994,35 +1720,23 @@ class Player {
 
         if (killer) {
             killer.kills++;
-
-            // Determine if this kill triggers a special announcement
             let hasSpecial = false;
-
-            // First blood — global
             if (!gameState.firstBlood) {
                 gameState.firstBlood = true;
                 audioManager.play('firstBlood');
                 if (killer.isPlayer) showStreakPopup('FIRST BLOOD', '#ff4444');
                 hasSpecial = true;
             }
-
-            // Gold reward — scales with victim's price (killing whales pays more)
             const baseGold = 50;
             const streakBonus = (killer._streak || 0) * 10;
             const victimBonus = Math.round(this.price * 10);
             killer.earnGold(baseGold + streakBonus + victimBonus);
-
-            // Price pump for killer (absorb victim's value)
             const pumpAmount = 0.5 + this.price * 0.3;
             killer.price += pumpAmount;
             if (killer.isPlayer) pumpPrice(pumpAmount);
-
-            // Player-specific streak/multi-kill tracking
             if (killer.isPlayer) {
                 gameState.kills = killer.kills;
                 document.getElementById('killCount').textContent = `Kills: ${gameState.kills}`;
-
-                // Kill streak
                 gameState.killStreak++;
                 const streak = gameState.killStreak;
                 const streakMap = {
@@ -2037,8 +1751,6 @@ class Player {
                     showStreakPopup(streakMap[streak][1], streakMap[streak][2]);
                     hasSpecial = true;
                 }
-
-                // Multi-kill tracking (kills within 4 seconds)
                 if (gameState.multiKillTimer > 0) {
                     gameState.multiKillCount++;
                 } else {
@@ -2063,32 +1775,20 @@ class Player {
                     showStreakPopup(multiMap[mk][1], multiMap[mk][2]);
                     hasSpecial = true;
                 }
-
-                // Play headshot on every kill — it's short and punchy
                 audioManager.play('headshot');
 
             } else {
-                // Bot got a kill — play special sounds globally (no popup text)
-                // Track per-bot streaks
                 if (!killer._streak) killer._streak = 0;
                 killer._streak++;
                 const bs = killer._streak;
                 const botStreakSounds = { 5: 'killingSpree', 10: 'rampage', 15: 'dominating', 20: 'unstoppable', 25: 'godlike' };
                 if (botStreakSounds[bs]) audioManager.play(botStreakSounds[bs]);
             }
-
-            // Show kill feed
             addKillFeed(killer.username, this.username);
         }
-
-        // Lose all items on death
         this.inventory = {};
         this._applyItems();
-
-        // Price dumps 50% on death
         this.price = Math.max(0.10, this.price * 0.5);
-
-        // Reset kill streak when dying
         if (this.isPlayer) {
             gameState.killStreak = 0;
             resetStreakChart();
@@ -2096,21 +1796,13 @@ class Player {
             updateGoldUI();
         }
         this._streak = 0;
-
-        // Update UI if this is the player
         if (this.isPlayer) {
             gameState.deaths++;
             document.getElementById('deathCount').textContent = `Deaths: ${gameState.deaths}`;
-
-            // Clear ALL move targets and commands
             gameState.moveTarget = null;
             gameState.targetLock = null;
-
-            // Dark Souls death screen
             const popup = document.getElementById('deathPopup');
             const killerName = killer ? killer.username : 'the darkness';
-
-            // Show killer's items
             let killerItems = '';
             if (killer && Object.keys(killer.inventory).length > 0) {
                 const items = Object.keys(killer.inventory).map(id => {
@@ -2129,15 +1821,9 @@ class Player {
 
             setTimeout(() => popup.classList.add('hidden'), 5000);
         }
-
-        // Hide during death
         this.mesh.visible = false;
-
-        // Clear bot move targets too
         this.targetPosition = null;
         this.attackWalkTarget = null;
-
-        // Auto-respawn after 5 seconds
         setTimeout(() => this.respawn(), 5000);
     }
 
@@ -2162,9 +1848,9 @@ class Player {
         this.mesh.visible = true;
 
         if (this.isPlayer) {
-            // Player alive
+
         } else {
-            // Bot auto-buy: prioritize items they don't have
+
             this._botShop();
         }
     }
@@ -2190,7 +1876,7 @@ class Player {
         if (this.isPlayer) {
             gameState.gold = this.gold;
             updateGoldUI();
-            // Float gold text
+
             showGoldPopup(`+${earned}g`);
         }
     }
@@ -2213,14 +1899,12 @@ class Player {
     }
 
     _applyItems() {
-        // Reset to base stats
+
         this.normalSpeed = this.baseSpeed;
         this.shootRange = this.baseRange;
         this.shootCooldownTime = this.baseCooldown;
         this.goldMultiplier = 1.0;
         this.hasShield = false;
-
-        // Apply all owned items
         for (const id of Object.keys(this.inventory)) {
             const item = SHOP_ITEMS[id];
             if (!item) continue;
@@ -2232,8 +1916,6 @@ class Player {
             if (item.stat === 'shield') this.hasShield = true;
             if (item.stat === 'ward') this.wardCharges = (this.wardCharges || 0) + item.val;
         }
-
-        // Update derived speed
         this.speed = this.normalSpeed;
         this.windwalkSpeed = this.normalSpeed * 1.75;
     }
@@ -2246,15 +1928,11 @@ class Player {
         return Math.sqrt(dx*dx + dz*dz) < 15;
     }
 }
-
-// Gold + Shop UI
 function updateGoldUI() {
     const el = document.getElementById('goldCount');
     if (el) el.textContent = gameState.gold;
 }
 
-// === TRADING TERMINAL — price tracking + HUD chart ===
-// Price system removed — stubs kept so callers don't error
 let _playerPrice = 1.00;
 let _priceHistory = [1.00];
 let _startPrice = 1.00;
@@ -2302,14 +1980,14 @@ function updateShopUI() {
     });
 }
 function checkShopProximity() {
-    // Show/hide shop prompt based on spawn proximity
+
     if (!gameState.player || gameState.player.health <= 0) return;
     const near = gameState.player.isNearSpawn && gameState.player.isNearSpawn();
     const shopBtn = document.querySelector('#shopBtn');
     if (shopBtn) shopBtn.style.opacity = near ? '1' : '0.4';
 }
 function showGoldPopup(text) {
-    // Simple floating gold text
+
     const el = document.createElement('div');
     el.style.cssText = 'position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);color:#ffd700;font-family:Oswald,sans-serif;font-size:1.5rem;font-weight:700;pointer-events:none;z-index:9999;text-shadow:0 0 10px rgba(255,215,0,0.5);animation:goldFloat 1s ease-out forwards;';
     el.textContent = text;
@@ -2347,8 +2025,6 @@ function drawHudChart() {
     const min = Math.min(...prices) * 0.95;
     const max = Math.max(...prices) * 1.05;
     const range = max - min || 1;
-
-    // Draw line chart
     ctx.beginPath();
     ctx.strokeStyle = _playerPrice >= _startPrice ? '#00ff44' : '#ff4444';
     ctx.lineWidth = 1.5;
@@ -2359,8 +2035,6 @@ function drawHudChart() {
         else ctx.lineTo(x, y);
     });
     ctx.stroke();
-
-    // Fill under the line
     const lastX = w;
     const lastY = h - ((prices[prices.length - 1] - min) / range) * h;
     ctx.lineTo(lastX, h);
@@ -2383,14 +2057,12 @@ function dumpPrice() {
     _priceHistory.push(_playerPrice);
     updateTerminal();
 }
-
-// Flying candle animation — spawns center, flies to HUD chart
 let _activeCandle = null;
 let _candleHoldTimer = null;
 let _streakCandleActive = false; // Prevents green candle from overriding streak candles
 
 function spawnFlyingCandle(text, color, boost) {
-    // If there's already a candle showing, send it flying immediately
+
     if (_activeCandle) {
         const old = _activeCandle;
         clearTimeout(_candleHoldTimer);
@@ -2414,8 +2086,6 @@ function spawnFlyingCandle(text, color, boost) {
     const wickH = Math.round(bodyH * 0.35);
     const bodyW = Math.min(16 + boost * 1.5, 40);
     const glowSize = Math.min(bodyH, 60);
-
-    // Sparkle particles
     let particles = '';
     const numParticles = Math.floor(6 + boost);
     for (let i = 0; i < numParticles; i++) {
@@ -2436,8 +2106,6 @@ function spawnFlyingCandle(text, color, boost) {
         </div>
         <div style="color:${color};font-size:clamp(1rem,4vw,1.8rem);font-weight:900;margin-top:8px;font-family:monospace;text-shadow:0 0 15px ${color},0 0 30px ${color}66;letter-spacing:0.05em;white-space:nowrap;">${text}</div>
     `;
-
-    // Start at center — slam in big
     candle.style.left = '50%';
     candle.style.top = '35%';
     candle.style.transform = 'translate(-50%, -50%) scale(2.5)';
@@ -2445,15 +2113,11 @@ function spawnFlyingCandle(text, color, boost) {
     candle.style.transition = 'transform 0.15s cubic-bezier(0,0.8,0.2,1.2)';
     document.body.appendChild(candle);
     _activeCandle = candle;
-
-    // Pop to normal
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             candle.style.transform = 'translate(-50%, -50%) scale(1)';
         });
     });
-
-    // Hold 1s, then fly to chart
     _candleHoldTimer = setTimeout(() => {
         if (_activeCandle !== candle) return; // Replaced by newer candle
         _activeCandle = null;
@@ -2473,7 +2137,7 @@ function spawnFlyingCandle(text, color, boost) {
 function showGoldPopup(text) {
     const boost = parseFloat(text.replace(/[^0-9.]/g, '')) / 50 || 0.5;
     pumpPrice(boost);
-    // Green candle for every kill — but skip if a streak candle is showing
+
     if (!_streakCandleActive) {
         spawnFlyingCandle(text, '#00ff44', boost * 8);
     }
@@ -2493,8 +2157,6 @@ function drawDeathChart() {
     const toX = (i) => (i / (prices.length - 1)) * w;
     const toY = (p) => h - ((p - min) / range) * h;
     const crashIdx = Math.max(1, prices.length - 3);
-
-    // Green section (full line up to crash point)
     ctx.beginPath();
     ctx.strokeStyle = '#00ff44';
     ctx.lineWidth = 2;
@@ -2503,15 +2165,11 @@ function drawDeathChart() {
         else ctx.lineTo(toX(i), toY(prices[i]));
     }
     ctx.stroke();
-
-    // Green fill
     ctx.lineTo(toX(crashIdx), h);
     ctx.lineTo(0, h);
     ctx.closePath();
     ctx.fillStyle = 'rgba(0,255,68,0.06)';
     ctx.fill();
-
-    // Red crash section (connected from crash point to end)
     if (prices.length > crashIdx) {
         ctx.beginPath();
         ctx.strokeStyle = '#ff2222';
@@ -2521,8 +2179,6 @@ function drawDeathChart() {
             ctx.lineTo(toX(i), toY(prices[i]));
         }
         ctx.stroke();
-
-        // Red fill under crash
         ctx.lineTo(toX(prices.length - 1), h);
         ctx.lineTo(toX(crashIdx), h);
         ctx.closePath();
@@ -2571,8 +2227,6 @@ function updateShopUI() {
         </div>`;
     }
     document.getElementById('shopItems').innerHTML = html;
-
-    // Bind click handlers
     panel.querySelectorAll('.shop-item:not(.disabled)').forEach(el => {
         el.onclick = () => {
             const itemId = el.dataset.item;
@@ -2583,8 +2237,6 @@ function updateShopUI() {
         };
     });
 }
-
-// Check shop proximity every frame — only auto-CLOSE when leaving spawn
 function checkShopProximity() {
     if (gameState.player && gameState.player.health > 0) {
         const nearSpawn = gameState.player.isNearSpawn();
@@ -2594,8 +2246,6 @@ function checkShopProximity() {
         }
     }
 }
-
-// UI Functions
 function showStreakPopup(text, color) {
     const boosts = {
         'FIRST BLOOD':2, 'KILLING SPREE':3, 'RAMPAGE':5, 'DOMINATING':8,
@@ -2605,14 +2255,10 @@ function showStreakPopup(text, color) {
     };
     const boost = boosts[text] || 1;
     pumpPrice(boost);
-
-    // Screen flash
     const flash = document.createElement('div');
     flash.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:${color};opacity:0.2;pointer-events:none;z-index:9998;animation:screenFlash 0.3s ease-out forwards;`;
     document.body.appendChild(flash);
     setTimeout(() => flash.remove(), 400);
-
-    // Big flying candle for streaks — mark active so green candle doesn't override
     _streakCandleActive = true;
     spawnFlyingCandle(text, color, boost * 5);
 End of removed price code block */
@@ -2634,23 +2280,17 @@ function addKillFeed(killer, victim) {
 function updateScoreboard() {
     const sb = document.getElementById('scoreboard');
     if (!sb || sb.classList.contains('hidden')) return;
-
-    // Collect all players
     const all = [];
     if (isOnlineMode) {
-        // Online: remote players + local player (no gameState.bots)
+
         _remotePlayers.forEach(r => all.push(r.player));
         if (gameState.player) all.push(gameState.player);
     } else {
-        // Offline: bots + local player
+
         all.push(...gameState.bots);
         if (gameState.player) all.push(gameState.player);
     }
-
-    // Sort by price descending
     all.sort((a, b) => b.kills - a.kills);
-
-    // Track price history per player for sparklines
     all.forEach(p => {
         if (!p._priceHist) p._priceHist = [1.0];
         if (p._priceHist[p._priceHist.length - 1] !== p.price) {
@@ -2682,8 +2322,6 @@ function updateScoreboard() {
     html += '<div style="color:#444;font-size:0.6rem;margin-top:0.8rem;text-align:center;">TAB to close</div>';
     html += '</div>';
     sb.innerHTML = html;
-
-    // Draw sparkline charts
     sb.querySelectorAll('.sb-chart').forEach(canvas => {
         const idx = parseInt(canvas.dataset.playerIdx);
         const p = all[idx];
@@ -2709,8 +2347,6 @@ function updateScoreboard() {
         ctx.stroke();
     });
 }
-
-// Abilities
 function useWindwalk() {
     const ability = gameState.abilities.windwalk;
     if (ability.cooldown > 0 || !gameState.player) return;
@@ -2730,16 +2366,12 @@ function useWindwalk() {
 function useFarsight() {
     const ability = gameState.abilities.farsight;
     if (ability.cooldown > 0 || !gameState.player) return;
-
-    // Place farsight at mouse position in world
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(gameState.mousePos, camera);
 
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     const intersectPoint = new THREE.Vector3();
     raycaster.ray.intersectPlane(plane, intersectPoint);
-
-    // Create visual indicator
     const farsightGeometry = new THREE.CircleGeometry(2, 32);
     const farsightMaterial = new THREE.MeshBasicMaterial({
         color: 0x00ff00,
@@ -2782,10 +2414,8 @@ function updateAbilityUI() {
         }
     });
 }
-
-// Input Handlers
 document.addEventListener('keydown', (e) => {
-    // Skip game keybinds when typing in any input
+
     const active = document.activeElement;
     if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
         if (e.key === 'Escape') { active.blur(); e.preventDefault(); }
@@ -2829,14 +2459,12 @@ document.addEventListener('keydown', (e) => {
     }
     if (e.shiftKey) gameState.attackWalk = true;
 });
-
-// FPS counter
 let _fpsFrames = 0, _fpsLast = performance.now();
 function updateDebugFPS() {
     _fpsFrames++;
     const now = performance.now();
     if (now - _fpsLast >= 1000) {
-        // Mostly shows 8008132, occasionally the last digit flickers
+
         const lastDigit = Math.random() < 0.15 ? Math.floor(Math.random() * 4) : 2;
         const fpsText = 'FPS: 800813' + lastDigit;
         const fpsEl = document.getElementById('fpsCounter');
@@ -2863,8 +2491,6 @@ document.addEventListener('keyup', (e) => {
 document.addEventListener('mousemove', (e) => {
     gameState.mousePos.x = (e.clientX / window.innerWidth) * 2 - 1;
     gameState.mousePos.y = -(e.clientY / window.innerHeight) * 2 + 1;
-
-    // Camera dragging with middle/right mouse
     if (gameState.isDraggingCamera) {
         const deltaX = e.clientX - gameState.lastMousePos.x;
         const deltaY = e.clientY - gameState.lastMousePos.y;
@@ -2878,33 +2504,25 @@ document.addEventListener('mousemove', (e) => {
 
 document.addEventListener('mousedown', (e) => {
     if (!gameState.gameStarted) return;
-
-    // Right click or middle mouse for camera drag
     if (e.button === 1 || e.button === 2) {
         gameState.isDraggingCamera = true;
         gameState.lastMousePos.set(e.clientX, e.clientY);
         e.preventDefault();
         return;
     }
-
-    // Left click
     if (e.button === 0 && gameState.player) {
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(gameState.mousePos, camera);
-
-        // Check if clicking on enemy
         const allPlayers = [...gameState.players.values(), ...gameState.bots]
             .filter(p => p.team !== gameState.team && p.health > 0 && p.mesh.visible);
-
-        // Only raycast against the body meshes, not sprites
         const bodyMeshes = allPlayers.map(p => p.mesh.children[0]);
         const intersects = raycaster.intersectObjects(bodyMeshes, false);
 
         if (intersects.length > 0) {
-            // Find which player was clicked
+
             for (let player of allPlayers) {
                 if (player.mesh.children[0] === intersects[0].object) {
-                    // Check if visible in fog of war
+
                     if (fogOfWar.isVisible(player.position.x, player.position.z)) {
                         gameState.targetLock = player;
                         gameState.moveTarget = null; // Stop moving
@@ -2914,21 +2532,13 @@ document.addEventListener('mousedown', (e) => {
                 }
             }
         }
-
-        // Click on ground to move
         const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
         const intersectPoint = new THREE.Vector3();
         raycaster.ray.intersectPlane(plane, intersectPoint);
-
-        // Clamp to map bounds
         intersectPoint.x = Math.max(-MAP_SIZE/2 + 2, Math.min(MAP_SIZE/2 - 2, intersectPoint.x));
         intersectPoint.z = Math.max(-MAP_SIZE/2 + 2, Math.min(MAP_SIZE/2 - 2, intersectPoint.z));
-
-        // Set move target
         gameState.moveTarget = intersectPoint.clone();
         gameState.targetLock = null; // Clear attack target
-
-        // Visual feedback - create click marker
         createMoveMarker(intersectPoint);
     }
 });
@@ -2942,8 +2552,6 @@ document.addEventListener('mouseup', (e) => {
 document.addEventListener('contextmenu', (e) => {
     e.preventDefault(); // Prevent right-click menu
 });
-
-// Scroll wheel zoom (only when game is active)
 document.addEventListener('wheel', (e) => {
     if (!gameState.gameStarted) return; // Allow normal page scroll on landing
     e.preventDefault();
@@ -2953,17 +2561,11 @@ document.addEventListener('wheel', (e) => {
     gameState.cameraOffset.y = newZoom;
     gameState.cameraOffset.z = newZoom;
 }, { passive: false });
-
-// WC3-style move marker — three spinning arrows converging on point
 function createMoveMarker(position) {
     const markerGroup = new THREE.Group();
     const terrainY = Math.sin(position.x * 0.1) * Math.cos(position.z * 0.1) * 2 + 0.6;
-
-    // Three arrow shapes, 120 degrees apart
     for (let i = 0; i < 3; i++) {
         const arrow = new THREE.Group();
-
-        // Arrow body — thin triangle pointing inward
         const shape = new THREE.Shape();
         shape.moveTo(0, 0);
         shape.lineTo(-0.12, 0.5);
@@ -2978,8 +2580,6 @@ function createMoveMarker(position) {
         });
         const mesh = new THREE.Mesh(geo, mat);
         arrow.add(mesh);
-
-        // Position arrow pointing inward from outside
         const angle = (i / 3) * Math.PI * 2;
         arrow.position.set(Math.cos(angle) * 0.8, 0, Math.sin(angle) * 0.8);
         arrow.rotation.x = -Math.PI / 2;
@@ -2990,8 +2590,6 @@ function createMoveMarker(position) {
 
     markerGroup.position.set(position.x, terrainY, position.z);
     scene.add(markerGroup);
-
-    // Animate: spin + shrink + fade
     let time = 0;
     let opacity = 0.9;
     const animInterval = setInterval(() => {
@@ -3013,10 +2611,8 @@ function createMoveMarker(position) {
         }
     }, 25);
 }
-
-// Game Setup
 let selectedTeamValue = null;
-// Mode selection (isOnlineMode declared at top of file)
+
 document.querySelectorAll('.modeBtn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.modeBtn').forEach(b => {
@@ -3046,8 +2642,6 @@ document.querySelectorAll('.teamBtn').forEach(btn => {
         console.log('Selected team:', selectedTeamValue);
     });
 });
-
-// Retro visitor counter
 {
     const vc = document.getElementById('visitorNum');
     if (vc) {
@@ -3079,8 +2673,6 @@ document.getElementById('startBtn').addEventListener('click', () => {
     document.getElementById('hud')?.classList.remove('hidden');
     document.getElementById('abilities')?.classList.remove('hidden');
     document.querySelector('.minimap')?.classList.remove('hidden');
-
-    // Set ticker to player name
     const tickerEl = document.getElementById('ticker');
     if (tickerEl) tickerEl.textContent = '$' + username.toUpperCase().slice(0, 5);
     _playerPrice = 1.00;
@@ -3112,12 +2704,10 @@ document.querySelectorAll('.ability').forEach(el => {
         }
     });
 });
-
-// Scoreboard + shop close handlers — only when game is running
 document.getElementById('scoreboard')?.addEventListener('click', () => {
     if (gameState.gameStarted) document.getElementById('scoreboard').classList.add('hidden');
 });
-// Menu button
+
 document.getElementById('menuBtn')?.addEventListener('mousedown', (e) => { e.stopPropagation(); });
 document.getElementById('menuBtn')?.addEventListener('click', () => {
     document.getElementById('gameMenu')?.classList.remove('hidden');
@@ -3132,35 +2722,23 @@ document.getElementById('menuMute')?.addEventListener('click', () => {
 });
 document.getElementById('menuQuit')?.addEventListener('click', () => {
     document.getElementById('gameMenu')?.classList.add('hidden');
-
-    // If wager match, forfeit
     if (window._isWagerMatch && _ws && _ws.readyState === 1) {
         _ws.send(JSON.stringify({ t: 'wager_forfeit' }));
     }
-
-    // Close WebSocket
     if (_ws) { try { _ws.close(); } catch(e) {} _ws = null; }
-
-    // Reset game state
     gameState.gameStarted = false;
     isOnlineMode = false;
     window._isWagerMatch = false;
     window._gameStarted = false;
-
-    // Hide game UI
     document.getElementById('hud')?.classList.add('hidden');
     document.getElementById('abilities')?.classList.add('hidden');
     document.querySelector('.minimap')?.classList.add('hidden');
     document.getElementById('teamScore')?.classList.add('hidden');
-
-    // Show landing page
     document.getElementById('landingPage')?.classList.remove('hidden');
     document.getElementById('gameCanvas').style.display = 'none';
     document.getElementById('ui').style.display = 'none';
     document.body.classList.remove('game-active');
     window.scrollTo(0, 0);
-
-    // Clean up remote players
     _remotePlayers.forEach((r) => { if (r.player.mesh.parent) r.player.mesh.parent.remove(r.player.mesh); });
     _remotePlayers.clear();
     _serverState.clear();
@@ -3185,9 +2763,6 @@ document.addEventListener('touchstart', (e) => {
 
 function startGame() {
     console.log('startGame() called');
-    try {
-
-    // Remove preview ground (not fog layers)
     const fogLayers = new Set(fogOfWar.fogLayers || []);
     const toRemove = scene.children.filter(child =>
         child.geometry && child.geometry.type === 'PlaneGeometry' && !fogLayers.has(child)
@@ -3197,16 +2772,10 @@ function startGame() {
     console.log('About to createMap...');
     createMap();
     console.log('Map created');
-
-    // Create player
     console.log('About to create player...');
     gameState.player = new Player(gameState.username, gameState.team, true);
     console.log('Player created at', gameState.player.position.x, gameState.player.position.z);
-
-    // Initialize camera at player position
     gameState.cameraTarget.copy(gameState.player.position);
-
-    // Create bots (5 per team) — only in offline mode
     if (!isOnlineMode) {
         const botNames = ['Elite', 'Anima', 'Game', 'ESi', 'Apathetic', 'Gem', 'Kflan', 'Jubei', 'Steve', 'Sean'];
         for (let i = 0; i < 10; i++) {
@@ -3216,7 +2785,7 @@ function startGame() {
         }
         console.log('Bots created:', gameState.bots.length);
     } else if (!_ws) {
-        // Online mode — connect to public server (skip if wager WS already set)
+
         console.log('Online mode — connecting to server');
         connectToServer();
     } else {
@@ -3224,22 +2793,16 @@ function startGame() {
     }
 
     updateScoreboard();
-
-    // Make sure the window has focus for keyboard input
     window.focus();
     document.body.focus();
 
     animate();
-    } catch(e) { console.error('startGame error:', e); }
 }
-
-// Minimap
 const minimapCanvas = document.getElementById('minimap');
 const minimapCtx = minimapCanvas.getContext('2d');
 minimapCanvas.width = 150;
 minimapCanvas.height = 150;
 
-// Minimap interaction — tap or hold+drag to scroll camera to that map position
 function minimapToWorld(clientX, clientY) {
     const rect = minimapCanvas.getBoundingClientRect();
     const mx = (clientX - rect.left) / rect.width;  // 0-1
@@ -3254,8 +2817,6 @@ function jumpCameraTo(worldX, worldZ) {
     gameState.cameraTarget.x += (worldX - gameState.cameraTarget.x) * 0.4;
     gameState.cameraTarget.z += (worldZ - gameState.cameraTarget.z) * 0.4;
 }
-
-// Works for both mouse and touch
 minimapCanvas.style.pointerEvents = 'all';
 minimapCanvas.style.touchAction = 'none';
 
@@ -3303,7 +2864,6 @@ function updateMinimap() {
 
     const scale = 150 / MAP_SIZE;
 
-    // Collect all players: offline bots + online remote players + local player
     const allPlayers = [...gameState.bots];
     if (isOnlineMode) {
         for (const [, remote] of _remotePlayers) {
@@ -3317,8 +2877,6 @@ function updateMinimap() {
 
         const isMe = p === gameState.player;
         const isTeammate = p.team === gameState.team;
-
-        // Teammates always show on minimap; enemies only if visible (in FOW)
         if (!isTeammate && !isMe) {
             if (!p.mesh.visible) return;
             if (!fogOfWar.isVisible(p.position.x, p.position.z)) return;
@@ -3333,8 +2891,6 @@ function updateMinimap() {
         minimapCtx.fill();
     });
 }
-
-// Game Loop
 let lastTime = performance.now();
 
 function animate() {
@@ -3346,17 +2902,11 @@ function animate() {
     lastTime = currentTime;
 
     if (!gameState.gameStarted) return;
-
-    // Update tree wind sway
     const windTime = currentTime * 0.001;
     for (let i = 0; i < _windMaterials.length; i++) {
         _windMaterials[i].uniforms.uTime.value = windTime;
     }
-
-    // Shop proximity check
     checkShopProximity();
-
-    // Multi-kill timer countdown
     if (gameState.multiKillTimer > 0) {
         gameState.multiKillTimer -= deltaTime;
         if (gameState.multiKillTimer <= 0) {
@@ -3364,8 +2914,6 @@ function animate() {
         }
     }
 
-    // Camera controls
-    // Edge scrolling
     const edgeScrollSpeed = 20;
     const edgeThreshold = 50;
     const mouseX = (gameState.mousePos.x + 1) * window.innerWidth / 2;
@@ -3382,41 +2930,27 @@ function animate() {
     } else if (mouseY > window.innerHeight - edgeThreshold) {
         gameState.cameraTarget.z += edgeScrollSpeed * deltaTime;
     }
-
-    // Middle mouse drag
     if (gameState.isDraggingCamera) {
-        // This will be handled in mousemove
-    }
 
-    // WASD camera movement (alternative to edge scroll)
+    }
     const camSpeed = 15;
     if (gameState.keys['w'] && !gameState.keys['s']) gameState.cameraTarget.z -= camSpeed * deltaTime;
     if (gameState.keys['s'] && !gameState.keys['w']) gameState.cameraTarget.z += camSpeed * deltaTime;
     if (gameState.keys['a'] && !gameState.keys['d']) gameState.cameraTarget.x -= camSpeed * deltaTime;
     if (gameState.keys['d'] && !gameState.keys['a']) gameState.cameraTarget.x += camSpeed * deltaTime;
-
-    // Spacebar to center on player
     if (gameState.keys[' '] && gameState.player) {
         gameState.cameraTarget.copy(gameState.player.position);
-        // space-to-center handled by cameraTarget.copy above
+
     }
-
-    // No auto-follow on mobile — camera stays where you put it
-
-    // Clamp camera to map bounds
     const mapBound = MAP_SIZE / 2 - 5;
     gameState.cameraTarget.x = THREE.MathUtils.clamp(gameState.cameraTarget.x, -mapBound, mapBound);
     gameState.cameraTarget.z = THREE.MathUtils.clamp(gameState.cameraTarget.z, -mapBound, mapBound);
-
-    // Smooth camera movement
     camera.position.x = THREE.MathUtils.lerp(camera.position.x, gameState.cameraTarget.x + gameState.cameraOffset.x, 0.06);
     camera.position.y = gameState.cameraOffset.y;
     camera.position.z = THREE.MathUtils.lerp(camera.position.z, gameState.cameraTarget.z + gameState.cameraOffset.z, 0.06);
     camera.lookAt(gameState.cameraTarget);
-
-    // Update player movement (click to move)
     if (gameState.player && gameState.player.health > 0) {
-        // Move towards click target
+
         if (gameState.moveTarget) {
             const reached = gameState.player.moveTowards(gameState.moveTarget, deltaTime);
             if (reached) {
@@ -3424,7 +2958,6 @@ function animate() {
             }
         }
 
-        // Aim weapon at mouse
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(gameState.mousePos, camera);
         const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -3432,24 +2965,16 @@ function animate() {
         raycaster.ray.intersectPlane(plane, intersectPoint);
 
         gameState.player.weapon.lookAt(intersectPoint);
-
-        // Gold display updated via earnGold()
     }
-
-    // Update bots (offline only — online mode updates from server)
     if (!isOnlineMode) {
         gameState.bots.forEach(bot => bot.update(deltaTime));
     } else {
-        // Online mode: interpolate remote players
+
         if (typeof updateRemotePlayers === 'function') updateRemotePlayers(deltaTime);
     }
-
-    // Update player
     if (gameState.player) {
         gameState.player.update(deltaTime);
     }
-
-    // Update abilities cooldown
     Object.values(gameState.abilities).forEach(ability => {
         if (ability.cooldown > 0) {
             ability.cooldown -= deltaTime;
@@ -3460,13 +2985,11 @@ function animate() {
     updateAbilityUI();
     updateScoreboard();
     updateMinimap();
-
-    // Update fog of war with all units (player + all bots + remote teammates)
     const allUnits = [...gameState.bots];
     if (gameState.player) {
         allUnits.push(gameState.player);
     }
-    // In online mode, include remote teammates for shared vision
+
     if (isOnlineMode) {
         for (const [, remote] of _remotePlayers) {
             if (remote.player.team === gameState.team && remote.player.health > 0) {
@@ -3481,18 +3004,14 @@ function animate() {
     }
 
     fogOfWar.update(gameState.player, allUnits, farsightPositions);
-
-    // Vision light follows player
     if (gameState.player) {
         visionLight.position.set(gameState.player.position.x, 12, gameState.player.position.z);
     }
-
-    // Hide enemy units — instant hide when leaving vision, no linger
     gameState.bots.forEach(bot => {
         if (bot.team !== gameState.team) {
             const inVision = fogOfWar.isVisible(bot.position.x, bot.position.z);
             bot.mesh.visible = inVision && bot.health > 0;
-            // Reset opacity when visible
+
             if (bot.mesh.visible) {
                 bot.mesh.traverse(child => {
                     if (child.material && !child.isSprite) {
@@ -3509,8 +3028,6 @@ function animate() {
     renderer.render(scene, camera);
     updateCRT();
 }
-
-// Handle window resize — ignore mobile keyboard resize
 let _baseWidth = window.innerWidth;
 let _baseHeight = window.innerHeight;
 const _isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('ontouchstart' in window);
@@ -3518,7 +3035,7 @@ const _isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
 function handleResize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    // On mobile, keyboard opening shrinks innerHeight but not width — skip that
+
     if (_isMobileDevice && w === _baseWidth && h < _baseHeight * 0.8) return;
     _baseWidth = w;
     _baseHeight = h;
@@ -3527,8 +3044,6 @@ function handleResize() {
     renderer.setSize(w, h);
 }
 window.addEventListener('resize', handleResize);
-
-// Prevent scroll when focusing chat on mobile
 if (_isMobileDevice) {
     const _chatEl = document.getElementById('chatInput');
     if (_chatEl) {
@@ -3538,22 +3053,16 @@ if (_isMobileDevice) {
         });
     }
 }
-
-// Initial render loop (before game starts)
 function preGameRender() {
     if (!gameState.gameStarted) {
         requestAnimationFrame(preGameRender);
         renderer.render(scene, camera);
     }
 }
-
-// Start pre-game rendering immediately
 preGameRender();
-
-// Respawn button — immediate respawn
 document.getElementById('respawnBtn')?.addEventListener('click', () => {
     document.getElementById('deathPopup').classList.add('hidden');
-    // Just snap camera to spawn — auto-respawn handles the actual respawn
+
     if (gameState.player) {
         const spawnX = gameState.player.team === 'red' ? -70 : 70;
         const spawnZ = gameState.player.team === 'red' ? -70 : 70;
@@ -3561,8 +3070,6 @@ document.getElementById('respawnBtn')?.addEventListener('click', () => {
         gameState.cameraTarget.z = spawnZ;
     }
 });
-
-// Also hide popup on respawn
 const _origRespawn = Player.prototype.respawn;
 Player.prototype.respawn = function() {
     _origRespawn.call(this);
@@ -3571,10 +3078,6 @@ Player.prototype.respawn = function() {
     }
 };
 
-// Smooth camera globals — used by mobile touch + minimap
-// smoothCam removed — camera moves directly via cameraTarget
-
-// === MOBILE TOUCH — drag anywhere to scroll camera, tap to move/attack ===
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('ontouchstart' in window);
 
 if (isMobile) {
@@ -3583,8 +3086,6 @@ if (isMobile) {
     const touches = new Map();
     const DRAG_THRESHOLD = 15;
     const TAP_TIME = 200;
-
-    // Camera velocity for flick momentum
     let camVelX = 0, camVelZ = 0;
 
     const _shopOpen = () => !document.getElementById('shopPanel').classList.contains('hidden');
@@ -3628,7 +3129,7 @@ if (isMobile) {
                 if (data.isDrag) {
                     const dx = t.clientX - data.lastX;
                     const dy = t.clientY - data.lastY;
-                    // Move camera directly — no smoothCam indirection
+
                     gameState.cameraTarget.x -= dx * 0.06;
                     gameState.cameraTarget.z -= dy * 0.06;
                     camVelX = -dx * 0.06;
@@ -3671,7 +3172,7 @@ if (isMobile) {
                 setTimeout(() => {
                     document.dispatchEvent(new MouseEvent('mouseup', { clientX: data.startX, clientY: data.startY, button: 0, bubbles: true }));
                 }, 50);
-                // No momentum on tap
+
                 camVelX = 0;
                 camVelZ = 0;
             }
@@ -3682,8 +3183,6 @@ if (isMobile) {
             gameState._pinchStart = null;
         }
     }, { passive: false });
-
-    // Momentum decay loop — runs every frame on mobile
     function applyMomentum() {
         requestAnimationFrame(applyMomentum);
         if (Math.abs(camVelX) > 0.01 || Math.abs(camVelZ) > 0.01) {
@@ -3695,8 +3194,6 @@ if (isMobile) {
     }
     applyMomentum();
 }
-
-// Ability buttons — works on both mobile and desktop via touch/click
 document.querySelectorAll('.ability').forEach(btn => {
     btn.addEventListener('touchstart', (e) => {
         e.stopPropagation();
@@ -3730,8 +3227,6 @@ document.querySelectorAll('.ability').forEach(btn => {
 });
 
 if (!isMobile) {
-
-    // Fullscreen on game start
     document.getElementById('startBtn')?.addEventListener('click', () => {
         setTimeout(() => {
             if (document.documentElement.requestFullscreen) {
@@ -3739,7 +3234,7 @@ if (!isMobile) {
             } else if (document.documentElement.webkitRequestFullscreen) {
                 document.documentElement.webkitRequestFullscreen();
             }
-            // Lock to landscape
+
             if (screen.orientation?.lock) {
                 screen.orientation.lock('landscape').catch(() => {});
             }
@@ -3749,14 +3244,8 @@ if (!isMobile) {
 
 console.log('Elite Snipers - Loading complete!' + (isMobile ? ' (Mobile)' : ''));
 
-// ============================================================================
-// === AABB COLLISION (uses map-data.json, matches server collision) ===
-// ============================================================================
-
 let _aabbWalls = null; // Will be loaded from map-data.json
 let _mapDataLoaded = null;
-
-// Fetch map data for AABB collision (used in online mode + as alternative collision)
 fetch('/map-data.json').then(r => r.json()).then(data => {
     _mapDataLoaded = data;
     _aabbWalls = [];
@@ -3775,7 +3264,7 @@ fetch('/map-data.json').then(r => r.json()).then(data => {
 function checkCollisionAABB(x, z, radius) {
     if (!_aabbWalls) return false;
     if (radius === undefined) radius = 1.0;
-    // Map bounds
+
     if (Math.abs(x) > MAP_SIZE / 2 - 2 || Math.abs(z) > MAP_SIZE / 2 - 2) return true;
     for (let i = 0; i < _aabbWalls.length; i++) {
         const w = _aabbWalls[i];
@@ -3798,16 +3287,10 @@ function hasLineOfSightAABB(ax, az, bx, bz) {
     return true;
 }
 
-// ============================================================================
-// === MULTIPLAYER NETWORKING ===
-// This section only activates when isOnlineMode is true
-// All offline code above remains completely untouched
-// ============================================================================
-
 let _ws = null;
 let _myServerId = null;
 let _roster = {}; // id -> { username, team, isBot }
-// _remotePlayers declared at top of file
+
 let _serverState = new Map(); // serverId -> latest decoded state
 let _lastSendTime = 0;
 let _lastAimRot = 0;
@@ -3816,7 +3299,7 @@ const BYTES_PER_PLAYER = 28;
 const INTERP_SPEED = 12; // units/sec for interpolation
 
 function _netDebug(text) {
-    // Console only — no on-screen debug
+
     console.log('[NET]', text);
 }
 
@@ -3827,14 +3310,12 @@ function connectToServer() {
 
     _ws = new WebSocket(url);
     _ws.binaryType = 'arraybuffer';
-
-    // Timeout — if no connection in 3s, fall back to offline
     const connectTimeout = setTimeout(() => {
         if (_ws.readyState !== 1) {
             _netDebug('Connection timeout — falling back to offline');
             _ws.close();
             isOnlineMode = false;
-            // Create local bots
+
             const botNames = ['Elite','Anima','Game','ESi','Apathetic','Gem','Kflan','Jubei','Steve','Sean'];
             for (let i = 0; i < 10; i++) {
                 const bot = new Player(botNames[i], i < 5 ? 'red' : 'blue', false);
@@ -3852,8 +3333,6 @@ function connectToServer() {
             n: gameState.username,
             m: gameState.team
         }));
-
-        // Show chat box
         document.getElementById('chatBox')?.classList.remove('hidden');
     };
 
@@ -3880,7 +3359,7 @@ function connectToServer() {
     _ws.onclose = () => {
         console.log('WebSocket disconnected');
         addChatSystem('Disconnected from server');
-        // Try reconnect after 3s
+
         setTimeout(() => {
             if (isOnlineMode && gameState.gameStarted) connectToServer();
         }, 3000);
@@ -3892,7 +3371,7 @@ function connectToServer() {
 }
 
 function handleBinaryState(buf) {
-    // Don't process binary state until we know our own ID (prevents ghost self-remote)
+
     if (!_myServerId) return;
 
     const view = new DataView(buf);
@@ -3900,7 +3379,7 @@ function handleBinaryState(buf) {
     if (!handleBinaryState._logged) {
         console.log('First binary state: ' + count + ' players, ' + buf.byteLength + ' bytes');
         handleBinaryState._logged = true;
-        // Visible debug on screen
+
         const dbg = document.createElement('div');
         dbg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#00ff44;font-size:1rem;z-index:99999;pointer-events:none;font-family:monospace;text-shadow:0 0 10px #00ff44;';
         dbg.textContent = 'Server: ' + count + ' players connected';
@@ -3934,7 +3413,7 @@ function handleBinaryState(buf) {
         seenIds.add(id);
 
         if (id === _myServerId) {
-            // Update local player state from server
+
             if (gameState.player) {
                 gameState.player.kills = kills;
                 gameState.player.deaths = deaths;
@@ -3942,20 +3421,16 @@ function handleBinaryState(buf) {
                 gameState.player.gold = gold;
                 gameState.player.streak = streak;
                 gameState.player._spawnProtection = isSpawnProt ? 1.0 : -1;
-
-                // Sync health state
                 const wasAlive = gameState.player.health > 0;
                 if (alive && !wasAlive) {
-                    // Respawned
+
                     gameState.player.health = 100;
                     gameState.player.mesh.visible = true;
                     gameState.player.position.set(x, Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.6, z);
                     document.getElementById('deathPopup')?.classList.add('hidden');
                 } else if (!alive && wasAlive) {
-                    // Died (handled by kill event)
-                }
 
-                // Server-authoritative position — interpolate toward server pos for smooth movement
+                }
                 if (alive) {
                     const cdx = x - gameState.player.position.x;
                     const cdz = z - gameState.player.position.z;
@@ -3969,8 +3444,6 @@ function handleBinaryState(buf) {
                     }
                     gameState.player.position.y = Math.sin(gameState.player.position.x * 0.1) * Math.cos(gameState.player.position.z * 0.1) * 2 + 0.6;
                 }
-
-                // Update HUD
                 gameState.kills = kills;
                 gameState.deaths = deaths;
                 gameState.gold = gold;
@@ -3984,12 +3457,12 @@ function handleBinaryState(buf) {
                 updateTerminal();
             }
         } else {
-            // Remote player
+
             _serverState.set(id, { x, z, rot, alive: !!alive, kills, deaths, price, gold, streak, team, isBot, isWindwalk, isSpawnProt });
 
             let remote = _remotePlayers.get(id);
             if (!remote) {
-                // Create new remote player mesh
+
                 const name = (_roster[id] && _roster[id].username) || (isBot ? 'Bot' : 'Player');
                 console.log('Creating remote: ' + name + ' id=' + id + ' team=' + team);
                 const rPlayer = new Player(name, team, false);
@@ -4013,19 +3486,15 @@ function handleBinaryState(buf) {
             remote.player.price = price;
             remote.player.gold = gold;
             remote.player.streak = streak;
-
-            // Health sync — snap position on respawn to avoid ghost at death spot
             const wasDead = remote.player.health <= 0;
             remote.player.health = alive ? 100 : 0;
             if (wasDead && alive) {
-                // Just respawned — snap to server position immediately
+
                 remote.player.position.x = x;
                 remote.player.position.z = z;
                 remote.player.position.y = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2 + 0.6;
             }
             remote.player._inFog = inFog;
-
-            // Dead = always hidden, no exceptions
             if (!alive) {
                 remote.player.mesh.visible = false;
                 remote.targetX = x;
@@ -4033,23 +3502,15 @@ function handleBinaryState(buf) {
                 remote.targetRot = rot;
                 continue;
             }
-
-            // Alive — visibility based on team/fog
             if (remote.player.team === gameState.team) {
                 remote.player.mesh.visible = true;
             } else {
                 remote.player.mesh.visible = fogOfWar.isVisible(x, z);
             }
-
-            // Windwalk visual
             remote.player.isWindwalking = isWindwalk;
-
-            // Spawn prot
             remote.player._spawnProtection = isSpawnProt ? 1.0 : -1;
         }
     }
-
-    // Remove stale remote players whose IDs are no longer in the server state
     for (const [rid, remote] of _remotePlayers) {
         if (!seenIds.has(rid) && rid !== _myServerId) {
             if (remote.player.mesh.parent) remote.player.mesh.parent.remove(remote.player.mesh);
@@ -4061,16 +3522,16 @@ function handleBinaryState(buf) {
 function handleJsonMessage(msg) {
     switch (msg.t) {
         case 'j': {
-            // Join confirmation
+
             _myServerId = msg.id;
             console.log('Joined as id', _myServerId);
-            // Store roster
+
             if (msg.roster) {
                 msg.roster.forEach(r => {
                     _roster[r.id] = { username: r.n, team: r.m, isBot: !!r.b };
                 });
             }
-            // Init team score HUD (skip in wager mode — wager has own HUD)
+
             if (msg.limit) {
                 _matchKillLimit = msg.limit;
                 _matchTimeLimit = msg.timeLimit || 1200;
@@ -4083,17 +3544,17 @@ function handleJsonMessage(msg) {
             break;
         }
         case 'pj': {
-            // Player joined
+
             addChatSystem(msg.n + ' joined ' + msg.m);
             break;
         }
         case 'pl': {
-            // Player left
+
             addChatSystem(msg.n + ' left');
             break;
         }
         case 'roster': {
-            // Full roster update — register all player names/teams
+
             if (msg.roster) {
                 for (const r of msg.roster) {
                     _roster[r.id] = { username: r.n, team: r.m, isBot: !!r.b };
@@ -4102,14 +3563,12 @@ function handleJsonMessage(msg) {
             break;
         }
         case 'k': {
-            // Kill event — play shooting VFX
+
             addKillFeed(msg.kn, msg.vn);
             audioManager.play('sniperFire');
-
-            // Update score HUD
             if (msg.rk !== undefined) {
                 if (window._isWagerMatch && window._updateWagerScoreFromKill) {
-                    // Wager mode: update wager HUD with red/blue kills
+
                     const myTeam = gameState.team;
                     const myKills = myTeam === 'red' ? msg.rk : msg.bk;
                     const oppKills = myTeam === 'red' ? msg.bk : msg.rk;
@@ -4118,8 +3577,6 @@ function handleJsonMessage(msg) {
                     updateTeamScore(msg.rk, msg.bk);
                 }
             }
-
-            // Find killer + victim meshes for tracer VFX
             const killer = msg.ki === _myServerId ? gameState.player :
                 _remotePlayers.get(msg.ki)?.player;
             const victim = msg.vi === _myServerId ? gameState.player :
@@ -4127,8 +3584,6 @@ function handleJsonMessage(msg) {
             if (killer && victim && killer.createShootingEffect) {
                 killer.createShootingEffect(victim.position);
             }
-
-            // Immediately hide remote victim — don't wait for binary state update
             if (msg.vi !== _myServerId) {
                 const remote = _remotePlayers.get(msg.vi);
                 if (remote) {
@@ -4136,12 +3591,8 @@ function handleJsonMessage(msg) {
                     remote.player.mesh.visible = false;
                 }
             }
-
-            // If the killer is our player
             if (msg.ki === _myServerId) {
                 audioManager.play('headshot');
-
-                // First blood
                 let hasSpecial = false;
                 if (msg.fb) {
                     audioManager.play('firstBlood');
@@ -4149,7 +3600,6 @@ function handleJsonMessage(msg) {
                     hasSpecial = true;
                 }
 
-                // Kill streak sounds (consecutive kills without dying)
                 const streakMap = {
                     5: ['killingSpree', 'KILLING SPREE', '#ff8800'],
                     10: ['rampage', 'RAMPAGE', '#ff4400'],
@@ -4162,8 +3612,6 @@ function handleJsonMessage(msg) {
                     if (!hasSpecial) showStreakPopup(streakMap[msg.s][1], streakMap[msg.s][2]);
                     hasSpecial = true;
                 }
-
-                // Multi-kill tracking (rapid kills within 4 seconds)
                 if (!gameState._multiKillTimer) gameState._multiKillTimer = 0;
                 if (!gameState._multiKillCount) gameState._multiKillCount = 0;
                 const now = Date.now();
@@ -4192,8 +3640,6 @@ function handleJsonMessage(msg) {
 
                 showGoldPopup('+' + msg.g + 'c');
             }
-
-            // If the victim is our player
             if (msg.vi === _myServerId && gameState.player) {
                 gameState.player.health = 0;
                 gameState.player.mesh.visible = false;
@@ -4212,14 +3658,14 @@ function handleJsonMessage(msg) {
             break;
         }
         case 'r': {
-            // Respawn event
+
             if (msg.id === _myServerId && gameState.player) {
                 gameState.player.health = 100;
                 gameState.player.mesh.visible = true;
                 const ty = Math.sin(msg.x * 0.1) * Math.cos(msg.z * 0.1) * 2 + 0.6;
                 gameState.player.position.set(msg.x, ty, msg.z);
                 gameState.player._spawnProtection = 1.5;
-                // Clear move targets — player should sit idle until clicked
+
                 gameState.moveTarget = null;
                 gameState.targetLock = null;
                 _lastMoveTarget = null;
@@ -4228,14 +3674,14 @@ function handleJsonMessage(msg) {
             break;
         }
         case 'shld': {
-            // Shield blocked
+
             if (msg.vi === _myServerId) {
                 showStreakPopup('SHIELD BLOCKED!', '#44aaff');
             }
             break;
         }
         case 'bought': {
-            // Shop purchase confirmed
+
             if (gameState.player) {
                 gameState.player.gold = msg.g;
                 gameState.player.inventory[msg.i] = true;
@@ -4248,7 +3694,7 @@ function handleJsonMessage(msg) {
             break;
         }
         case 'ch': {
-            // Chat message
+
             addChatMessage(msg.n, msg.m, msg.x);
             break;
         }
@@ -4262,8 +3708,6 @@ function handleJsonMessage(msg) {
         }
     }
 }
-
-// === MATCH STATE ===
 let _matchKillLimit = 50;
 let _matchTimeLimit = 1200;
 let _matchStartTime = Date.now();
@@ -4286,18 +3730,12 @@ function showMatchEnd(msg) {
     const isDraw = msg.win === 'draw';
 
     el.className = isDraw ? 'draw' : (isWin ? 'win' : 'lose');
-
-    // Title
     document.getElementById('matchEndTitle').textContent =
         isDraw ? 'DRAW' : (isWin ? 'VICTORY' : 'DEFEAT');
-
-    // Score — big and bold
     document.getElementById('matchEndScore').innerHTML =
         '<span style="color:#ff5555">' + msg.rk + '</span>' +
         ' <span style="color:#555;font-size:0.6em;">vs</span> ' +
         '<span style="color:#55aaff">' + msg.bk + '</span>';
-
-    // Your stats boxes
     const me = msg.stats && msg.stats.find(s => s.n === gameState.username);
     const yourStats = document.getElementById('matchEndYourStats');
     if (me) {
@@ -4310,8 +3748,6 @@ function showMatchEnd(msg) {
     } else {
         yourStats.innerHTML = '';
     }
-
-    // MVP
     const mvp = msg.stats && msg.stats[0];
     if (mvp) {
         const mvpColor = mvp.m === 'red' ? '#ff5555' : '#55aaff';
@@ -4319,8 +3755,6 @@ function showMatchEnd(msg) {
             'MVP <span style="color:' + mvpColor + ';font-weight:bold;">' + mvp.n + '</span> — ' +
             mvp.k + ' kills';
     }
-
-    // Full stats table
     if (msg.stats) {
         let html = '';
         msg.stats.forEach(function(s) {
@@ -4339,14 +3773,10 @@ function showMatchEnd(msg) {
     const timeStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
 
     el.classList.remove('hidden');
-
-    // Exit button
     document.getElementById('matchEndExit').onclick = function() {
         el.classList.add('hidden');
         if (_matchEndCountdown) { clearInterval(_matchEndCountdown); _matchEndCountdown = null; }
     };
-
-    // Countdown
     let remaining = 12;
     const timerEl = document.getElementById('matchEndTimer');
     timerEl.textContent = timeStr + '  •  Next match in ' + remaining + 's';
@@ -4363,25 +3793,19 @@ function showMatchEnd(msg) {
 }
 
 function handleNewMatch(msg) {
-    // Hide match end screen
+
     document.getElementById('matchEnd')?.classList.add('hidden');
     document.getElementById('deathPopup')?.classList.add('hidden');
     if (_matchEndCountdown) { clearInterval(_matchEndCountdown); _matchEndCountdown = null; }
-
-    // Reset match state
     _matchKillLimit = msg.limit || 50;
     _matchTimeLimit = msg.timeLimit || 1200;
     _matchStartTime = Date.now();
     updateTeamScore(0, 0);
-
-    // Update roster
     if (msg.roster) {
         for (const r of msg.roster) {
             _roster[r.id] = { username: r.n, team: r.m, isBot: !!r.b };
         }
     }
-
-    // Reset local player
     if (gameState.player) {
         gameState.player.health = 100;
         gameState.player.kills = 0;
@@ -4394,14 +3818,14 @@ function handleNewMatch(msg) {
         gameState.player._applyItems();
         gameState.player.mesh.visible = true;
         gameState.player._spawnProtection = 1.5;
-        // Respawn at team spawn
+
         const spawnX = gameState.player.team === 'red' ? -70 : 70;
         const spawnZ = gameState.player.team === 'red' ? -70 : 70;
         const spawnY = Math.sin(spawnX * 0.1) * Math.cos(spawnZ * 0.1) * 2 + 0.6;
         gameState.player.position.set(spawnX, spawnY, spawnZ);
         gameState.cameraTarget.x = spawnX;
         gameState.cameraTarget.z = spawnZ;
-        // Clear move targets — idle until player clicks
+
         gameState.moveTarget = null;
         gameState.targetLock = null;
         _lastMoveTarget = null;
@@ -4416,8 +3840,6 @@ function handleNewMatch(msg) {
         updateGoldUI();
         updateTerminal();
     }
-
-    // Reset remote players
     for (const [, remote] of _remotePlayers) {
         remote.player.kills = 0;
         remote.player.deaths = 0;
@@ -4443,14 +3865,12 @@ function updateRemotePlayers(dt) {
     for (const [id, remote] of _remotePlayers) {
         const p = remote.player;
         if (!p.mesh.visible) continue;
-
-        // Interpolate position
         const dx = remote.targetX - p.position.x;
         const dz = remote.targetZ - p.position.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
 
         if (dist > 20) {
-            // Snap if too far (first frame or teleport)
+
             p.position.x = remote.targetX;
             p.position.z = remote.targetZ;
         } else if (dist > 0.1) {
@@ -4462,8 +3882,6 @@ function updateRemotePlayers(dt) {
         } else {
             p.velocity.set(0, 0, 0);
         }
-
-        // Interpolate rotation
         let rotDiff = remote.targetRot - (p.mesh.rotation.y || 0);
         while (rotDiff > Math.PI) rotDiff -= 2 * Math.PI;
         while (rotDiff < -Math.PI) rotDiff += 2 * Math.PI;
@@ -4474,11 +3892,8 @@ function updateRemotePlayers(dt) {
             p.weapon.lookAt(lookTarget);
         }
 
-        // Run animation updates (handles leg swing, cape, etc.)
-        // Call the animation part only (shootCooldown, spawn prot visual, etc.)
         if (p.shootCooldown > 0) p.shootCooldown -= dt;
 
-        // Spawn protection visual
         if (p._spawnProtection > 0) {
             const flicker = Math.sin(Date.now() * 0.015) > 0;
             p.mesh.traverse(child => {
@@ -4489,7 +3904,6 @@ function updateRemotePlayers(dt) {
             });
             p._wasSpawnProt = true;
         } else if (p._wasSpawnProt) {
-            // Spawn protection ended — restore full opacity
             p.mesh.traverse(child => {
                 if (child.material && !child.isSprite) {
                     child.material.transparent = false;
@@ -4499,7 +3913,6 @@ function updateRemotePlayers(dt) {
             p._wasSpawnProt = false;
         }
 
-        // Animation (movement idle/walk)
         const isMoving = dist > 0.5;
         const time = Date.now() * 0.001;
         if (isMoving && p.leftLeg && p.rightLeg) {
@@ -4521,14 +3934,12 @@ function updateRemotePlayers(dt) {
             if (p.cape) p.cape.rotation.x = 0.1 + Math.sin(time * 1.5) * 0.05;
         }
     }
-
-    // Send player rotation to server for FOV-based auto-aim
     if (_ws && _ws.readyState === 1 && gameState.player && gameState.player.health > 0 && isOnlineMode) {
         const now2 = performance.now();
         if (now2 - _lastSendTime > 33) { // 30hz rotation updates
             let rot;
             if (_isMobileDevice) {
-                // Mobile: aim toward move target (positioning is the skill)
+
                 if (gameState.moveTarget) {
                     const dx = gameState.moveTarget.x - gameState.player.position.x;
                     const dz = gameState.moveTarget.z - gameState.player.position.z;
@@ -4538,7 +3949,7 @@ function updateRemotePlayers(dt) {
                     rot = _lastAimRot || 0;
                 }
             } else {
-                // Desktop: aim toward mouse cursor on ground plane
+
                 const raycaster = new THREE.Raycaster();
                 raycaster.setFromCamera(gameState.mousePos, camera);
                 const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -4552,14 +3963,8 @@ function updateRemotePlayers(dt) {
     }
 }
 
-// === ONLINE MODE: Override movement to send to server ===
-// Intercept click-to-move in online mode
 const _origMouseDown = document.onmousedown;
 
-// We hook into the existing mousedown handler by checking isOnlineMode in
-// the move target section. The existing code sets gameState.moveTarget which
-// drives local movement. In online mode, we also send the move command.
-// We add a frame-level check to send move commands.
 let _lastMoveTarget = null;
 
 function checkAndSendMove() {
@@ -4573,10 +3978,6 @@ function checkAndSendMove() {
     _ws.send(JSON.stringify({ t: 'mv', x: mt.x, z: mt.z }));
 }
 
-// Abilities in online mode send network messages via the keydown listener below
-// Local ability functions still run for client-side visuals
-
-// Override shop buying in online mode
 const _origBuyItem = Player.prototype.buyItem;
 Player.prototype.buyItem = function(itemId) {
     if (isOnlineMode && _ws && _ws.readyState === 1) {
@@ -4585,11 +3986,9 @@ Player.prototype.buyItem = function(itemId) {
     }
     return _origBuyItem.call(this, itemId);
 };
-
-// Override ability key handlers to also send to server
 document.addEventListener('keydown', (e) => {
     if (!isOnlineMode || !_ws || _ws.readyState !== 1) return;
-    // Allow typing in chat (except Enter which is handled below)
+
     const chatInput = document.getElementById('chatInput');
     if (chatInput && document.activeElement === chatInput && e.key !== 'Enter') return;
     if (e.key.toLowerCase() === 'g') {
@@ -4599,7 +3998,7 @@ document.addEventListener('keydown', (e) => {
         _ws.send(JSON.stringify({ t: 'ab', a: 'ww' }));
     }
     if (e.key.toLowerCase() === 'e' && gameState.player) {
-        // Send farsight with position
+
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(gameState.mousePos, camera);
         const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -4607,7 +4006,7 @@ document.addEventListener('keydown', (e) => {
         raycaster.ray.intersectPlane(plane, pt);
         _ws.send(JSON.stringify({ t: 'ab', a: 'fs', x: pt.x, z: pt.z }));
     }
-    // Chat
+
     if (e.key === 'Enter') {
         const input = document.getElementById('chatInput');
         if (input && document.activeElement === input) {
@@ -4624,8 +4023,6 @@ document.addEventListener('keydown', (e) => {
         }
     }
 });
-
-// Chat UI helpers
 function addChatMessage(name, team, text) {
     const el = document.getElementById('chatMessages');
     if (!el) return;
@@ -4635,7 +4032,7 @@ function addChatMessage(name, team, text) {
     msg.innerHTML = '<span class="' + nameClass + '">' + escapeHtml(name) + ':</span> ' + escapeHtml(text);
     el.appendChild(msg);
     el.scrollTop = el.scrollHeight;
-    // Trim old messages
+
     while (el.children.length > 50) el.removeChild(el.firstChild);
 }
 
@@ -4654,36 +4051,22 @@ function escapeHtml(str) {
     div.textContent = str;
     return div.innerHTML;
 }
-
-// Start network tick loop (does nothing in offline mode)
 requestAnimationFrame(function netLoop() {
     requestAnimationFrame(netLoop);
     if (isOnlineMode) checkAndSendMove();
 });
 
 console.log('Multiplayer module loaded');
-
-// === WAGER MATCH GAME INTEGRATION ===
-// Called by wager-ui.js when a wager match starts
-// Injects the wager WebSocket as the game connection
 window._startWagerGame = function(ws, matchData) {
     console.log('[WAGER] Starting wager game', matchData);
-
-    // Set game state
     const user = window._wagerUser;
     gameState.username = user?.twitter_handle || user?.display_name || 'Player';
     gameState.team = matchData.isCreator ? 'red' : 'blue';
     gameState.gameStarted = true;
     isOnlineMode = true;
-
-    // Mark as wager mode (disables 5v5 HUD elements)
     window._isWagerMatch = true;
-
-    // Use the wager WebSocket as the game connection
     _ws = ws;
     _ws.binaryType = 'arraybuffer';
-
-    // Set up message handling on the wager WS (same as connectToServer)
     _ws.addEventListener('message', function(evt) {
         const data = evt.data;
         if (typeof data === 'string') {
@@ -4694,8 +4077,6 @@ window._startWagerGame = function(ws, matchData) {
             data.arrayBuffer().then(ab => handleBinaryState(ab));
         }
     });
-
-    // Show game UI — hide landing page, show canvas + HUD
     document.getElementById('landingPage')?.classList.add('hidden');
     document.getElementById('usernameModal')?.classList.add('hidden');
     document.getElementById('gameCanvas').style.display = 'block';
@@ -4704,32 +4085,26 @@ window._startWagerGame = function(ws, matchData) {
     document.getElementById('hud')?.classList.remove('hidden');
     document.getElementById('abilities')?.classList.remove('hidden');
     document.querySelector('.minimap')?.classList.remove('hidden');
-
-    // Hide 5v5-specific HUD elements (wager has its own)
     document.getElementById('teamScore')?.classList.add('hidden');
     document.getElementById('shopPanel')?.classList.add('hidden');
-    // Hide gold display in wager (no shop)
-    document.getElementById('goldDisplay')?.style.setProperty('display', 'none');
 
-    // Start the Three.js game (creates map, player, starts render loop)
+    document.getElementById('goldDisplay')?.style.setProperty('display', 'none');
     if (!window._gameStarted) {
         startGame();
         window._gameStarted = true;
     } else {
-        // Game already running (map exists), reset player for new match
+
         if (gameState.player && gameState.player.mesh.parent) {
             gameState.player.mesh.parent.remove(gameState.player.mesh);
         }
         gameState.player = new Player(gameState.username, gameState.team, true);
         gameState.cameraTarget.copy(gameState.player.position);
-        // Clear old remote players
+
         _remotePlayers.forEach((r) => { if (r.player.mesh.parent) r.player.mesh.parent.remove(r.player.mesh); });
         _remotePlayers.clear();
         _serverState.clear();
         _roster = {};
     }
-
-    // Send join AFTER game is initialized
     _ws.send(JSON.stringify({
         t: 'join',
         n: gameState.username,

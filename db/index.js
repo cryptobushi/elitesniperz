@@ -8,18 +8,12 @@ const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
-
-// Run schema on init (all CREATE IF NOT EXISTS, safe to re-run)
 const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
 db.exec(schema);
-
-// Migrations
 try { db.exec('ALTER TABLE users ADD COLUMN profile_picture TEXT'); } catch(e) { /* already exists */ }
 try { db.exec("ALTER TABLE matches ADD COLUMN match_mode TEXT DEFAULT 'open'"); } catch(e) { /* already exists */ }
 
-// --- Prepared statements ---
-
-// Users
+// Prepared statements
 const _getUser = db.prepare('SELECT * FROM users WHERE id = ?');
 const _upsertUser = db.prepare(`
   INSERT INTO users (id, twitter_handle, twitter_id, privy_wallet, display_name, profile_picture, created_at, last_seen)
@@ -32,9 +26,7 @@ const _upsertUser = db.prepare(`
     profile_picture = COALESCE(excluded.profile_picture, users.profile_picture),
     last_seen = excluded.last_seen
 `);
-// _updateUserStats is now dynamic — see updateUserStats() below
 
-// Matches
 const _createMatch = db.prepare(`
   INSERT INTO matches (id, creator_id, stake_amount, stake_token, kill_target, password_hash, match_mode, created_at)
   VALUES (@id, @creator_id, @stake_amount, @stake_token, @kill_target, @password_hash, @match_mode, @created_at)
@@ -43,8 +35,6 @@ const _getMatch = db.prepare('SELECT * FROM matches WHERE id = ?');
 const _joinMatch = db.prepare(`
   UPDATE matches SET joiner_id = @joiner_id WHERE id = @id AND status IN ('open', 'funded_creator', 'matched') AND joiner_id IS NULL
 `);
-
-// Transactions
 const _createTransaction = db.prepare(`
   INSERT INTO transactions (id, match_id, user_id, tx_type, amount, token, tx_signature, from_wallet, to_wallet, status, created_at)
   VALUES (@id, @match_id, @user_id, @tx_type, @amount, @token, @tx_signature, @from_wallet, @to_wallet, COALESCE(@status, 'pending'), @created_at)
@@ -52,8 +42,6 @@ const _createTransaction = db.prepare(`
 const _confirmTransaction = db.prepare(`
   UPDATE transactions SET status = 'confirmed', confirmed_at = @confirmed_at WHERE id = @id
 `);
-
-// Match history
 const _createMatchHistory = db.prepare(`
   INSERT INTO match_history (match_id, user_id, opponent_id, result, kills, deaths, stake_amount, stake_token, payout, played_at)
   VALUES (@match_id, @user_id, @opponent_id, @result, @kills, @deaths, @stake_amount, @stake_token, @payout, @played_at)
@@ -61,15 +49,13 @@ const _createMatchHistory = db.prepare(`
 const _getMatchHistory = db.prepare(`
   SELECT * FROM match_history WHERE user_id = ? ORDER BY played_at DESC LIMIT ?
 `);
-
-// Leaderboard
 const _getLeaderboard = db.prepare(`
   SELECT id, twitter_handle, display_name, profile_picture, wins, losses, draws, total_earned, total_wagered, elo,
   (COALESCE(wins,0) + COALESCE(losses,0) + COALESCE(draws,0)) as matches
   FROM users ORDER BY wins DESC LIMIT ?
 `);
 
-// --- Exported helpers ---
+// Exports
 
 function getUser(id) {
   return _getUser.get(id) || null;
@@ -206,8 +192,6 @@ function getLeaderboard(limit = 50) {
   return _getLeaderboard.all(limit);
 }
 
-// --- Challenge request queries ---
-
 const _createChallengeRequest = db.prepare(`
   INSERT INTO challenge_requests (id, match_id, challenger_id, status, created_at)
   VALUES (@id, @match_id, @challenger_id, 'pending', @created_at)
@@ -263,9 +247,7 @@ function expireChallengeRequests(matchId) {
 }
 
 function getRecentDeclineCount(creatorId, challengerId, windowMs) {
-  // Count declines within the time window. Use created_at as proxy for decline time
-  // (challenge_requests doesn't have a declined_at column, but created_at is close enough
-  // since challenges are typically declined shortly after creation)
+
   const cutoff = Date.now() - windowMs;
   return db.prepare(`
     SELECT COUNT(*) as cnt FROM challenge_requests cr
@@ -276,14 +258,12 @@ function getRecentDeclineCount(creatorId, challengerId, windowMs) {
 }
 
 function clearTestChallengeDeclines(creatorId, challengerId) {
-  // For testing: clear old decline records so tests don't interfere
+
   return db.prepare(`
     DELETE FROM challenge_requests WHERE challenger_id = ? AND status = 'declined'
     AND match_id IN (SELECT id FROM matches WHERE creator_id = ?)
   `).run(challengerId, creatorId);
 }
-
-// --- Recovery / cleanup queries ---
 
 function getStuckMatches() {
   return db.prepare("SELECT * FROM matches WHERE status IN ('in_progress', 'funded_both', 'submitting', 'completed')").all();
