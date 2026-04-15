@@ -1447,16 +1447,21 @@
 
         /* === TEAM SCORE HUD === */
         #teamScore {
-            position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
-            z-index: 500; font-family: 'Courier New', monospace; font-size: clamp(0.8rem, 2.5vw, 1.1rem);
-            background: #0B0F14ee; border: 1px solid #1F2933; border-radius: 2px;
-            padding: 4px 16px; letter-spacing: 0.08em; pointer-events: none;
-            backdrop-filter: blur(4px);
+            position: fixed; top: 0; left: 0;
+            width: 100%;
+            z-index: 500; font-family: 'MedievalSharp', 'Courier New', cursive;
+            display: flex; justify-content: center; align-items: baseline;
+            padding-top: max(env(safe-area-inset-top, 6px), 6px);
+            pointer-events: none;
         }
-        .ts-red { color: #ff3344; font-weight: 700; }
-        .ts-blue { color: #4488ff; font-weight: 700; }
-        .ts-sep { color: #333; margin: 0 6px; font-size: 0.8em; }
-        .ts-limit { color: #444; font-size: 0.7em; }
+        #teamScore > .ts-inner {
+            background: #000000; border: 1px solid #333333;
+            padding: 4px 20px; display: flex; align-items: baseline; gap: 12px;
+        }
+        .ts-red { color: #ff3333; font-size: clamp(1rem, 4vw, 1.6rem); font-weight: 900; }
+        .ts-blue { color: #4488ff; font-size: clamp(1rem, 4vw, 1.6rem); font-weight: 900; }
+        .ts-sep { color: #888888; font-size: clamp(0.8rem, 3vw, 1.2rem); }
+        .ts-limit { color: #666; font-size: 0.7em; }
 
         /* === SHOP PANEL === */
         #shopPanel {
@@ -2062,10 +2067,12 @@
 
         <!-- Team Score HUD -->
         <div id="teamScore" class="hidden">
-            <span class="ts-red"><span id="tsRedKills">0</span></span>
-            <span class="ts-sep">—</span>
-            <span class="ts-blue"><span id="tsBlueKills">0</span></span>
-            <span class="ts-limit">/ <span id="tsLimit">50</span></span>
+            <div class="ts-inner">
+                <span class="ts-red"><span id="tsRedKills">0</span></span>
+                <span class="ts-sep">—</span>
+                <span class="ts-blue"><span id="tsBlueKills">0</span></span>
+                <span class="ts-limit">/ <span id="tsLimit">50</span></span>
+            </div>
         </div>
 
         <div class="minimap hidden">
