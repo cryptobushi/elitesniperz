@@ -9,18 +9,23 @@ const {
     getAccount
 } = require('@solana/spl-token');
 const bs58 = require('bs58');
+const { TOKEN_CONFIG } = require('../shared/constants');
 
-// === CONFIG ===
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
 const ESCROW_PRIVATE_KEY = process.env.ESCROW_PRIVATE_KEY || null;
 const TREASURY_WALLET = process.env.TREASURY_WALLET || null;
 
-// USDC mints per network
-const USDC_MINT_MAINNET = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const USDC_MINT_DEVNET = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
-
 const isMainnet = SOLANA_RPC_URL.includes('mainnet');
-const USDC_MINT = new PublicKey(isMainnet ? USDC_MINT_MAINNET : USDC_MINT_DEVNET);
+
+// Build mint PublicKey map from TOKEN_CONFIG
+const TOKEN_MINTS = {};
+for (const [name, cfg] of Object.entries(TOKEN_CONFIG)) {
+    if (cfg.mint) {
+        TOKEN_MINTS[name] = new PublicKey(isMainnet ? cfg.mint.mainnet : cfg.mint.devnet);
+    }
+}
+// Backwards compat
+const USDC_MINT = TOKEN_MINTS.USDC;
 
 // === INIT ===
 let connection = null;
@@ -77,29 +82,20 @@ async function createDepositTransaction(userWalletPubkey, amount, token) {
                 toPubkey: escrowKeypair.publicKey,
                 lamports: amount
             }));
-        } else if (token === 'USDC') {
-            const userAta = await getAssociatedTokenAddress(USDC_MINT, userPubkey);
-            const escrowAta = await getAssociatedTokenAddress(USDC_MINT, escrowKeypair.publicKey);
+        } else if (TOKEN_MINTS[token]) {
+            const mint = TOKEN_MINTS[token];
+            const userAta = await getAssociatedTokenAddress(mint, userPubkey);
+            const escrowAta = await getAssociatedTokenAddress(mint, escrowKeypair.publicKey);
 
-            // Check if escrow ATA exists, if not add create instruction
             try {
                 await getAccount(connection, escrowAta);
             } catch (e) {
-                // ATA doesn't exist — add create instruction (user pays)
                 tx.add(createAssociatedTokenAccountInstruction(
-                    userPubkey,           // payer
-                    escrowAta,            // ata
-                    escrowKeypair.publicKey, // owner
-                    USDC_MINT             // mint
+                    userPubkey, escrowAta, escrowKeypair.publicKey, mint
                 ));
             }
 
-            tx.add(createTransferInstruction(
-                userAta,                  // source
-                escrowAta,                // destination
-                userPubkey,               // authority (user signs)
-                amount                    // amount in base units
-            ));
+            tx.add(createTransferInstruction(userAta, escrowAta, userPubkey, amount));
         } else {
             console.error('[escrow] Unknown token:', token);
             return null;
@@ -169,17 +165,16 @@ async function confirmDeposit(txSignature, expectedAmount, expectedToken, expect
             }
 
             return { confirmed: true, fromWallet: expectedFrom };
-        } else if (expectedToken === 'USDC') {
-            // Verify USDC transfer via token balance changes
+        } else if (TOKEN_MINTS[expectedToken]) {
+            const mint = TOKEN_MINTS[expectedToken];
             const preTokenBalances = result.meta.preTokenBalances || [];
             const postTokenBalances = result.meta.postTokenBalances || [];
 
-            // Find escrow's USDC balance change
             const escrowPost = postTokenBalances.find(b =>
-                b.owner === escrowAddr && b.mint === USDC_MINT.toBase58()
+                b.owner === escrowAddr && b.mint === mint.toBase58()
             );
             const escrowPre = preTokenBalances.find(b =>
-                b.owner === escrowAddr && b.mint === USDC_MINT.toBase58()
+                b.owner === escrowAddr && b.mint === mint.toBase58()
             );
 
             const preBal = escrowPre ? parseInt(escrowPre.uiTokenAmount.amount, 10) : 0;
@@ -187,7 +182,7 @@ async function confirmDeposit(txSignature, expectedAmount, expectedToken, expect
             const received = postBal - preBal;
 
             if (received < expectedAmount) {
-                return { confirmed: false, error: 'USDC amount mismatch: expected ' + expectedAmount + ', received ' + received };
+                return { confirmed: false, error: expectedToken + ' amount mismatch: expected ' + expectedAmount + ', received ' + received };
             }
 
             return { confirmed: true, fromWallet: expectedFrom };
@@ -219,28 +214,20 @@ async function sendPayout(toWalletPubkey, amount, token) {
                 toPubkey: toPubkey,
                 lamports: amount
             }));
-        } else if (token === 'USDC') {
-            const escrowAta = await getAssociatedTokenAddress(USDC_MINT, escrowKeypair.publicKey);
-            const toAta = await getAssociatedTokenAddress(USDC_MINT, toPubkey);
+        } else if (TOKEN_MINTS[token]) {
+            const mint = TOKEN_MINTS[token];
+            const escrowAta = await getAssociatedTokenAddress(mint, escrowKeypair.publicKey);
+            const toAta = await getAssociatedTokenAddress(mint, toPubkey);
 
-            // Ensure recipient ATA exists
             try {
                 await getAccount(connection, toAta);
             } catch (e) {
                 tx.add(createAssociatedTokenAccountInstruction(
-                    escrowKeypair.publicKey, // payer (escrow pays for ATA creation)
-                    toAta,
-                    toPubkey,
-                    USDC_MINT
+                    escrowKeypair.publicKey, toAta, toPubkey, mint
                 ));
             }
 
-            tx.add(createTransferInstruction(
-                escrowAta,
-                toAta,
-                escrowKeypair.publicKey, // authority (escrow signs)
-                amount
-            ));
+            tx.add(createTransferInstruction(escrowAta, toAta, escrowKeypair.publicKey, amount));
         } else {
             return { error: 'Unknown token: ' + token };
         }
@@ -280,13 +267,12 @@ async function getBalance(walletPubkey, token) {
 
         if (token === 'SOL') {
             return await connection.getBalance(pubkey, 'confirmed');
-        } else if (token === 'USDC') {
-            const ata = await getAssociatedTokenAddress(USDC_MINT, pubkey);
+        } else if (TOKEN_MINTS[token]) {
+            const ata = await getAssociatedTokenAddress(TOKEN_MINTS[token], pubkey);
             try {
                 const account = await getAccount(connection, ata);
                 return Number(account.amount);
             } catch (e) {
-                // ATA doesn't exist — balance is 0
                 return 0;
             }
         }
@@ -321,5 +307,6 @@ module.exports = {
     getBalance,
     isBlockhashValid,
     USDC_MINT,
+    TOKEN_MINTS,
     isReady
 };

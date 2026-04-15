@@ -1154,13 +1154,13 @@ function buildDOM() {
                 </div>
                 <div style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.4rem;">
                     <span style="color:#ffcc00;font-weight:700;">2.</span>
-                    <span>Send SOL or USDC to that address from any Solana wallet or exchange</span>
+                    <span>Send SOL, USDC, or SNIPERZ tokens to that address from any Solana wallet</span>
                 </div>
                 <div style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.4rem;">
                     <span style="color:#ffcc00;font-weight:700;">3.</span>
                     <span>Your balance updates automatically — then create or join a wager</span>
                 </div>
-                <div style="margin-top:0.6rem;color:#888;font-size:0.65rem;text-align:center;">Minimum wager: 0.01 SOL or 1 USDC &middot; Withdraw anytime</div>
+                <div style="margin-top:0.6rem;color:#888;font-size:0.65rem;text-align:center;">Minimum wager: 0.01 SOL, 1 USDC, or 1 SNIPERZ &middot; Withdraw anytime</div>
             </div>
         </div>
         <div id="wlWithdrawModal" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:10001;display:flex;align-items:center;justify-content:center;">
@@ -1178,6 +1178,7 @@ function buildDOM() {
                         <select id="wdToken" style="width:100%;padding:8px;background:#000000;border:1px solid #333333;color:#ffffff;font-family:inherit;font-size:0.85rem;border-radius:0;">
                             <option value="SOL">SOL</option>
                             <option value="USDC">USDC</option>
+                            <option value="SNIPERZ">SNIPERZ</option>
                         </select>
                     </div>
                 </div>
@@ -1227,6 +1228,7 @@ function buildDOM() {
             <div class="cm-toggle-group" id="cmTokenGroup">
                 <button class="cm-toggle selected" data-token="SOL">SOL</button>
                 <button class="cm-toggle" data-token="USDC">USDC</button>
+                <button class="cm-toggle" data-token="SNIPERZ">SNIPERZ</button>
             </div>
             <div class="cm-label">Kill Target (First To)</div>
             <div class="cm-toggle-group" id="cmTargetGroup">
@@ -1476,7 +1478,7 @@ function setupCreateMatchEvents() {
     });
     document.getElementById('cmAvailBal')?.addEventListener('click', () => {
         const token = document.querySelector('#cmTokenGroup .cm-toggle.selected')?.dataset.token || 'SOL';
-        const avail = token === 'SOL' ? _cachedBalance.sol : _cachedBalance.usdc;
+        const avail = _cachedBalance[token.toLowerCase()] ?? 0;
         if (avail > 0) {
             const input = document.getElementById('cmStake');
             if (input) input.value = avail >= 1 ? avail.toFixed(2) : avail.toFixed(4);
@@ -1522,7 +1524,7 @@ async function handleCreateMatch() {
         const res = await api('/matches', {
             method: 'POST',
             body: JSON.stringify({
-                stakeAmount: token === 'SOL' ? Math.round(stakeVal * 1e9) : Math.round(stakeVal * 1e6),
+                stakeAmount: stakeToBase(stakeVal, token),
                 stakeToken: token,
                 killTarget,
                 password: password || undefined,
@@ -1620,10 +1622,11 @@ async function refreshBalance() {
         if (bal) {
             const sol = typeof bal.sol === 'number' ? bal.sol.toFixed(3) : '--';
             const usdc = typeof bal.usdc === 'number' ? bal.usdc.toFixed(2) : '--';
-            els.wlBalance.textContent = `${sol} SOL | ${usdc} USDC`;
+            const snz = typeof bal.sniperz === 'number' ? bal.sniperz.toFixed(0) : '--';
+            els.wlBalance.textContent = `${sol} SOL | ${usdc} USDC | ${snz} SNIPERZ`;
             const guide = document.getElementById('wlFundingGuide');
             const walletBox = document.getElementById('wlWalletBox');
-            if (guide && bal.sol === 0 && bal.usdc === 0) {
+            if (guide && bal.sol === 0 && bal.usdc === 0 && (bal.sniperz ?? 0) === 0) {
                 guide.style.display = '';
                 if (walletBox) walletBox.style.display = '';
             } else if (guide) {
@@ -1786,7 +1789,7 @@ function showErrorModal(message) {
     if (isBalance) {
         title = 'INSUFFICIENT FUNDS';
         icon = '<div style="font-size:2rem;margin-bottom:0.5rem;">⚠️</div>';
-        hint = '<div style="color:#888888;font-size:0.6rem;margin-top:0.8rem;line-height:1.4;">Deposit SOL or USDC to your wallet from the duel lobby to fund wagers.</div>';
+        hint = '<div style="color:#888888;font-size:0.6rem;margin-top:0.8rem;line-height:1.4;">Deposit SOL, USDC, or SNIPERZ to your wallet from the duel lobby to fund wagers.</div>';
         borderColor = '#ffcc00';
     } else if (isExpired) {
         title = 'TRANSACTION EXPIRED';
@@ -1935,7 +1938,7 @@ export function showCreateMatch() {
     _updateCreateModalBalance();
 }
 
-let _cachedBalance = { sol: 0, usdc: 0 };
+let _cachedBalance = { sol: 0, usdc: 0, sniperz: 0 };
 async function _updateCreateModalBalance() {
     const balEl = document.getElementById('cmAvailBal');
     if (!balEl) return;
@@ -1944,7 +1947,7 @@ async function _updateCreateModalBalance() {
         if (bal) _cachedBalance = bal;
     } catch(_) {}
     const token = document.querySelector('#cmTokenGroup .cm-toggle.selected')?.dataset.token || 'SOL';
-    const avail = token === 'SOL' ? _cachedBalance.sol : _cachedBalance.usdc;
+    const avail = _cachedBalance[token.toLowerCase()] ?? 0;
     const formatted = typeof avail === 'number' ? (avail >= 1 ? avail.toFixed(2) : avail.toFixed(4)) : '--';
     balEl.textContent = `${formatted} ${token} available`;
 }
@@ -2453,8 +2456,14 @@ function avatarInitial(name) { return (name || '?')[0].toUpperCase(); }
 /**
  * Convert base-unit stake amount to human-readable.
  */
+const _TOKEN_DECIMALS = { SOL: 9, USDC: 6, SNIPERZ: 6 };
 function stakeToHuman(amount, token) {
-    return token === 'SOL' ? amount / 1e9 : amount / 1e6;
+    const d = _TOKEN_DECIMALS[token] ?? 9;
+    return amount / Math.pow(10, d);
+}
+function stakeToBase(amount, token) {
+    const d = _TOKEN_DECIMALS[token] ?? 9;
+    return Math.round(amount * Math.pow(10, d));
 }
 
 // ── Public init ─────────────────────────────────────────────────────────────

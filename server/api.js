@@ -9,14 +9,18 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const { authMiddleware } = require('./auth');
 const db = require('../db/index');
-const { VALID_TOKENS, WAGER_KILL_TARGETS: VALID_KILL_TARGETS } = require('../shared/constants');
-
-const { stakeToHuman } = require('../shared/constants');
+const { VALID_TOKENS, WAGER_KILL_TARGETS: VALID_KILL_TARGETS, stakeToHuman, TOKEN_CONFIG } = require('../shared/constants');
 
 const router = express.Router();
 const BCRYPT_ROUNDS = 10;
-const MIN_STAKE = { SOL: 10000000, USDC: 1000000 }; // 0.01 SOL, 1 USDC in base units
-const MAX_STAKE = { SOL: 100000000000, USDC: 10000000000 }; // 100 SOL, 10000 USDC in base units
+
+// Build MIN/MAX stake from TOKEN_CONFIG
+const MIN_STAKE = {};
+const MAX_STAKE = {};
+for (const [name, cfg] of Object.entries(TOKEN_CONFIG)) {
+    MIN_STAKE[name] = cfg.minStake;
+    MAX_STAKE[name] = cfg.maxStake;
+}
 
 function success(data) {
     return { success: true, data };
@@ -757,14 +761,16 @@ router.post('/matches/:id/confirm-deposit', authMiddleware, async (req, res) => 
 router.get('/wallet/balance', authMiddleware, async (req, res) => {
     try {
         const user = db.getUser(req.privyUserId);
-        if (!user || !user.privy_wallet) return res.json(success({ sol: 0, usdc: 0 }));
-        if (!escrow.isReady()) return res.json(success({ sol: 0, usdc: 0 }));
+        if (!user || !user.privy_wallet) return res.json(success({ sol: 0, usdc: 0, sniperz: 0 }));
+        if (!escrow.isReady()) return res.json(success({ sol: 0, usdc: 0, sniperz: 0 }));
 
-        const solLamports = await escrow.getBalance(user.privy_wallet, 'SOL');
-        const usdcBase = await escrow.getBalance(user.privy_wallet, 'USDC');
-        const sol = (solLamports || 0) / 1e9;
-        const usdc = (usdcBase || 0) / 1e6;
-        return res.json(success({ sol, usdc, solLamports: solLamports || 0, usdcBase: usdcBase || 0 }));
+        const balances = {};
+        for (const [name, cfg] of Object.entries(TOKEN_CONFIG)) {
+            const raw = await escrow.getBalance(user.privy_wallet, name) ?? 0;
+            balances[name.toLowerCase()] = raw / Math.pow(10, cfg.decimals);
+            balances[name.toLowerCase() + 'Base'] = raw;
+        }
+        return res.json(success(balances));
     } catch (e) {
         return res.status(500).json(fail('Balance check failed'));
     }
@@ -775,7 +781,7 @@ router.post('/wallet/withdraw-tx', authMiddleware, async (req, res) => {
     try {
         const { destination, amount, token } = req.body;
         if (!destination || !amount || !token) return res.status(400).json(fail('Missing destination, amount, or token'));
-        if (!['SOL', 'USDC'].includes(token)) return res.status(400).json(fail('Token must be SOL or USDC'));
+        if (!VALID_TOKENS.includes(token)) return res.status(400).json(fail('Token must be one of: ' + VALID_TOKENS.join(', ')));
         if (amount <= 0) return res.status(400).json(fail('Amount must be positive'));
 
         const user = db.getUser(req.privyUserId);
@@ -801,13 +807,16 @@ router.post('/wallet/withdraw-tx', authMiddleware, async (req, res) => {
             tx.add(SystemProgram.transfer({ fromPubkey, toPubkey, lamports }));
         } else {
             const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = require('@solana/spl-token');
-            const fromAta = await getAssociatedTokenAddress(escrow.USDC_MINT, fromPubkey);
-            const toAta = await getAssociatedTokenAddress(escrow.USDC_MINT, toPubkey);
+            const mint = escrow.TOKEN_MINTS[token];
+            if (!mint) return res.status(400).json(fail('Unsupported token for withdrawal'));
+            const fromAta = await getAssociatedTokenAddress(mint, fromPubkey);
+            const toAta = await getAssociatedTokenAddress(mint, toPubkey);
 
             try { await require('@solana/spl-token').getAccount(conn, toAta); } catch(e) {
-                tx.add(createAssociatedTokenAccountInstruction(fromPubkey, toAta, toPubkey, escrow.USDC_MINT));
+                tx.add(createAssociatedTokenAccountInstruction(fromPubkey, toAta, toPubkey, mint));
             }
-            const baseUnits = Math.round(amount * 1e6);
+            const cfg = TOKEN_CONFIG[token];
+            const baseUnits = Math.round(amount * Math.pow(10, cfg.decimals));
             tx.add(createTransferInstruction(fromAta, toAta, fromPubkey, baseUnits));
         }
 

@@ -42,24 +42,14 @@ function dist(a, b) {
     return Math.sqrt((a.x - b.x) ** 2 + (a.z - b.z) ** 2);
 }
 
-/**
- * Convert base-unit stake amount to human-readable.
- * @param {number} amount - Amount in base units (lamports or USDC smallest)
- * @param {string} token - 'SOL' or 'USDC'
- * @returns {number}
- */
 function stakeToHuman(amount, token) {
-    return token === 'SOL' ? amount / 1e9 : amount / 1e6;
+    const cfg = TOKEN_CONFIG[token];
+    return cfg ? amount / Math.pow(10, cfg.decimals) : amount / 1e9;
 }
 
-/**
- * Convert human-readable amount to base units.
- * @param {number} amount - Human-readable amount
- * @param {string} token - 'SOL' or 'USDC'
- * @returns {number}
- */
 function stakeToBase(amount, token) {
-    return Math.round(token === 'SOL' ? amount * 1e9 : amount * 1e6);
+    const cfg = TOKEN_CONFIG[token];
+    return Math.round(cfg ? amount * Math.pow(10, cfg.decimals) : amount * 1e9);
 }
 
 // Bytes per player in binary state encoding
@@ -73,6 +63,16 @@ const WAGER_DISCONNECT_TIMEOUT = 30;
 const RAKE_PERCENT = 0.05; // 5% rake
 const MIN_STAKE_SOL = 10000000; // 0.01 SOL in lamports
 const MIN_STAKE_USDC = 1000000; // 1 USDC in base units (1e6)
+
+// Token configuration registry — add new tokens here
+// TODO: Replace SNIPERZ mint with actual contract address after pump.fun launch
+const TOKEN_CONFIG = {
+    SOL:     { decimals: 9, minStake: 10000000,    maxStake: 100000000000, native: true },
+    USDC:    { decimals: 6, minStake: 1000000,     maxStake: 10000000000,
+               mint: { mainnet: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', devnet: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU' } },
+    SNIPERZ: { decimals: 6, minStake: 1000000,     maxStake: 100000000000000,
+               mint: { mainnet: 'PASTE_CONTRACT_ADDRESS_HERE', devnet: 'PASTE_CONTRACT_ADDRESS_HERE' } },
+};
 
 /** @enum {string} Match status state machine — see shared/types.js for full docs */
 const MATCH_STATUS = {
@@ -90,7 +90,7 @@ const MATCH_STATUS = {
     SUBMITTING: 'submitting',
 };
 
-const VALID_TOKENS = ['SOL', 'USDC'];
+const VALID_TOKENS = Object.keys(TOKEN_CONFIG);
 
 const TX_TYPES = {
     DEPOSIT: 'deposit',
@@ -107,6 +107,6 @@ if (typeof module !== 'undefined' && module.exports) {
         stakeToHuman, stakeToBase, BYTES_PER_PLAYER,
         WAGER_KILL_TARGETS, WAGER_TIME_LIMIT, WAGER_AFK_TIMEOUT,
         WAGER_DISCONNECT_TIMEOUT, RAKE_PERCENT, MIN_STAKE_SOL, MIN_STAKE_USDC,
-        MATCH_STATUS, VALID_TOKENS, TX_TYPES
+        MATCH_STATUS, VALID_TOKENS, TX_TYPES, TOKEN_CONFIG
     };
 }
