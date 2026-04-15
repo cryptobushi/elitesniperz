@@ -16,7 +16,6 @@ const SHOP_ITEMS = {
     cloak2:    { name: 'Phantom Shroud',   cost: 400, icon: 'ghost', desc: '+6s windwalk',      stat: 'wwDur',     val: 6,    tier: 2, group: 'cloak', requires: 'cloak1' },
     scope1:    { name: 'Scout Scope',      cost: 150, icon: 'scope', desc: '+25% range',        stat: 'range',     mult: 1.25, tier: 1, group: 'scope' },
     scope2:    { name: 'Eagle Eye',        cost: 400, icon: 'eagle', desc: '+50% range',        stat: 'range',     mult: 1.5, tier: 2, group: 'scope', requires: 'scope1' },
-    ward:      { name: 'Vision Ward',      cost: 75,  icon: 'eye',   desc: 'Place a ward',      stat: 'ward',      val: 1,    tier: 1, group: 'ward', stackable: true },
     shield:    { name: 'Iron Buckler',     cost: 200, icon: 'shield',desc: 'Survive 1 shot',    stat: 'shield',    val: 1,    tier: 1, group: 'shield' },
     rapidfire: { name: 'Hair Trigger',     cost: 250, icon: 'bolt',  desc: '-30% shot cooldown', stat: 'firerate',  mult: 0.7, tier: 1, group: 'firerate' },
     bounty:    { name: 'Bounty Hunter',    cost: 200, icon: 'gold',  desc: '+50% gold per kill', stat: 'goldMult',  mult: 1.5, tier: 1, group: 'bounty' },

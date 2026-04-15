@@ -59,7 +59,6 @@ const SHOP_ITEMS = {
     cloak2:    { name: 'Phantom Shroud',   cost: 400, icon: '👻', desc: '+6s windwalk',      stat: 'wwDur',     val: 6,    tier: 2, group: 'cloak', requires: 'cloak1' },
     scope1:    { name: 'Scout Scope',      cost: 150, icon: '🔭', desc: '+25% range',        stat: 'range',     mult: 1.25, tier: 1, group: 'scope' },
     scope2:    { name: 'Eagle Eye',        cost: 400, icon: '🦅', desc: '+50% range',        stat: 'range',     mult: 1.5, tier: 2, group: 'scope', requires: 'scope1' },
-    ward:      { name: 'Vision Ward',      cost: 75,  icon: '👁', desc: 'Place a ward',      stat: 'ward',      val: 1,    tier: 1, group: 'ward', stackable: true },
     shield:    { name: 'Iron Buckler',     cost: 200, icon: '🛡', desc: 'Survive 1 shot',    stat: 'shield',    val: 1,    tier: 1, group: 'shield' },
     rapidfire: { name: 'Hair Trigger',     cost: 250, icon: '⚡', desc: '-30% shot cooldown', stat: 'firerate',  mult: 0.7, tier: 1, group: 'firerate' },
     bounty:    { name: 'Bounty Hunter',    cost: 200, icon: '💰', desc: '+50% gold per kill', stat: 'goldMult',  mult: 1.5, tier: 1, group: 'bounty' },
@@ -787,7 +786,6 @@ class Player {
         this.shootCooldownTime = 1.0; // 1 second between shots
         this.gold = 0;
         this.inventory = {}; // { itemId: true }
-        this.wardCharges = 0;
         this.hasShield = false;
         this.goldMultiplier = 1.0;
         this.baseSpeed = 8;
@@ -1914,7 +1912,6 @@ class Player {
             if (item.stat === 'firerate') this.shootCooldownTime = this.baseCooldown * item.mult;
             if (item.stat === 'goldMult') this.goldMultiplier *= item.mult;
             if (item.stat === 'shield') this.hasShield = true;
-            if (item.stat === 'ward') this.wardCharges = (this.wardCharges || 0) + item.val;
         }
         this.speed = this.normalSpeed;
         this.windwalkSpeed = this.normalSpeed * 1.75;
