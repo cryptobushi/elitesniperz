@@ -85,7 +85,7 @@ function updateUserStats(id, updates) {
   const allowed = ['wins', 'losses', 'draws', 'total_earned', 'total_wagered'];
   const keys = Object.keys(updates).filter(k => allowed.includes(k));
   if (keys.length === 0) return;
-  const sets = keys.map(k => `${k} = ${k} + @${k}`).join(', ');
+  const sets = keys.map(k => `${k} = COALESCE(${k}, 0) + @${k}`).join(', ');
   db.prepare(`UPDATE users SET ${sets} WHERE id = @id`).run({ id, ...Object.fromEntries(keys.map(k => [k, updates[k]])) });
 }
 
