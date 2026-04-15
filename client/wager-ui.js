@@ -38,6 +38,7 @@ const STYLES = `
     align-items: center;
     font-family: Arial, Helvetica, sans-serif;
     overflow-y: auto;
+    padding-top: env(safe-area-inset-top, 0px);
 }
 #wagerLobby.hidden { display: none !important; }
 
@@ -444,6 +445,7 @@ const STYLES = `
     justify-content: center;
     font-family: Arial, Helvetica, sans-serif;
     padding: 2rem 1rem;
+    padding-top: max(env(safe-area-inset-top, 0px), 2rem);
 }
 #waitingRoom.hidden { display: none !important; }
 
