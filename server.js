@@ -61,11 +61,13 @@ async function recoverStuckMatches() {
                         try {
                             const result = await escrow.sendPayout(user.privy_wallet, match.stake_amount, match.stake_token);
                             if (result && result.signature) {
+                                const refTxId = uuidv4();
                                 db.createTransaction({
-                                    id: uuidv4(), match_id: match.id, user_id: userId,
+                                    id: refTxId, match_id: match.id, user_id: userId,
                                     tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
                                     tx_signature: result.signature, from_wallet: 'escrow', to_wallet: user.privy_wallet
                                 });
+                                db.confirmTransaction(refTxId, Date.now());
                                 console.log('[RECOVERY] Refunded ' + userId + ' for match ' + match.id + ' (' + targetStatus + ') sig=' + result.signature);
                             }
                         } catch (e) {
@@ -85,11 +87,13 @@ async function recoverStuckMatches() {
                     try {
                         const payoutResult = await escrow.sendPayout(winner.privy_wallet, payout, match.stake_token);
                         if (payoutResult && payoutResult.signature) {
+                            const recPayTxId = uuidv4();
                             db.createTransaction({
-                                id: uuidv4(), match_id: match.id, user_id: match.winner_id,
+                                id: recPayTxId, match_id: match.id, user_id: match.winner_id,
                                 tx_type: 'payout', amount: payout, token: match.stake_token,
                                 tx_signature: payoutResult.signature, from_wallet: 'escrow', to_wallet: winner.privy_wallet
                             });
+                            db.confirmTransaction(recPayTxId, Date.now());
                             db.updateMatch(match.id, { status: 'settled', rake_amount: rake });
                             console.log('[RECOVERY] Payout retry succeeded for match ' + match.id + ' winner=' + match.winner_id + ' sig=' + payoutResult.signature);
                         }
@@ -712,11 +716,13 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
                 try {
                     const result = await escrow.sendPayout(creator.privy_wallet, match.stake_amount, match.stake_token);
                     if (result && result.signature) {
+                        const drawTxId1 = uuidv4();
                         db.createTransaction({
-                            id: uuidv4(), match_id: matchId, user_id: match.creator_id,
+                            id: drawTxId1, match_id: matchId, user_id: match.creator_id,
                             tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
                             tx_signature: result.signature, from_wallet: 'escrow', to_wallet: creator.privy_wallet
                         });
+                        db.confirmTransaction(drawTxId1, Date.now());
                     }
                 } catch (e) {
                     console.error('[WAGER] Draw refund error (creator):', e);
@@ -727,11 +733,13 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
                 try {
                     const result = await escrow.sendPayout(joiner.privy_wallet, match.stake_amount, match.stake_token);
                     if (result && result.signature) {
+                        const drawTxId2 = uuidv4();
                         db.createTransaction({
-                            id: uuidv4(), match_id: matchId, user_id: match.joiner_id,
+                            id: drawTxId2, match_id: matchId, user_id: match.joiner_id,
                             tx_type: 'refund', amount: match.stake_amount, token: match.stake_token,
                             tx_signature: result.signature, from_wallet: 'escrow', to_wallet: joiner.privy_wallet
                         });
+                        db.confirmTransaction(drawTxId2, Date.now());
                     }
                 } catch (e) {
                     console.error('[WAGER] Draw refund error (joiner):', e);
@@ -829,22 +837,25 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
             // Send payout to winner
             const payoutResult = await escrow.sendPayout(winner.privy_wallet, payout, match.stake_token);
             if (payoutResult && payoutResult.signature) {
+                const payoutTxId = uuidv4();
                 db.createTransaction({
-                    id: uuidv4(), match_id: matchId, user_id: winnerId,
+                    id: payoutTxId, match_id: matchId, user_id: winnerId,
                     tx_type: 'payout', amount: payout, token: match.stake_token,
                     tx_signature: payoutResult.signature, from_wallet: 'escrow', to_wallet: winner.privy_wallet
                 });
-                db.confirmTransaction(payoutResult.signature, Date.now());
+                db.confirmTransaction(payoutTxId, Date.now());
             }
 
             // Send rake to treasury
             const rakeResult = await escrow.sendRake(rake, match.stake_token);
             if (rakeResult && rakeResult.signature) {
+                const rakeTxId = uuidv4();
                 db.createTransaction({
-                    id: uuidv4(), match_id: matchId, user_id: null,
+                    id: rakeTxId, match_id: matchId, user_id: null,
                     tx_type: 'rake', amount: rake, token: match.stake_token,
                     tx_signature: rakeResult.signature, from_wallet: 'escrow', to_wallet: 'treasury'
                 });
+                db.confirmTransaction(rakeTxId, Date.now());
             }
 
             // Payout succeeded — mark as settled

@@ -691,12 +691,13 @@ router.post('/matches/:id/submit-signed-tx', authMiddleware, async (req, res) =>
         console.log('[DEPOSIT] Confirmed tx:', txSignature);
         const isCreator = userId === match.creator_id;
 
+        const txId = uuidv4();
         db.createTransaction({
-            id: uuidv4(), match_id: match.id, user_id: userId,
+            id: txId, match_id: match.id, user_id: userId,
             tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token,
             tx_signature: txSignature, from_wallet: user.privy_wallet, to_wallet: 'escrow'
         });
-        db.confirmTransaction(txSignature, Date.now());
+        db.confirmTransaction(txId, Date.now());
 
         updateFundingStatus(match.id, isCreator);
 
@@ -741,12 +742,13 @@ router.post('/matches/:id/confirm-deposit', authMiddleware, async (req, res) => 
             }
         }
 
+        const txId2 = uuidv4();
         db.createTransaction({
-            id: uuidv4(), match_id: match.id, user_id: userId,
+            id: txId2, match_id: match.id, user_id: userId,
             tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token,
             tx_signature: txSignature, from_wallet: user.privy_wallet, to_wallet: 'escrow'
         });
-        db.confirmTransaction(txSignature, Date.now());
+        db.confirmTransaction(txId2, Date.now());
 
         updateFundingStatus(match.id, isCreator);
 
