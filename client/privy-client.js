@@ -268,6 +268,7 @@ export async function handleOAuthCallback() {
                     _saveSession();
                     _notifyListeners();
                     console.log('[Privy] Login complete, wallet:', solanaWallet?.address, 'redirecting...');
+                    sessionStorage.setItem('privy_open_lobby', '1');
                     window.location.href = '/';
                     return true;
                 }

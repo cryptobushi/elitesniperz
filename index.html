@@ -2440,6 +2440,12 @@
 
         // Expose returnToLanding for external use
         window._returnToLanding = returnToLanding;
+
+        // Auto-open lobby after OAuth redirect
+        if (sessionStorage.getItem('privy_open_lobby') === '1') {
+            sessionStorage.removeItem('privy_open_lobby');
+            setTimeout(() => openWagerLobby(), 300);
+        }
     })();
     </script>
 
