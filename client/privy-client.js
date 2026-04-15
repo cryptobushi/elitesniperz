@@ -509,15 +509,4 @@ export function onAuthChange(callback) {
     return () => { _listeners = _listeners.filter(cb => cb !== callback); };
 }
 
-export async function refreshProfile() {
-    if (!_token) return null;
-    try {
-        const res = await fetch('/api/profile/me', { headers: { 'Authorization': `Bearer ${_token}` } });
-        if (!res.ok) return null;
-        const body = await res.json();
-        if (body.success && body.data) { _user = body.data; _saveSession(); return _user; }
-    } catch { /* ignore */ }
-    return null;
-}
-
 // OAuth callback is checked after initPrivy() is called

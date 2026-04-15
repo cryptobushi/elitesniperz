@@ -1,12 +1,11 @@
 // server/escrow.js — Solana escrow for wager system (CommonJS)
 const {
     Connection, Keypair, PublicKey, SystemProgram,
-    Transaction, LAMPORTS_PER_SOL, sendAndConfirmTransaction
+    Transaction, sendAndConfirmTransaction
 } = require('@solana/web3.js');
 const {
     getAssociatedTokenAddress, createTransferInstruction,
-    getOrCreateAssociatedTokenAccount, TOKEN_PROGRAM_ID,
-    ASSOCIATED_TOKEN_PROGRAM_ID, createAssociatedTokenAccountInstruction,
+    createAssociatedTokenAccountInstruction,
     getAccount
 } = require('@solana/spl-token');
 const bs58 = require('bs58');
@@ -22,7 +21,6 @@ const USDC_MINT_DEVNET = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 
 const isMainnet = SOLANA_RPC_URL.includes('mainnet');
 const USDC_MINT = new PublicKey(isMainnet ? USDC_MINT_MAINNET : USDC_MINT_DEVNET);
-const USDC_DECIMALS = 6;
 
 // === INIT ===
 let connection = null;
@@ -323,6 +321,5 @@ module.exports = {
     getBalance,
     isBlockhashValid,
     USDC_MINT,
-    USDC_DECIMALS,
     isReady
 };

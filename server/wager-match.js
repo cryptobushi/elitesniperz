@@ -538,20 +538,6 @@ class WagerMatch {
         });
     }
 
-    _sendRoster() {
-        const roster = [];
-        this.players.forEach(p => {
-            roster.push({ id: p.id, n: p.username, m: p.team, b: 0 });
-        });
-        this._broadcast(JSON.stringify({
-            t: 'j_wager',
-            matchId: this.matchId,
-            killTarget: this.killTarget,
-            timeLimit: TIME_LIMIT,
-            roster
-        }));
-    }
-
     // === INTERNAL: HELPERS ===
 
     _broadcast(data) {

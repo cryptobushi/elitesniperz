@@ -58,10 +58,6 @@ const _createMatchHistory = db.prepare(`
   INSERT INTO match_history (match_id, user_id, opponent_id, result, kills, deaths, stake_amount, stake_token, payout, played_at)
   VALUES (@match_id, @user_id, @opponent_id, @result, @kills, @deaths, @stake_amount, @stake_token, @payout, @played_at)
 `);
-const _getMatchHistory = db.prepare(`
-  SELECT * FROM match_history WHERE user_id = ? ORDER BY played_at DESC LIMIT ?
-`);
-
 // Leaderboard
 const _getLeaderboard = db.prepare(`
   SELECT id, twitter_handle, display_name, profile_picture, wins, losses, draws, total_earned, total_wagered, elo,
@@ -198,10 +194,6 @@ function createMatchHistory({ match_id, user_id, opponent_id, result, kills, dea
   return db.prepare('SELECT * FROM match_history WHERE match_id = ? AND user_id = ?').all(match_id, user_id);
 }
 
-function getMatchHistory(userId, limit = 20) {
-  return _getMatchHistory.all(userId, limit);
-}
-
 function getLeaderboard(limit = 50) {
   return _getLeaderboard.all(limit);
 }
@@ -314,7 +306,6 @@ module.exports = {
   createTransaction,
   confirmTransaction,
   createMatchHistory,
-  getMatchHistory,
   getLeaderboard,
   getStuckMatches,
   getStaleFundedMatches,
