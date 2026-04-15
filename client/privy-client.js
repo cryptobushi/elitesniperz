@@ -136,8 +136,7 @@ export function initPrivy(appId) {
 }
 export async function login() {
     if (!_privyClient) {
-        console.warn('[Privy] No client, falling back to dev login');
-        return _devLogin();
+        return { success: false, error: 'Privy not initialized' };
     }
 
     return new Promise((resolve) => {
@@ -159,17 +158,7 @@ export async function login() {
 
                 <div id="authStatus" style="color:#888;font-size:0.65rem;margin:0.5rem 0;min-height:1.2em;"></div>
 
-                <div style="border-top:1px solid #333;margin:1rem 0 0.8rem;"></div>
-                <div style="color:#888;font-size:0.55rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.5rem;">Dev Mode</div>
-
-                <input id="authHandleInput" type="text" placeholder="@handle"
-                    style="width:100%;padding:10px;background:#000;border:1px solid #333;color:#fff;font-family:Arial,Helvetica,sans-serif;font-size:0.8rem;text-align:center;box-sizing:border-box;margin-bottom:0.5rem;" />
-
-                <button id="authDevBtn" style="width:100%;padding:10px;background:#000;border:1px solid #333;color:#888;font-family:Arial,Helvetica,sans-serif;font-size:0.7rem;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;">
-                    Dev Login
-                </button>
-
-                <div id="authCancelBtn" style="color:#888;font-size:0.65rem;cursor:pointer;margin-top:0.8rem;">
+                <div id="authCancelBtn" style="color:#888;font-size:0.65rem;cursor:pointer;margin-top:1rem;">
                     Cancel
                 </div>
             </div>
@@ -201,29 +190,11 @@ export async function login() {
             }
         });
 
-        // Dev login
-        document.getElementById('authDevBtn').addEventListener('click', async () => {
-            const handle = document.getElementById('authHandleInput').value.trim().replace(/^@/, '');
-            if (!handle) { document.getElementById('authHandleInput').style.borderColor = '#ff4444'; return; }
-            cleanup();
-            resolve(await _doDevLogin(handle));
-        });
-
-        document.getElementById('authHandleInput').addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter') {
-                const handle = document.getElementById('authHandleInput').value.trim().replace(/^@/, '');
-                if (!handle) return;
-                cleanup();
-                resolve(await _doDevLogin(handle));
-            }
-        });
-
         document.getElementById('authCancelBtn').addEventListener('click', () => {
             cleanup();
             resolve({ success: false, error: 'Login cancelled' });
         });
 
-        setTimeout(() => document.getElementById('authHandleInput')?.focus(), 100);
     });
 }
 export async function handleOAuthCallback() {
@@ -310,48 +281,6 @@ export async function handleOAuthCallback() {
     console.warn('[Privy] Callback failed, redirecting home');
     window.location.href = '/';
     return false;
-}
-async function _doDevLogin(handle) {
-    const userId = _mockUserId(handle);
-    const wallet = _mockWallet(handle);
-    const mockToken = `dev:${userId}:${handle}:${wallet}`;
-
-    try {
-        const res = await fetch('/api/auth/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${mockToken}` }
-        });
-        if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            return { success: false, error: body.error || `Server ${res.status}` };
-        }
-        const body = await res.json();
-        if (!body.success) return { success: false, error: body.error };
-
-        _token = mockToken;
-        _user = body.data;
-        _saveSession();
-        _notifyListeners();
-        return { success: true, user: _user };
-    } catch (e) {
-        return { success: false, error: e.message };
-    }
-}
-
-function _mockUserId(handle) {
-    let hash = 0;
-    for (let i = 0; i < handle.length; i++) hash = ((hash << 5) - hash + handle.charCodeAt(i)) | 0;
-    return `did:privy:mock-${Math.abs(hash).toString(16).padStart(8, '0')}`;
-}
-
-function _mockWallet(handle) {
-    const b58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-    let s = 0;
-    for (let i = 0; i < handle.length; i++) s = ((s << 7) - s + handle.charCodeAt(i)) | 0;
-    s = Math.abs(s);
-    let addr = '';
-    for (let i = 0; i < 44; i++) { s = (s * 1103515245 + 12345) & 0x7fffffff; addr += b58[s % 58]; }
-    return addr;
 }
 /**
  * Get the Privy Solana provider for signing transactions.

@@ -29,9 +29,8 @@ export async function requestDeposit(matchId, token) {
         const txBase64 = txBody.data?.transaction;
         const messageBase64 = txBody.data?.message;
 
-        if (!txBase64 || txBase64 === 'dev-mock-tx') {
-            console.log('[deposit] Dev mode — auto-confirming');
-            return _devConfirm(matchId, authToken);
+        if (!txBase64) {
+            return { success: false, error: 'No transaction data returned' };
         }
         console.log('[deposit] Getting Solana provider...');
         const provider = await getSolanaProvider();
@@ -69,24 +68,6 @@ export async function requestDeposit(matchId, token) {
         return { success: false, error: e.message };
     }
 }
-async function _devConfirm(matchId, authToken) {
-    const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-    let sig = '';
-    for (let i = 0; i < 88; i++) sig += chars[Math.floor(Math.random() * chars.length)];
-    console.log(`[deposit] Dev auto-confirm: ${sig.slice(0, 16)}...`);
-
-    const confirmRes = await fetch(`/api/matches/${matchId}/lock-in`, {
-        method: 'POST',
-        headers: authHeaders(authToken),
-        body: JSON.stringify({ transaction: 'dev-mock', signature: sig }),
-    });
-    const body = await confirmRes.json().catch(() => ({}));
-    if (!confirmRes.ok || !body.success) {
-        return { success: false, error: body.error || 'Dev confirm failed' };
-    }
-    return { success: true, status: body.data?.status, txSignature: sig };
-}
-
 /**
  * Check wallet balance
  */

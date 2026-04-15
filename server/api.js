@@ -321,10 +321,7 @@ router.post('/matches/:id/cancel', authMiddleware, async (req, res) => {
         }
         if (match.status === 'funded_creator') {
             const creator = db.getUser(match.creator_id);
-            const token = req.headers.authorization?.replace('Bearer ', '') || '';
-            const isDevToken = ALLOW_DEV_TOKENS && token.startsWith('dev:');
-
-            if (!isDevToken && creator?.privy_wallet && escrow.isReady()) {
+            if (creator?.privy_wallet && escrow.isReady()) {
                 try {
                     const result = await escrow.sendPayout(creator.privy_wallet, match.stake_amount, match.stake_token);
                     if (result?.signature) {
@@ -508,7 +505,6 @@ router.get('/leaderboard', (req, res) => {
 
 // GET /matches/:id/deposit-tx — get unsigned deposit transaction
 const escrow = require('./escrow');
-const { ALLOW_DEV_TOKENS } = require('./auth');
 
 router.get('/matches/:id/deposit-tx', authMiddleware, async (req, res) => {
     try {
@@ -518,12 +514,6 @@ router.get('/matches/:id/deposit-tx', authMiddleware, async (req, res) => {
         const userId = req.privyUserId;
         if (userId !== match.creator_id && userId !== match.joiner_id) {
             return res.status(403).json(fail('Not in this match'));
-        }
-
-    
-        const token = req.headers.authorization?.replace('Bearer ', '') || '';
-        if (ALLOW_DEV_TOKENS && token.startsWith('dev:')) {
-            return res.json(success({ transaction: 'dev-mock-tx', devMode: true }));
         }
 
         const user = db.getUser(userId);
@@ -599,50 +589,42 @@ router.post('/matches/:id/lock-in', authMiddleware, async (req, res) => {
         }
         console.log('[LOCK-IN] Both locked for match', match.id, '— submitting to Solana...');
 
-        const token = req.headers.authorization?.replace('Bearer ', '') || '';
-        const isDevToken = (ALLOW_DEV_TOKENS && token.startsWith('dev:')) || pending.creator.transaction === 'dev-mock' || pending.joiner.transaction === 'dev-mock';
+        const { Connection, Transaction, PublicKey } = require('@solana/web3.js');
+        const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
 
-        if (!isDevToken) {
-            const { Connection, Transaction, PublicKey } = require('@solana/web3.js');
-            const conn = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
+        const creatorTxCheck = Transaction.from(Buffer.from(pending.creator.transaction, 'base64'));
+        const joinerTxCheck = Transaction.from(Buffer.from(pending.joiner.transaction, 'base64'));
 
-    
-            const creatorTxCheck = Transaction.from(Buffer.from(pending.creator.transaction, 'base64'));
-            const joinerTxCheck = Transaction.from(Buffer.from(pending.joiner.transaction, 'base64'));
+        const [creatorBhValid, joinerBhValid] = await Promise.all([
+            escrow.isBlockhashValid(creatorTxCheck.recentBlockhash),
+            escrow.isBlockhashValid(joinerTxCheck.recentBlockhash),
+        ]);
 
-            const [creatorBhValid, joinerBhValid] = await Promise.all([
-                escrow.isBlockhashValid(creatorTxCheck.recentBlockhash),
-                escrow.isBlockhashValid(joinerTxCheck.recentBlockhash),
-            ]);
-
-            if (!creatorBhValid || !joinerBhValid) {
-                _pendingLockIns.delete(match.id);
-                _lockInProgress.delete(match.id);
-                db.updateMatch(match.id, { status: 'matched' });
-                console.log('[LOCK-IN] Blockhash expired for match', match.id, 'creator:', creatorBhValid, 'joiner:', joinerBhValid);
-                return res.status(400).json(fail('Transaction expired. Please re-lock.'));
-            }
-            const creatorUser = db.getUser(match.creator_id);
-            const creatorTx = Transaction.from(Buffer.from(pending.creator.transaction, 'base64'));
-            creatorTx.addSignature(new PublicKey(creatorUser.privy_wallet), Buffer.from(pending.creator.signature, 'base64'));
-            const creatorSig = await conn.sendRawTransaction(creatorTx.serialize(), { skipPreflight: false });
-            console.log('[LOCK-IN] Creator tx submitted:', creatorSig);
-            const joinerUser = db.getUser(match.joiner_id);
-            const joinerTx = Transaction.from(Buffer.from(pending.joiner.transaction, 'base64'));
-            joinerTx.addSignature(new PublicKey(joinerUser.privy_wallet), Buffer.from(pending.joiner.signature, 'base64'));
-            const joinerSig = await conn.sendRawTransaction(joinerTx.serialize(), { skipPreflight: false });
-            console.log('[LOCK-IN] Joiner tx submitted:', joinerSig);
-            await Promise.all([
-                conn.confirmTransaction(creatorSig, 'confirmed'),
-                conn.confirmTransaction(joinerSig, 'confirmed'),
-            ]);
-            console.log('[LOCK-IN] Both confirmed on-chain');
-
-    s
-    
-            db.createTransaction({ id: uuidv4(), match_id: match.id, user_id: match.creator_id, tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token, tx_signature: creatorSig, from_wallet: creatorUser.privy_wallet, to_wallet: 'escrow' });
-            db.createTransaction({ id: uuidv4(), match_id: match.id, user_id: match.joiner_id, tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token, tx_signature: joinerSig, from_wallet: joinerUser.privy_wallet, to_wallet: 'escrow' });
+        if (!creatorBhValid || !joinerBhValid) {
+            _pendingLockIns.delete(match.id);
+            _lockInProgress.delete(match.id);
+            db.updateMatch(match.id, { status: 'matched' });
+            console.log('[LOCK-IN] Blockhash expired for match', match.id, 'creator:', creatorBhValid, 'joiner:', joinerBhValid);
+            return res.status(400).json(fail('Transaction expired. Please re-lock.'));
         }
+        const creatorUser = db.getUser(match.creator_id);
+        const creatorTx = Transaction.from(Buffer.from(pending.creator.transaction, 'base64'));
+        creatorTx.addSignature(new PublicKey(creatorUser.privy_wallet), Buffer.from(pending.creator.signature, 'base64'));
+        const creatorSig = await conn.sendRawTransaction(creatorTx.serialize(), { skipPreflight: false });
+        console.log('[LOCK-IN] Creator tx submitted:', creatorSig);
+        const joinerUser = db.getUser(match.joiner_id);
+        const joinerTx = Transaction.from(Buffer.from(pending.joiner.transaction, 'base64'));
+        joinerTx.addSignature(new PublicKey(joinerUser.privy_wallet), Buffer.from(pending.joiner.signature, 'base64'));
+        const joinerSig = await conn.sendRawTransaction(joinerTx.serialize(), { skipPreflight: false });
+        console.log('[LOCK-IN] Joiner tx submitted:', joinerSig);
+        await Promise.all([
+            conn.confirmTransaction(creatorSig, 'confirmed'),
+            conn.confirmTransaction(joinerSig, 'confirmed'),
+        ]);
+        console.log('[LOCK-IN] Both confirmed on-chain');
+
+        db.createTransaction({ id: uuidv4(), match_id: match.id, user_id: match.creator_id, tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token, tx_signature: creatorSig, from_wallet: creatorUser.privy_wallet, to_wallet: 'escrow' });
+        db.createTransaction({ id: uuidv4(), match_id: match.id, user_id: match.joiner_id, tx_type: 'deposit', amount: match.stake_amount, token: match.stake_token, tx_signature: joinerSig, from_wallet: joinerUser.privy_wallet, to_wallet: 'escrow' });
         db.updateMatch(match.id, { status: 'funded_both', funded_at: Date.now() });
         _pendingLockIns.delete(match.id);
         console.log('[LOCK-IN] Match', match.id, 'fully funded');
@@ -723,23 +705,15 @@ router.post('/matches/:id/confirm-deposit', authMiddleware, async (req, res) => 
         if (!txSignature) return res.status(400).json(fail('Missing txSignature'));
 
         const user = db.getUser(userId);
-        const token = req.headers.authorization?.replace('Bearer ', '') || '';
-        const isDevToken = ALLOW_DEV_TOKENS && token.startsWith('dev:');
-        const skipVerification = isDevToken;
+        if (!user || !user.privy_wallet) return res.status(400).json(fail('No wallet'));
 
-        if (!skipVerification) {
-            if (!user || !user.privy_wallet) return res.status(400).json(fail('No wallet'));
+        const result = await escrow.confirmDeposit(txSignature, match.stake_amount, match.stake_token, user.privy_wallet);
+        if (!result || !result.confirmed) {
+            return res.status(400).json(fail('Deposit not confirmed: ' + (result?.error || 'unknown')));
+        }
 
-    
-            const result = await escrow.confirmDeposit(txSignature, match.stake_amount, match.stake_token, user.privy_wallet);
-            if (!result || !result.confirmed) {
-                return res.status(400).json(fail('Deposit not confirmed: ' + (result?.error || 'unknown')));
-            }
-
-    
-            if (result.fromWallet && !user.funding_wallet) {
-                db.upsertUser({ id: userId, twitter_handle: user.twitter_handle, funding_wallet: result.fromWallet });
-            }
+        if (result.fromWallet && !user.funding_wallet) {
+            db.upsertUser({ id: userId, twitter_handle: user.twitter_handle, funding_wallet: result.fromWallet });
         }
 
         const txId2 = uuidv4();
