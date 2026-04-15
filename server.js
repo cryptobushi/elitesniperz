@@ -344,18 +344,18 @@ function pickTarget(bot) {
 }
 
 var BOT_RADIUS = 0.8;
+var MOVE_RADIUS = BOT_RADIUS + 0.15;
 function tryMove(bot, nx, nz) {
     nx = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nx));
     nz = Math.max(-MAP_SIZE/2+2, Math.min(MAP_SIZE/2-2, nz));
 
-    // Direct move
-    if (!collidesWithWall(nx, nz, BOT_RADIUS)) {
+    if (!collidesWithWall(nx, nz, MOVE_RADIUS)) {
         bot.x = nx; bot.z = nz; return true;
     }
-    if (!collidesWithWall(nx, bot.z, BOT_RADIUS)) {
+    if (!collidesWithWall(nx, bot.z, MOVE_RADIUS)) {
         bot.x = nx; return true;
     }
-    if (!collidesWithWall(bot.x, nz, BOT_RADIUS)) {
+    if (!collidesWithWall(bot.x, nz, MOVE_RADIUS)) {
         bot.z = nz; return true;
     }
     return false;
@@ -390,23 +390,24 @@ function updateBot(bot, dt) {
         }
     }
 
-    // Push bot out if stuck inside a wall
-    if (collidesWithWall(bot.x, bot.z, BOT_RADIUS)) {
+    // Push bot out if stuck inside or touching a wall (use larger check radius to catch edge cases)
+    if (collidesWithWall(bot.x, bot.z, BOT_RADIUS + 0.2)) {
         var escaped = false;
-        for (var radius = 1; radius <= 8 && !escaped; radius++) {
+        for (var radius = 1.5; radius <= 10 && !escaped; radius += 0.5) {
             for (var a = 0; a < Math.PI * 2; a += Math.PI / 16) {
                 var px = bot.x + Math.cos(a) * radius;
                 var pz = bot.z + Math.sin(a) * radius;
-                if (!collidesWithWall(px, pz, BOT_RADIUS) && Math.abs(px) < MAP_SIZE/2 - 2 && Math.abs(pz) < MAP_SIZE/2 - 2) {
+                if (!collidesWithWall(px, pz, BOT_RADIUS + 0.3) && Math.abs(px) < MAP_SIZE/2 - 2 && Math.abs(pz) < MAP_SIZE/2 - 2) {
                     bot.x = px; bot.z = pz; escaped = true; break;
                 }
             }
         }
-        // Last resort: teleport to spawn
         if (!escaped) {
             var pos = spawnPos(bot.team);
             bot.x = pos.x; bot.z = pos.z;
         }
+        bot.botTarget = null;
+        bot.stuckFrames = 0;
     }
 
     var closestEnemy = null, closestDist = Infinity;
@@ -478,9 +479,8 @@ function updateBot(bot, dt) {
                 }
             }
 
-            if (bot.stuckFrames > 8) {
-                // Stuck — immediately pick new target in a clear direction
-                bot.botTarget = null; // forces pickTarget next frame
+            if (bot.stuckFrames > 5) {
+                bot.botTarget = null;
                 bot.chaseDetour = false;
                 bot.stuckFrames = 0;
                 bot._nudgeSide *= -1;
