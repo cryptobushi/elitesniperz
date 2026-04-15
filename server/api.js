@@ -1,17 +1,19 @@
 'use strict';
 
+/** @typedef {import('../shared/types').MatchRow} MatchRow */
+/** @typedef {import('../shared/types').MatchResponse} MatchResponse */
+/** @typedef {import('../shared/types').UserRow} UserRow */
+
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const { authMiddleware } = require('./auth');
 const db = require('../db/index');
+const { VALID_TOKENS, WAGER_KILL_TARGETS: VALID_KILL_TARGETS } = require('../shared/constants');
 
 const { stakeToHuman } = require('../shared/constants');
 
 const router = express.Router();
-
-const VALID_TOKENS = ['SOL', 'USDC'];
-const VALID_KILL_TARGETS = [1, 5, 7, 10];
 const BCRYPT_ROUNDS = 10;
 const MIN_STAKE = { SOL: 10000000, USDC: 1000000 }; // 0.01 SOL, 1 USDC in base units
 const MAX_STAKE = { SOL: 100000000000, USDC: 10000000000 }; // 100 SOL, 10000 USDC in base units

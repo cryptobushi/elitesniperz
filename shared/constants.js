@@ -74,6 +74,34 @@ const RAKE_PERCENT = 0.05; // 5% rake
 const MIN_STAKE_SOL = 10000000; // 0.01 SOL in lamports
 const MIN_STAKE_USDC = 1000000; // 1 USDC in base units (1e6)
 
+/** @enum {string} Match status state machine — see shared/types.js for full docs */
+const MATCH_STATUS = {
+    OPEN: 'open',
+    MATCHED: 'matched',
+    FUNDED_CREATOR: 'funded_creator',
+    FUNDED_JOINER: 'funded_joiner',
+    FUNDED_BOTH: 'funded_both',
+    IN_PROGRESS: 'in_progress',
+    COMPLETED: 'completed',
+    SETTLED: 'settled',
+    CANCELLED: 'cancelled',
+    DISPUTED: 'disputed',
+    EXPIRED: 'expired',
+    SUBMITTING: 'submitting',
+};
+
+const VALID_TOKENS = ['SOL', 'USDC'];
+
+const TX_TYPES = {
+    DEPOSIT: 'deposit',
+    PAYOUT: 'payout',
+    RAKE: 'rake',
+    REFUND: 'refund',
+};
+
+/** Per-player binary state encoding: 28 bytes */
+const BYTES_PER_PLAYER = 28;
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         MAP_SIZE, VISION_RADIUS, FARSIGHT_RADIUS, SHOOT_RANGE, SHOOT_COOLDOWN,
@@ -81,6 +109,7 @@ if (typeof module !== 'undefined' && module.exports) {
         SHOP_ITEMS, BOT_NAMES, terrainY, spawnPos, isNearSpawn, dist,
         stakeToHuman, stakeToBase, BYTES_PER_PLAYER,
         WAGER_KILL_TARGETS, WAGER_TIME_LIMIT, WAGER_AFK_TIMEOUT,
-        WAGER_DISCONNECT_TIMEOUT, RAKE_PERCENT, MIN_STAKE_SOL, MIN_STAKE_USDC
+        WAGER_DISCONNECT_TIMEOUT, RAKE_PERCENT, MIN_STAKE_SOL, MIN_STAKE_USDC,
+        MATCH_STATUS, VALID_TOKENS, TX_TYPES, BYTES_PER_PLAYER
     };
 }

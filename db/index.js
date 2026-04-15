@@ -1,3 +1,9 @@
+/** @typedef {import('../shared/types').UserRow} UserRow */
+/** @typedef {import('../shared/types').MatchRow} MatchRow */
+/** @typedef {import('../shared/types').TransactionRow} TransactionRow */
+/** @typedef {import('../shared/types').MatchHistoryRow} MatchHistoryRow */
+/** @typedef {import('../shared/types').ChallengeRequestRow} ChallengeRequestRow */
+
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
@@ -57,10 +63,12 @@ const _getLeaderboard = db.prepare(`
 
 // Exports
 
+/** @param {string} id @returns {UserRow|null} */
 function getUser(id) {
   return _getUser.get(id) || null;
 }
 
+/** @returns {UserRow} */
 function upsertUser({ id, twitter_handle, twitter_id, privy_wallet, display_name, profile_picture }) {
   const now = Date.now();
   _upsertUser.run({
@@ -84,6 +92,7 @@ function updateUserStats(id, updates) {
   db.prepare(`UPDATE users SET ${sets} WHERE id = @id`).run({ id, ...Object.fromEntries(keys.map(k => [k, updates[k]])) });
 }
 
+/** @returns {MatchRow} */
 function createMatch({ id, creator_id, stake_amount, stake_token, kill_target, password_hash, match_mode }) {
   const now = Date.now();
   _createMatch.run({
@@ -99,10 +108,12 @@ function createMatch({ id, creator_id, stake_amount, stake_token, kill_target, p
   return _getMatch.get(id);
 }
 
+/** @param {string} id @returns {MatchRow|null} */
 function getMatch(id) {
   return _getMatch.get(id) || null;
 }
 
+/** @returns {MatchRow[]} */
 function listOpenMatches({ token, minStake, maxStake, limit = 50, offset = 0 } = {}) {
   let sql = "SELECT * FROM matches WHERE status IN ('open', 'funded_creator')";
   const params = [];
@@ -128,6 +139,7 @@ function listOpenMatches({ token, minStake, maxStake, limit = 50, offset = 0 } =
 
 const MATCH_FIELDS = ['status', 'joiner_id', 'winner_id', 'win_reason', 'creator_kills', 'joiner_kills', 'creator_deaths', 'joiner_deaths', 'funded_at', 'started_at', 'ended_at', 'rake_amount', 'match_mode'];
 
+/** @param {string} id @param {Partial<MatchRow>} fields @returns {MatchRow|null} */
 function updateMatch(id, fields) {
   const keys = Object.keys(fields).filter(k => MATCH_FIELDS.includes(k));
   if (keys.length === 0) return null;
@@ -145,6 +157,7 @@ function joinMatch(matchId, joinerId) {
   return _getMatch.get(matchId);
 }
 
+/** @returns {TransactionRow} */
 function createTransaction({ id, match_id, user_id, tx_type, amount, token, tx_signature, from_wallet, to_wallet }) {
   const now = Date.now();
   _createTransaction.run({
@@ -184,10 +197,12 @@ function createMatchHistory({ match_id, user_id, opponent_id, result, kills, dea
   return db.prepare('SELECT * FROM match_history WHERE match_id = ? AND user_id = ?').all(match_id, user_id);
 }
 
+/** @param {string} userId @param {number} [limit=20] @returns {MatchHistoryRow[]} */
 function getMatchHistory(userId, limit = 20) {
   return _getMatchHistory.all(userId, limit);
 }
 
+/** @param {number} [limit=50] @returns {UserRow[]} */
 function getLeaderboard(limit = 50) {
   return _getLeaderboard.all(limit);
 }
