@@ -190,7 +190,7 @@ router.post('/matches', authMiddleware, async (req, res) => {
         if (!VALID_KILL_TARGETS.includes(killTarget)) {
             return res.status(400).json(fail(`killTarget must be one of: ${VALID_KILL_TARGETS.join(', ')}`));
         }
-        const openCount = db.db.prepare("SELECT COUNT(*) as cnt FROM matches WHERE creator_id = ? AND status IN ('open', 'matched', 'funded_creator', 'funded_joiner')").get(req.privyUserId)?.cnt || 0;
+        const openCount = db.db.prepare("SELECT COUNT(*) as cnt FROM matches WHERE creator_id = ? AND status IN ('open', 'matched', 'funded_creator', 'funded_joiner')").get(req.privyUserId)?.cnt ?? 0;
         if (openCount >= 5) {
             return res.status(429).json(fail('Maximum 5 open matches. Cancel existing matches first.'));
         }

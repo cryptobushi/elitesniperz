@@ -175,7 +175,7 @@ async function run() {
         }
     }
     const stuckPct = totalBotTicks > 0 ? (totalStuckTicks / totalBotTicks * 100).toFixed(0) : 0;
-    test('Stuck rate < 20%', parseInt(stuckPct) < 20 || stuckPct + '% stuck');
+    test('Stuck rate < 20%', parseInt(stuckPct, 10) < 20 || stuckPct + '% stuck');
     console.log('  Stuck rate: ' + stuckPct + '% (' + totalStuckTicks + '/' + totalBotTicks + ' ticks)');
 
     // ============================================

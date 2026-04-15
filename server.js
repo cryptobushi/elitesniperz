@@ -750,8 +750,8 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
             console.log('[WAGER] Draw refund(s) failed for match ' + matchId + ' — leaving as completed for retry');
             db.updateMatch(matchId, {
                 status: 'completed', winner_id: null, win_reason: 'draw',
-                creator_kills: creatorStats.kills || 0, joiner_kills: joinerStats.kills || 0,
-                creator_deaths: creatorStats.deaths || 0, joiner_deaths: joinerStats.deaths || 0,
+                creator_kills: creatorStats.kills ?? 0, joiner_kills: joinerStats.kills ?? 0,
+                creator_deaths: creatorStats.deaths ?? 0, joiner_deaths: joinerStats.deaths ?? 0,
                 ended_at: Date.now(), rake_amount: 0
             });
             activeWagerMatches.delete(matchId);
@@ -760,8 +760,8 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
 
         db.updateMatch(matchId, {
             status: 'settled', winner_id: null, win_reason: 'draw',
-            creator_kills: creatorStats.kills || 0, joiner_kills: joinerStats.kills || 0,
-            creator_deaths: creatorStats.deaths || 0, joiner_deaths: joinerStats.deaths || 0,
+            creator_kills: creatorStats.kills ?? 0, joiner_kills: joinerStats.kills ?? 0,
+            creator_deaths: creatorStats.deaths ?? 0, joiner_deaths: joinerStats.deaths ?? 0,
             ended_at: Date.now(), rake_amount: 0
         });
 
@@ -773,12 +773,12 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
         const now = Date.now();
         db.createMatchHistory({
             match_id: matchId, user_id: match.creator_id, opponent_id: match.joiner_id, result: 'draw',
-            kills: creatorStats.kills || 0, deaths: creatorStats.deaths || 0,
+            kills: creatorStats.kills ?? 0, deaths: creatorStats.deaths ?? 0,
             stake_amount: match.stake_amount, stake_token: match.stake_token, payout: match.stake_amount, played_at: now
         });
         db.createMatchHistory({
             match_id: matchId, user_id: match.joiner_id, opponent_id: match.creator_id, result: 'draw',
-            kills: joinerStats.kills || 0, deaths: joinerStats.deaths || 0,
+            kills: joinerStats.kills ?? 0, deaths: joinerStats.deaths ?? 0,
             stake_amount: match.stake_amount, stake_token: match.stake_token, payout: match.stake_amount, played_at: now
         });
 
@@ -800,10 +800,10 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
         status: 'completed',
         winner_id: winnerId,
         win_reason: reason,
-        creator_kills: creatorStats.kills || 0,
-        joiner_kills: joinerStats.kills || 0,
-        creator_deaths: creatorStats.deaths || 0,
-        joiner_deaths: joinerStats.deaths || 0,
+        creator_kills: creatorStats.kills ?? 0,
+        joiner_kills: joinerStats.kills ?? 0,
+        creator_deaths: creatorStats.deaths ?? 0,
+        joiner_deaths: joinerStats.deaths ?? 0,
         ended_at: Date.now()
     });
 
@@ -821,12 +821,12 @@ async function settleWagerMatch(matchId, winnerId, reason, stats) {
     const loserStats = stats[loserId] || {};
     db.createMatchHistory({
         match_id: matchId, user_id: winnerId, opponent_id: loserId, result: 'win',
-        kills: winnerStats.kills || 0, deaths: winnerStats.deaths || 0,
+        kills: winnerStats.kills ?? 0, deaths: winnerStats.deaths ?? 0,
         stake_amount: match.stake_amount, stake_token: match.stake_token, payout, played_at: now
     });
     db.createMatchHistory({
         match_id: matchId, user_id: loserId, opponent_id: winnerId, result: 'loss',
-        kills: loserStats.kills || 0, deaths: loserStats.deaths || 0,
+        kills: loserStats.kills ?? 0, deaths: loserStats.deaths ?? 0,
         stake_amount: match.stake_amount, stake_token: match.stake_token, payout: 0, played_at: now
     });
 
@@ -1072,8 +1072,8 @@ wss.on('connection', function(ws) {
             else if (msg.t === 'mv' && ws.playerId) {
                 const p = players.get(ws.playerId);
                 if (p && p.health > 0) {
-                    const mx = Math.max(-MAP_SIZE / 2, Math.min(MAP_SIZE / 2, msg.x || 0));
-                    const mz = Math.max(-MAP_SIZE / 2, Math.min(MAP_SIZE / 2, msg.z || 0));
+                    const mx = Math.max(-MAP_SIZE / 2, Math.min(MAP_SIZE / 2, Number(msg.x) || 0));
+                    const mz = Math.max(-MAP_SIZE / 2, Math.min(MAP_SIZE / 2, Number(msg.z) || 0));
                     p.moveTarget = { x: mx, z: mz };
                     p.lastInput = Date.now();
                 }
@@ -1081,8 +1081,8 @@ wss.on('connection', function(ws) {
             else if (msg.t === 'rot' && ws.playerId) {
                 const p = players.get(ws.playerId);
                 if (p) {
-                    p.aimRot = msg.r || 0; p.rot = msg.r || 0; p.lastInput = Date.now();
-                
+                    p.aimRot = typeof msg.r === 'number' ? msg.r : 0; p.rot = typeof msg.r === 'number' ? msg.r : 0; p.lastInput = Date.now();
+
                     if (TEST_MODE && !p.isBot) {
                         const now = Date.now();
                         if (!p._lastAimLog || now - p._lastAimLog > 1000) {
@@ -1128,8 +1128,8 @@ wss.on('connection', function(ws) {
                     if (p._fsCooldown > 0) return;
                     p._fsCooldown = 15;
                     p.farsight = true;
-                    p.farsightX = Math.max(-MAP_SIZE/2, Math.min(MAP_SIZE/2, msg.x || 0));
-                    p.farsightZ = Math.max(-MAP_SIZE/2, Math.min(MAP_SIZE/2, msg.z || 0));
+                    p.farsightX = Math.max(-MAP_SIZE/2, Math.min(MAP_SIZE/2, Number(msg.x) || 0));
+                    p.farsightZ = Math.max(-MAP_SIZE/2, Math.min(MAP_SIZE/2, Number(msg.z) || 0));
                     p.farsightTimer = 5.0;
                 }
             }
@@ -1281,7 +1281,7 @@ setInterval(function() {
 
         const matchedResult = db.db.prepare("UPDATE matches SET status = 'expired' WHERE status = 'matched' AND created_at < ?")
             .run(Date.now() - 15 * 60 * 1000);
-        const total = (openResult?.changes || 0) + (matchedResult?.changes || 0);
+        const total = (openResult?.changes ?? 0) + (matchedResult?.changes ?? 0);
         if (total > 0) {
 
             const expiredMatches = db.db.prepare("SELECT id FROM matches WHERE status = 'expired'").all();

@@ -100,7 +100,7 @@ function createMatch({ id, creator_id, stake_amount, stake_token, kill_target, p
     creator_id,
     stake_amount,
     stake_token,
-    kill_target: kill_target || 7,
+    kill_target: kill_target ?? 7,
     password_hash: password_hash || null,
     match_mode: match_mode || 'open',
     created_at: now,
@@ -122,11 +122,11 @@ function listOpenMatches({ token, minStake, maxStake, limit = 50, offset = 0 } =
     sql += ' AND stake_token = ?';
     params.push(token);
   }
-  if (minStake != null) {
+  if (minStake !== null && minStake !== undefined) {
     sql += ' AND stake_amount >= ?';
     params.push(minStake);
   }
-  if (maxStake != null) {
+  if (maxStake !== null && maxStake !== undefined) {
     sql += ' AND stake_amount <= ?';
     params.push(maxStake);
   }
@@ -269,7 +269,7 @@ function getRecentDeclineCount(creatorId, challengerId, windowMs) {
     JOIN matches m ON cr.match_id = m.id
     WHERE m.creator_id = ? AND cr.challenger_id = ? AND cr.status = 'declined'
     AND cr.created_at > ?
-  `).get(creatorId, challengerId, cutoff)?.cnt || 0;
+  `).get(creatorId, challengerId, cutoff)?.cnt ?? 0;
 }
 
 function clearTestChallengeDeclines(creatorId, challengerId) {
