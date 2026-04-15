@@ -4075,6 +4075,28 @@ window._startWagerGame = function(ws, matchData) {
     gameState.gameStarted = true;
     isOnlineMode = true;
     window._isWagerMatch = true;
+
+    // Clean up any existing bots (from "play while waiting" or previous game)
+    if (gameState.bots && gameState.bots.length > 0) {
+        gameState.bots.forEach(b => {
+            if (b.mesh && b.mesh.parent) b.mesh.parent.remove(b.mesh);
+        });
+        gameState.bots = [];
+    }
+
+    // Clean up any existing remote players
+    _remotePlayers.forEach((r) => { if (r.player.mesh.parent) r.player.mesh.parent.remove(r.player.mesh); });
+    _remotePlayers.clear();
+    _serverState.clear();
+    _roster = {};
+    _myServerId = null;
+    handleBinaryState._logged = false;
+
+    // Clean up old player mesh
+    if (gameState.player && gameState.player.mesh.parent) {
+        gameState.player.mesh.parent.remove(gameState.player.mesh);
+    }
+
     _ws = ws;
     _ws.binaryType = 'arraybuffer';
     _ws.addEventListener('message', function(evt) {
@@ -4097,23 +4119,20 @@ window._startWagerGame = function(ws, matchData) {
     document.querySelector('.minimap')?.classList.remove('hidden');
     document.getElementById('teamScore')?.classList.add('hidden');
     document.getElementById('shopPanel')?.classList.add('hidden');
+    document.getElementById('deathPopup')?.classList.add('hidden');
 
     document.getElementById('goldDisplay')?.style.setProperty('display', 'none');
+
+    // Create fresh player
+    gameState.player = new Player(gameState.username, gameState.team, true);
+    gameState.cameraTarget.copy(gameState.player.position);
+    gameState.kills = 0;
+    gameState.deaths = 0;
+    gameState.killStreak = 0;
+
     if (!window._gameStarted) {
         startGame();
         window._gameStarted = true;
-    } else {
-
-        if (gameState.player && gameState.player.mesh.parent) {
-            gameState.player.mesh.parent.remove(gameState.player.mesh);
-        }
-        gameState.player = new Player(gameState.username, gameState.team, true);
-        gameState.cameraTarget.copy(gameState.player.position);
-
-        _remotePlayers.forEach((r) => { if (r.player.mesh.parent) r.player.mesh.parent.remove(r.player.mesh); });
-        _remotePlayers.clear();
-        _serverState.clear();
-        _roster = {};
     }
     _ws.send(JSON.stringify({
         t: 'join',
