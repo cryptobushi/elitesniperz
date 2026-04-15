@@ -158,7 +158,24 @@ export async function login() {
 
                 <div id="authStatus" style="color:#888;font-size:0.65rem;margin:0.5rem 0;min-height:1.2em;"></div>
 
-                <div style="color:#666;font-size:0.55rem;line-height:1.5;margin-top:0.8rem;border-top:1px solid #333;padding-top:0.8rem;">Secured by <span style="color:#aaa;">Privy</span> — your wallet is created automatically. No extensions, no seed phrases. Your keys stay encrypted and only you can access your funds.</div>
+                <div style="margin-top:1.2rem;border-top:1px solid #222;padding-top:1rem;">
+                    <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:0.6rem;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <span style="color:#4ade80;font-size:0.6rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">Secured by Privy</span>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:0.35rem;text-align:left;max-width:280px;margin:0 auto;">
+                        <div style="display:flex;align-items:center;gap:6px;color:#888;font-size:0.55rem;">
+                            <span style="color:#4ade80;">&#10003;</span> Wallet created automatically — no extensions needed
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px;color:#888;font-size:0.55rem;">
+                            <span style="color:#4ade80;">&#10003;</span> No seed phrases — keys encrypted and stored securely
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px;color:#888;font-size:0.55rem;">
+                            <span style="color:#4ade80;">&#10003;</span> Only you can access your funds — withdraw anytime
+                        </div>
+                    </div>
+                    <div style="margin-top:0.6rem;color:#555;font-size:0.5rem;"><a href="https://www.privy.io" target="_blank" rel="noopener" style="color:#555;text-decoration:underline;">privy.io</a> — trusted by 1000+ apps</div>
+                </div>
 
                 <div id="authCancelBtn" style="color:#888;font-size:0.65rem;cursor:pointer;margin-top:1rem;">
                     Cancel
