@@ -2666,7 +2666,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
     document.getElementById('landingPage')?.classList.add('hidden');
     document.getElementById('gameCanvas').style.display = 'block';
     document.getElementById('ui').style.display = '';
-    document.body.classList.add('game-active');
+    document.body.classList.add('game-active', 'game-playing');
     document.getElementById('hud')?.classList.remove('hidden');
     document.getElementById('abilities')?.classList.remove('hidden');
     document.querySelector('.minimap')?.classList.remove('hidden');
@@ -2734,7 +2734,7 @@ document.getElementById('menuQuit')?.addEventListener('click', () => {
     document.getElementById('landingPage')?.classList.remove('hidden');
     document.getElementById('gameCanvas').style.display = 'none';
     document.getElementById('ui').style.display = 'none';
-    document.body.classList.remove('game-active');
+    document.body.classList.remove('game-active', 'game-playing');
     window.scrollTo(0, 0);
     _remotePlayers.forEach((r) => { if (r.player.mesh.parent) r.player.mesh.parent.remove(r.player.mesh); });
     _remotePlayers.clear();
@@ -4071,7 +4071,7 @@ window.startGame = function(opts) {
     document.getElementById('landingPage')?.classList.add('hidden');
     document.getElementById('gameCanvas').style.display = 'block';
     document.getElementById('ui').style.display = '';
-    document.body.classList.add('game-active');
+    document.body.classList.add('game-active', 'game-playing');
     document.getElementById('hud')?.classList.remove('hidden');
     document.getElementById('abilities')?.classList.remove('hidden');
     document.querySelector('.minimap')?.classList.remove('hidden');
@@ -4106,7 +4106,7 @@ window._startWagerGame = function(ws, matchData) {
     document.getElementById('usernameModal')?.classList.add('hidden');
     document.getElementById('gameCanvas').style.display = 'block';
     document.getElementById('ui').style.display = '';
-    document.body.classList.add('game-active');
+    document.body.classList.add('game-active', 'game-playing');
     document.getElementById('hud')?.classList.remove('hidden');
     document.getElementById('abilities')?.classList.remove('hidden');
     document.querySelector('.minimap')?.classList.remove('hidden');

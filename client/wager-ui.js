@@ -1612,7 +1612,7 @@ function _returnToLandingPage() {
     if (landing) landing.classList.remove('hidden');
     if (canvas) canvas.style.display = 'none';
     if (ui) ui.style.display = 'none';
-    document.body.classList.remove('game-active');
+    document.body.classList.remove('game-active', 'game-playing');
     window.scrollTo(0, 0);
 }
 
@@ -2033,7 +2033,7 @@ function _exitBotGame() {
     document.getElementById('teamScore')?.classList.add('hidden');
     document.getElementById('gameCanvas').style.display = 'none';
     document.getElementById('ui').style.display = 'none';
-    document.body.classList.remove('game-active');
+    document.body.classList.remove('game-active', 'game-playing');
     // Clear bots
     if (window.gameState.bots) {
         window.gameState.bots.forEach(b => { if (b.mesh?.parent) b.mesh.parent.remove(b.mesh); });
