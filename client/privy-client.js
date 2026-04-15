@@ -146,38 +146,38 @@ export async function login() {
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:20000;display:flex;align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif;';
 
         overlay.innerHTML = `
-            <div style="background:#1a1a1a;border:1px solid #333;padding:2rem;width:min(90%,360px);text-align:center;">
-                <div style="font-family:'Courier New',monospace;font-size:1.2rem;font-weight:700;color:#ffcc00;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.4rem;">ENTER THE ARENA</div>
-                <div style="color:#ccc;font-size:0.75rem;margin-bottom:0.3rem;">Connect to compete in wager duels</div>
-                <div style="color:#888;font-size:0.6rem;margin-bottom:1.5rem;">Every match is public. Every win and loss is recorded.</div>
+            <div style="background:#1a1a1a;border:1px solid #333;padding:clamp(1.5rem,4vw,2.5rem);width:min(92%,420px);text-align:center;">
+                <div style="font-family:'MedievalSharp',cursive;font-size:clamp(1.4rem,5vw,1.8rem);font-weight:700;color:#ffcc00;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.5rem;">ENTER THE ARENA</div>
+                <div style="color:#ccc;font-size:clamp(0.85rem,3vw,1rem);margin-bottom:0.3rem;">Connect to compete in wager duels</div>
+                <div style="color:#888;font-size:clamp(0.7rem,2.5vw,0.85rem);margin-bottom:1.8rem;">Every match is public. Every win and loss is recorded.</div>
 
-                <button id="authTwitterBtn" style="width:100%;padding:12px;background:#000;border:1px solid #ffcc00;color:#ffcc00;font-family:Arial,Helvetica,sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;margin-bottom:0.75rem;display:flex;align-items:center;justify-content:center;gap:10px;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffcc00"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                <button id="authTwitterBtn" style="width:100%;padding:clamp(12px,3vw,16px);background:#000;border:1px solid #ffcc00;color:#ffcc00;font-family:Arial,Helvetica,sans-serif;font-size:clamp(0.9rem,3vw,1.05rem);font-weight:600;cursor:pointer;margin-bottom:0.75rem;display:flex;align-items:center;justify-content:center;gap:10px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffcc00"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                     Sign in with X
                 </button>
 
-                <div id="authStatus" style="color:#888;font-size:0.65rem;margin:0.5rem 0;min-height:1.2em;"></div>
+                <div id="authStatus" style="color:#888;font-size:clamp(0.7rem,2.5vw,0.8rem);margin:0.5rem 0;min-height:1.2em;"></div>
 
                 <div style="margin-top:1.2rem;border-top:1px solid #222;padding-top:1rem;">
-                    <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:0.6rem;">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                        <span style="color:#4ade80;font-size:0.6rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">Secured by Privy</span>
+                    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:0.8rem;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <span style="color:#4ade80;font-size:clamp(0.65rem,2.2vw,0.75rem);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">Secured by Privy</span>
                     </div>
-                    <div style="display:flex;flex-direction:column;gap:0.35rem;text-align:left;max-width:280px;margin:0 auto;">
-                        <div style="display:flex;align-items:center;gap:6px;color:#888;font-size:0.55rem;">
-                            <span style="color:#4ade80;">&#10003;</span> Wallet created automatically — no extensions needed
+                    <div style="display:flex;flex-direction:column;gap:0.5rem;text-align:left;max-width:340px;margin:0 auto;">
+                        <div style="display:flex;align-items:center;gap:8px;color:#aaa;font-size:clamp(0.7rem,2.3vw,0.8rem);">
+                            <span style="color:#4ade80;flex-shrink:0;">&#10003;</span> Wallet created automatically — no extensions needed
                         </div>
-                        <div style="display:flex;align-items:center;gap:6px;color:#888;font-size:0.55rem;">
-                            <span style="color:#4ade80;">&#10003;</span> No seed phrases — keys encrypted and stored securely
+                        <div style="display:flex;align-items:center;gap:8px;color:#aaa;font-size:clamp(0.7rem,2.3vw,0.8rem);">
+                            <span style="color:#4ade80;flex-shrink:0;">&#10003;</span> No seed phrases — keys encrypted and stored securely
                         </div>
-                        <div style="display:flex;align-items:center;gap:6px;color:#888;font-size:0.55rem;">
-                            <span style="color:#4ade80;">&#10003;</span> Only you can access your funds — withdraw anytime
+                        <div style="display:flex;align-items:center;gap:8px;color:#aaa;font-size:clamp(0.7rem,2.3vw,0.8rem);">
+                            <span style="color:#4ade80;flex-shrink:0;">&#10003;</span> Only you can access your funds — withdraw anytime
                         </div>
                     </div>
-                    <div style="margin-top:0.6rem;color:#555;font-size:0.5rem;"><a href="https://www.privy.io" target="_blank" rel="noopener" style="color:#555;text-decoration:underline;">privy.io</a> — trusted by 1000+ apps</div>
+                    <div style="margin-top:0.8rem;color:#555;font-size:clamp(0.6rem,2vw,0.7rem);"><a href="https://www.privy.io" target="_blank" rel="noopener" style="color:#666;text-decoration:underline;">privy.io</a> — trusted by 1000+ apps</div>
                 </div>
 
-                <div id="authCancelBtn" style="color:#888;font-size:0.65rem;cursor:pointer;margin-top:1rem;">
+                <div id="authCancelBtn" style="color:#888;font-size:clamp(0.75rem,2.5vw,0.85rem);cursor:pointer;margin-top:1.2rem;">
                     Cancel
                 </div>
             </div>
