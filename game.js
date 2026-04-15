@@ -2154,9 +2154,8 @@ function updateShopUI() {
     const panel = document.getElementById('shopPanel');
     if (!panel || !gameState.player) return;
 
-
-    const inv = gameState.player.inventory;
-    const gold = gameState.player.gold;
+    const inv = gameState.player.inventory || {};
+    const gold = gameState.player.gold || 0;
     const shopGold = document.getElementById('shopGold');
     if (shopGold) shopGold.textContent = `Gold: ${gold}`;
 
