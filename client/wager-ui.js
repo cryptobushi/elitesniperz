@@ -1670,8 +1670,7 @@ function hideLobby() {
     els.lobby.classList.add('hidden');
     if (lobbyInterval) { clearInterval(lobbyInterval); lobbyInterval = null; }
 
-    const startModal = document.getElementById('usernameModal');
-    if (startModal) startModal.style.display = '';
+    _returnToLandingPage();
 }
 
 async function refreshBalance() {
