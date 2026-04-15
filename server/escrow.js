@@ -184,8 +184,8 @@ async function confirmDeposit(txSignature, expectedAmount, expectedToken, expect
                 b.owner === escrowAddr && b.mint === USDC_MINT.toBase58()
             );
 
-            const preBal = escrowPre ? parseInt(escrowPre.uiTokenAmount.amount) : 0;
-            const postBal = escrowPost ? parseInt(escrowPost.uiTokenAmount.amount) : 0;
+            const preBal = escrowPre ? parseInt(escrowPre.uiTokenAmount.amount, 10) : 0;
+            const postBal = escrowPost ? parseInt(escrowPost.uiTokenAmount.amount, 10) : 0;
             const received = postBal - preBal;
 
             if (received < expectedAmount) {

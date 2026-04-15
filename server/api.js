@@ -152,7 +152,7 @@ router.post('/matches', authMiddleware, async (req, res) => {
         }
 
         // Limit open matches per user
-        const openCount = db.db.prepare("SELECT COUNT(*) as cnt FROM matches WHERE creator_id = ? AND status IN ('open', 'matched', 'funded_creator', 'funded_joiner')").get(req.privyUserId)?.cnt || 0;
+        const openCount = db.db.prepare("SELECT COUNT(*) as cnt FROM matches WHERE creator_id = ? AND status IN ('open', 'matched', 'funded_creator', 'funded_joiner')").get(req.privyUserId)?.cnt ?? 0;
         if (openCount >= 5) {
             return res.status(429).json(fail('Maximum 5 open matches. Cancel existing matches first.'));
         }
@@ -209,11 +209,11 @@ router.get('/matches', (req, res) => {
             return {
                 ...rest,
                 passwordProtected: !!password_hash,
-                creator_twitter: creator?.twitter_handle || null,
-                creator_pfp: creator?.profile_picture || null,
-                creator_wins: creator?.wins || 0,
-                creator_losses: creator?.losses || 0,
-                creator_elo: creator?.elo || 1000,
+                creator_twitter: creator?.twitter_handle ?? null,
+                creator_pfp: creator?.profile_picture ?? null,
+                creator_wins: creator?.wins ?? 0,
+                creator_losses: creator?.losses ?? 0,
+                creator_elo: creator?.elo ?? 1000,
             };
         });
 
@@ -238,16 +238,16 @@ router.get('/matches/:id', (req, res) => {
         return res.json(success({
             ...rest,
             passwordProtected: !!password_hash,
-            creator_twitter: creator?.twitter_handle || null,
-            creator_pfp: creator?.profile_picture || null,
-            creator_wins: creator?.wins || 0,
-            creator_losses: creator?.losses || 0,
-            creator_elo: creator?.elo || 1000,
-            joiner_twitter: joiner?.twitter_handle || null,
-            joiner_pfp: joiner?.profile_picture || null,
-            joiner_wins: joiner?.wins || 0,
-            joiner_losses: joiner?.losses || 0,
-            joiner_elo: joiner?.elo || 1000,
+            creator_twitter: creator?.twitter_handle ?? null,
+            creator_pfp: creator?.profile_picture ?? null,
+            creator_wins: creator?.wins ?? 0,
+            creator_losses: creator?.losses ?? 0,
+            creator_elo: creator?.elo ?? 1000,
+            joiner_twitter: joiner?.twitter_handle ?? null,
+            joiner_pfp: joiner?.profile_picture ?? null,
+            joiner_wins: joiner?.wins ?? 0,
+            joiner_losses: joiner?.losses ?? 0,
+            joiner_elo: joiner?.elo ?? 1000,
         }));
     } catch (e) {
         console.error('GET /matches/:id error:', e);
@@ -858,9 +858,9 @@ router.get('/wallet/balance', authMiddleware, async (req, res) => {
 
         const solLamports = await escrow.getBalance(user.privy_wallet, 'SOL');
         const usdcBase = await escrow.getBalance(user.privy_wallet, 'USDC');
-        const sol = (solLamports || 0) / 1e9;
-        const usdc = (usdcBase || 0) / 1e6;
-        return res.json(success({ sol, usdc, solLamports: solLamports || 0, usdcBase: usdcBase || 0 }));
+        const sol = (solLamports ?? 0) / 1e9;
+        const usdc = (usdcBase ?? 0) / 1e6;
+        return res.json(success({ sol, usdc, solLamports: solLamports ?? 0, usdcBase: usdcBase ?? 0 }));
     } catch (e) {
         return res.status(500).json(fail('Balance check failed'));
     }
@@ -872,9 +872,9 @@ router.get('/wallet/balance', authMiddleware, async (req, res) => {
 router.post('/wallet/withdraw-tx', authMiddleware, async (req, res) => {
     try {
         const { destination, amount, token } = req.body;
-        if (!destination || !amount || !token) return res.status(400).json(fail('Missing destination, amount, or token'));
+        if (!destination || !token) return res.status(400).json(fail('Missing destination or token'));
+        if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) return res.status(400).json(fail('Amount must be a positive number'));
         if (!['SOL', 'USDC'].includes(token)) return res.status(400).json(fail('Token must be SOL or USDC'));
-        if (amount <= 0) return res.status(400).json(fail('Amount must be positive'));
 
         const user = db.getUser(req.privyUserId);
         if (!user?.privy_wallet) return res.status(400).json(fail('No wallet'));

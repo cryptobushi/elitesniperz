@@ -197,13 +197,13 @@ class WagerMatch {
 
         if (msg.t === 'mv') {
             if (p.health > 0) {
-                const mx = Math.max(-MAP_SIZE / 2, Math.min(MAP_SIZE / 2, msg.x || 0));
-                const mz = Math.max(-MAP_SIZE / 2, Math.min(MAP_SIZE / 2, msg.z || 0));
+                const mx = Math.max(-MAP_SIZE / 2, Math.min(MAP_SIZE / 2, Number(msg.x) || 0));
+                const mz = Math.max(-MAP_SIZE / 2, Math.min(MAP_SIZE / 2, Number(msg.z) || 0));
                 p.moveTarget = { x: mx, z: mz };
             }
         } else if (msg.t === 'rot') {
-            p.aimRot = msg.r || 0;
-            p.rot = msg.r || 0;
+            p.aimRot = typeof msg.r === 'number' ? msg.r : 0;
+            p.rot = typeof msg.r === 'number' ? msg.r : 0;
         } else if (msg.t === 'ab') {
             if (p.health <= 0) return;
             // Only windwalk and farsight allowed in wager matches (no shop)
@@ -216,8 +216,8 @@ class WagerMatch {
                 if (p.fsCooldown > 0) return;
                 p.fsCooldown = 15;
                 p.farsight = true;
-                p.farsightX = Math.max(-MAP_SIZE/2, Math.min(MAP_SIZE/2, msg.x || 0));
-                p.farsightZ = Math.max(-MAP_SIZE/2, Math.min(MAP_SIZE/2, msg.z || 0));
+                p.farsightX = Math.max(-MAP_SIZE/2, Math.min(MAP_SIZE/2, Number(msg.x) || 0));
+                p.farsightZ = Math.max(-MAP_SIZE/2, Math.min(MAP_SIZE/2, Number(msg.z) || 0));
                 p.farsightTimer = 5.0;
             }
         }

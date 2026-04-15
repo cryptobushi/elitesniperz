@@ -1545,7 +1545,7 @@ async function handleCreateMatch() {
     if (!stakeVal || stakeVal <= 0) return showErrorModal('Enter a valid stake amount');
 
     const token = document.querySelector('#cmTokenGroup .cm-toggle.selected')?.dataset.token || 'SOL';
-    const killTarget = parseInt(document.querySelector('#cmTargetGroup .cm-toggle.selected')?.dataset.target || '7');
+    const killTarget = parseInt(document.querySelector('#cmTargetGroup .cm-toggle.selected')?.dataset.target || '7', 10);
     const password = document.getElementById('cmPassword')?.value?.trim() || undefined;
     const matchMode = document.querySelector('#cmModeGroup .cm-toggle.selected')?.dataset.mode || 'open';
 

@@ -2685,7 +2685,7 @@ function updateScoreboard() {
 
     // Draw sparkline charts
     sb.querySelectorAll('.sb-chart').forEach(canvas => {
-        const idx = parseInt(canvas.dataset.playerIdx);
+        const idx = parseInt(canvas.dataset.playerIdx, 10);
         const p = all[idx];
         if (!p || !p._priceHist || p._priceHist.length < 2) return;
 
