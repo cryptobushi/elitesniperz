@@ -1035,13 +1035,44 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: #00ff00;
-            font-size: 1.2rem;
             text-align: center;
             padding: 2rem;
         }
-        #rotateOverlay .icon { font-size: 4rem; margin-bottom: 1rem; animation: rotate 2s infinite; }
-        @keyframes rotate { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }
+        #rotateOverlay .rotate-icon {
+            width: 60px; height: 60px;
+            border: 3px solid #ffcc00;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            position: relative;
+            animation: rotateDevice 2.5s ease-in-out infinite;
+        }
+        #rotateOverlay .rotate-icon::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 20px; height: 20px;
+            border: 2px solid #ffcc00;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.5;
+        }
+        #rotateOverlay .rotate-title {
+            font-family: 'MedievalSharp', cursive;
+            font-size: 1.6rem;
+            color: #ffcc00;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.6rem;
+            text-shadow: 0 0 10px rgba(255,204,0,0.3);
+        }
+        #rotateOverlay .rotate-sub {
+            color: #888;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+        @keyframes rotateDevice {
+            0%, 100% { transform: rotate(0deg); }
+            40%, 60% { transform: rotate(90deg); }
+        }
 
         @media (orientation: portrait) {
             body.game-playing #rotateOverlay { display: flex; }
@@ -1963,8 +1994,9 @@
 
     <!-- Force landscape overlay -->
     <div id="rotateOverlay">
-        <div class="icon">📱</div>
-        <div>Rotate your device to<br><strong>LANDSCAPE</strong><br>to play</div>
+        <div class="rotate-icon"></div>
+        <div class="rotate-title">ROTATE TO BATTLE</div>
+        <div class="rotate-sub">Turn your device to landscape<br>to enter the arena</div>
     </div>
 
     <canvas id="gameCanvas" style="display:none;"></canvas>
