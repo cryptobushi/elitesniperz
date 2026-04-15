@@ -1283,10 +1283,31 @@ function buildDOM() {
         </div>
         <button class="wr-deposit-btn" id="wrDepositBtn" style="display:none;">LOCK IN 0.01 SOL</button>
         <button class="wr-share-btn" id="wrShareBtn">CHALLENGE ON X</button>
+        <button class="wr-play-btn" id="wrPlayWhileWaiting" style="display:none;margin:0.5rem auto;padding:0.5rem 1.2rem;background:none;border:1px solid #ffcc00;color:#ffcc00;font-family:'MedievalSharp',cursive;font-size:0.8rem;cursor:pointer;text-transform:uppercase;letter-spacing:0.06em;">PLAY BOTS WHILE WAITING</button>
         <div class="wr-note">Match begins when both players lock in.</div>
         <button class="wr-cancel" id="wrCancel">Cancel Match</button>
     `;
     document.body.appendChild(waiting);
+
+    // Queue pop overlay (WoW-style instance ready notification)
+    const queuePop = document.createElement('div');
+    queuePop.id = 'queuePopOverlay';
+    queuePop.className = 'hidden';
+    queuePop.innerHTML = `
+        <div id="queuePopPanel" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20000;background:#000;border:2px solid #ffcc00;padding:2rem 2.5rem;text-align:center;min-width:300px;box-shadow:0 0 40px rgba(255,204,0,0.3),0 0 80px rgba(255,204,0,0.1);">
+            <div style="font-family:'MedievalSharp',cursive;color:#ffcc00;font-size:1.6rem;margin-bottom:0.3rem;letter-spacing:0.1em;text-shadow:0 0 10px rgba(255,204,0,0.5);" id="queuePopTitle">MATCH READY</div>
+            <div style="color:#aaa;font-size:0.75rem;margin-bottom:1.2rem;" id="queuePopSub">An opponent has joined your wager</div>
+            <div style="font-family:'MedievalSharp',cursive;color:#fff;font-size:1rem;margin-bottom:1.5rem;" id="queuePopInfo"></div>
+            <div style="display:flex;gap:1rem;justify-content:center;">
+                <button id="queuePopAccept" style="padding:0.6rem 2rem;background:#ffcc00;color:#000;border:none;font-family:'MedievalSharp',cursive;font-size:1rem;cursor:pointer;font-weight:700;letter-spacing:0.05em;">ENTER LOBBY</button>
+                <button id="queuePopDecline" style="padding:0.6rem 1.5rem;background:none;border:1px solid #666;color:#888;font-family:'MedievalSharp',cursive;font-size:0.85rem;cursor:pointer;">LATER</button>
+            </div>
+            <div style="margin-top:1rem;color:#666;font-size:0.65rem;" id="queuePopTimer"></div>
+        </div>
+        <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:19999;"></div>
+    `;
+    document.body.appendChild(queuePop);
+
     const hud = document.createElement('div');
     hud.id = 'wagerHUD';
     hud.className = 'hidden';
@@ -1395,6 +1416,51 @@ function bindEvents() {
         );
         window.open('https://twitter.com/intent/tweet?text=' + text, '_blank');
     });
+
+    // Play bots while waiting
+    document.getElementById('wrPlayWhileWaiting')?.addEventListener('click', () => {
+        if (!currentMatchId) return;
+        _playingWhileWaiting = true;
+        _bgMatchId = currentMatchId;
+        _bgMatchRole = _waitingRoomRole;
+
+        // Hide waiting room, start a bot game
+        els.waiting.classList.add('hidden');
+        document.getElementById('landingPage')?.classList.add('hidden');
+
+        // Start offline bot game via game.js
+        const user = getUser();
+        window.gameState = window.gameState || {};
+        window.gameState.username = user?.twitter_handle || 'Player';
+        window.gameState.team = 'red';
+        window.isOnlineMode = false;
+        window._isWagerMatch = false;
+        document.getElementById('gameCanvas').style.display = '';
+        document.getElementById('ui').style.display = '';
+        document.body.classList.add('game-active');
+        if (window.startGame) window.startGame();
+
+        // Keep polling in background
+        if (!_bgPollInterval) {
+            _bgPollInterval = setInterval(() => _bgPollMatchStatus(), 3000);
+        }
+    });
+
+    // Queue pop accept
+    document.getElementById('queuePopAccept')?.addEventListener('click', () => {
+        _dismissQueuePop();
+        _exitBotGame();
+        // Return to waiting room
+        if (_bgMatchId) showWaitingRoom(_bgMatchId, _bgMatchRole);
+        _playingWhileWaiting = false;
+    });
+
+    // Queue pop decline (stay in bot game)
+    document.getElementById('queuePopDecline')?.addEventListener('click', () => {
+        _dismissQueuePop();
+        // Keep playing, keep polling
+    });
+
     document.getElementById('wrResultBack')?.addEventListener('click', () => {
         els.result.classList.add('hidden');
         showLobby();
@@ -1954,11 +2020,139 @@ async function _updateCreateModalBalance() {
 let _waitingRoomRole = null; // 'creator', 'challenger', or null (joiner in open mode)
 let challengePollingInterval = null;
 
+// "Play while waiting" state
+let _playingWhileWaiting = false;
+let _bgMatchId = null;
+let _bgMatchRole = null;
+let _bgPollInterval = null;
+let _bgLastStatus = null;
+let _queuePopShown = false;
+
+function _exitBotGame() {
+    // Clean up the bot game state via game.js globals
+    if (window._ws) { try { window._ws.close(); } catch(_) {} window._ws = null; }
+    window.gameState = window.gameState || {};
+    window.gameState.gameStarted = false;
+    window.isOnlineMode = false;
+    window._isWagerMatch = false;
+    window._gameStarted = false;
+    document.getElementById('hud')?.classList.add('hidden');
+    document.getElementById('abilities')?.classList.add('hidden');
+    document.querySelector('.minimap')?.classList.add('hidden');
+    document.getElementById('teamScore')?.classList.add('hidden');
+    document.getElementById('gameCanvas').style.display = 'none';
+    document.getElementById('ui').style.display = 'none';
+    document.body.classList.remove('game-active');
+    // Clear bots
+    if (window.gameState.bots) {
+        window.gameState.bots.forEach(b => { if (b.mesh?.parent) b.mesh.parent.remove(b.mesh); });
+        window.gameState.bots = [];
+    }
+    if (window._remotePlayers) { window._remotePlayers.clear(); }
+    if (window._serverState) { window._serverState.clear(); }
+}
+
+function _showQueuePop(title, sub, info) {
+    if (_queuePopShown) return;
+    _queuePopShown = true;
+    const overlay = document.getElementById('queuePopOverlay');
+    if (!overlay) return;
+    overlay.classList.remove('hidden');
+    const titleEl = document.getElementById('queuePopTitle');
+    const subEl = document.getElementById('queuePopSub');
+    const infoEl = document.getElementById('queuePopInfo');
+    if (titleEl) titleEl.textContent = title;
+    if (subEl) subEl.textContent = sub;
+    if (infoEl) infoEl.textContent = info;
+
+    // Play a sound cue
+    try {
+        const audio = new Audio('/sounds/first_blood.wav');
+        audio.volume = 0.4;
+        audio.play().catch(() => {});
+    } catch(_) {}
+}
+
+function _dismissQueuePop() {
+    _queuePopShown = false;
+    const overlay = document.getElementById('queuePopOverlay');
+    if (overlay) overlay.classList.add('hidden');
+}
+
+async function _bgPollMatchStatus() {
+    if (!_bgMatchId || !_playingWhileWaiting) {
+        if (_bgPollInterval) { clearInterval(_bgPollInterval); _bgPollInterval = null; }
+        return;
+    }
+    try {
+        const data = await api(`/matches/${_bgMatchId}`);
+        if (!data.success) return;
+        const m = data.data || data;
+        const me = getUser();
+        const amCreator = me && m.creator_id === me.id;
+        const isSelective = m.match_mode === 'selective';
+        const info = currentMatchInfo || {};
+        const stakeStr = `${info.stakeAmount || '?'} ${info.stakeToken || 'SOL'} — First to ${m.kill_target || 7}`;
+
+        // OPEN mode: opponent joined
+        if (!isSelective && m.joiner_id && _bgLastStatus === 'open') {
+            const oppHandle = amCreator ? (m.joiner_twitter || 'opponent') : (m.creator_twitter || 'opponent');
+            _showQueuePop('MATCH READY', `@${oppHandle} has joined your wager`, stakeStr);
+        }
+
+        // SELECTIVE mode (creator): new challenger arrived
+        if (isSelective && amCreator && !m.joiner_id && !_queuePopShown) {
+            try {
+                const cData = await api(`/matches/${_bgMatchId}/challenges`);
+                if (cData.success && (cData.data || []).length > 0 && _bgLastStatus !== 'has_challengers') {
+                    const c = cData.data[0];
+                    _showQueuePop('NEW CHALLENGER', `@${c.twitter_handle || 'unknown'} wants to fight`, stakeStr);
+                    _bgLastStatus = 'has_challengers';
+                }
+            } catch(_) {}
+        }
+
+        // SELECTIVE mode (challenger): got accepted
+        if (isSelective && _bgMatchRole === 'challenger' && m.joiner_id && me && m.joiner_id === me.id && _bgLastStatus !== 'accepted') {
+            _showQueuePop('CHALLENGE ACCEPTED', `@${m.creator_twitter || 'creator'} accepted your challenge`, stakeStr);
+            _bgLastStatus = 'accepted';
+        }
+
+        // Match cancelled/expired while playing
+        if (m.status === 'cancelled' || m.status === 'expired') {
+            _dismissQueuePop();
+            if (_bgPollInterval) { clearInterval(_bgPollInterval); _bgPollInterval = null; }
+            _playingWhileWaiting = false;
+            showToast('Your wager match was cancelled', '#ff3333');
+            return;
+        }
+
+        // Already funded_both (someone else locked in fast) — force return
+        if (m.status === 'funded_both') {
+            _dismissQueuePop();
+            _exitBotGame();
+            if (_bgPollInterval) { clearInterval(_bgPollInterval); _bgPollInterval = null; }
+            _playingWhileWaiting = false;
+            hideWaitingRoom();
+            connectWagerMatch(_bgMatchId);
+            return;
+        }
+
+        if (!_bgLastStatus || _bgLastStatus === 'open') _bgLastStatus = m.status;
+    } catch(_) {}
+}
+
 export function showWaitingRoom(matchId, role) {
     currentMatchId = matchId;
     _waitingRoomRole = role || null;
 
+    // Clean up play-while-waiting state
+    if (_bgPollInterval) { clearInterval(_bgPollInterval); _bgPollInterval = null; }
+    _playingWhileWaiting = false;
+    _bgLastStatus = null;
+
     els.lobby.classList.add('hidden');
+    document.getElementById('landingPage')?.classList.add('hidden');
     if (lobbyInterval) { clearInterval(lobbyInterval); lobbyInterval = null; }
     els.waiting.classList.remove('hidden');
     const challengersEl = document.getElementById('wrChallengers');
@@ -1973,8 +2167,12 @@ function hideWaitingRoom() {
     els.waiting.classList.add('hidden');
     if (waitingInterval) { clearInterval(waitingInterval); waitingInterval = null; }
     if (challengePollingInterval) { clearInterval(challengePollingInterval); challengePollingInterval = null; }
+    if (_bgPollInterval) { clearInterval(_bgPollInterval); _bgPollInterval = null; }
     _waitingRoomRole = null;
     currentMatchId = null;
+    _playingWhileWaiting = false;
+    _bgLastStatus = null;
+    _dismissQueuePop();
 }
 
 async function pollWaitingRoom(matchId) {
@@ -2088,6 +2286,12 @@ async function pollWaitingRoom(matchId) {
             depositBtn.textContent = `LOCK IN ${wrAmt} ${wrToken}`;
             depositBtn.disabled = false;
             depositBtn.style.background = '#ffcc00';
+        }
+        // Show "play while waiting" when no opponent yet
+        const playBtn = document.getElementById('wrPlayWhileWaiting');
+        if (playBtn) {
+            const showPlay = !m.joiner_id && (m.status === 'open' || (m.match_mode === 'selective' && amCreator));
+            playBtn.style.display = showPlay ? 'block' : 'none';
         }
         const challengersEl = document.getElementById('wrChallengers');
         const challengeSubmittedEl = document.getElementById('wrChallengeSubmitted');

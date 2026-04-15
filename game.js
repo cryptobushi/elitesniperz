@@ -4057,6 +4057,24 @@ requestAnimationFrame(function netLoop() {
 });
 
 console.log('Multiplayer module loaded');
+
+// Expose for wager-ui "play while waiting"
+window.startGame = function() {
+    isOnlineMode = false;
+    gameState.gameStarted = true;
+    gameState.kills = 0;
+    gameState.deaths = 0;
+    gameState.killStreak = 0;
+    document.getElementById('hud')?.classList.remove('hidden');
+    document.getElementById('abilities')?.classList.remove('hidden');
+    document.querySelector('.minimap')?.classList.remove('hidden');
+    document.getElementById('teamScore')?.classList.remove('hidden');
+    startGame();
+};
+window.gameState = gameState;
+window._remotePlayers = _remotePlayers;
+window._serverState = _serverState;
+
 window._startWagerGame = function(ws, matchData) {
     console.log('[WAGER] Starting wager game', matchData);
     const user = window._wagerUser;
